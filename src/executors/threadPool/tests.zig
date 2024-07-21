@@ -33,3 +33,50 @@ test "Thread Pool Capture" {
     tp.stop();
     tp.deinit();
 }
+test "Wait" {
+    if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
+    var tp = try ThreadPool.init(1, testing.allocator);
+    try tp.start();
+
+    const Context = struct {
+        done: bool,
+        pub fn run(self: *@This()) void {
+            std.time.sleep(std.time.ns_per_ms);
+            self.done = true;
+        }
+    };
+    var ctx = Context{ .done = false };
+    try tp.submit(Context.run, .{&ctx});
+
+    tp.waitIdle();
+    tp.stop();
+    tp.deinit();
+
+    try testing.expect(ctx.done);
+}
+
+test "MultiWait" {
+    if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
+    var tp = try ThreadPool.init(1, testing.allocator);
+    try tp.start();
+
+    const Context = struct {
+        done: bool,
+        pub fn run(self: *@This()) void {
+            std.time.sleep(std.time.ns_per_ms);
+            self.done = true;
+        }
+    };
+    for (0..3) |_| {
+        var ctx = Context{ .done = false };
+        try tp.submit(Context.run, .{&ctx});
+        tp.waitIdle();
+        try testing.expect(ctx.done);
+    }
+    tp.stop();
+    tp.deinit();
+}
