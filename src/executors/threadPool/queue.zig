@@ -10,8 +10,9 @@ pub fn UnboundedBlockingQueue(comptime T: type) type {
 
         backing_queue: BackingQueue = undefined,
         mutex: Mutex = .{},
-        queue_empty_cond: CondVar = .{},
+        has_entries_or_is_closed: CondVar = .{},
         allocator: std.mem.Allocator,
+        closed: bool = false,
 
         pub fn deinit(self: *Impl) void {
             self.mutex.lock();
@@ -21,25 +22,42 @@ pub fn UnboundedBlockingQueue(comptime T: type) type {
             }
         }
 
+        const PutError = error{
+            queue_closed,
+        };
+
         pub fn put(self: *Impl, value: T) !void {
             self.mutex.lock();
             defer self.mutex.unlock();
+            if (self.closed) {
+                return PutError.queue_closed;
+            }
             var node = try self.allocator.create(BackingQueue.Node);
             node.data = value;
             self.backing_queue.append(node);
-            self.queue_empty_cond.signal();
+            self.has_entries_or_is_closed.signal();
         }
 
-        pub fn takeBlocking(self: *Impl) T {
+        pub fn takeBlocking(self: *Impl) ?T {
             self.mutex.lock();
             defer self.mutex.unlock();
 
-            while (self.backing_queue.len == 0) {
-                self.queue_empty_cond.wait(&self.mutex);
+            while (self.backing_queue.len == 0 and !self.closed) {
+                self.has_entries_or_is_closed.wait(&self.mutex);
+            }
+            if (self.closed) {
+                return null;
             }
             const node = self.backing_queue.popFirst().?;
             defer self.allocator.destroy(node);
             return node.data;
+        }
+
+        pub fn close(self: *Impl) void {
+            self.mutex.lock();
+            defer self.mutex.unlock();
+            self.closed = true;
+            self.has_entries_or_is_closed.signal();
         }
     };
 }
