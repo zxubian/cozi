@@ -8,6 +8,8 @@ test "Thread Pool Capture" {
         return error.SkipZigTest;
     }
     var tp = try ThreadPool.init(1, testing.allocator);
+    defer tp.deinit();
+
     const Context = struct {
         a: usize,
         pub fn run(self: *@This()) void {
@@ -31,7 +33,6 @@ test "Thread Pool Capture" {
     try testing.expectEqual(4, ctx.a);
 
     tp.stop();
-    tp.deinit();
 }
 
 test "Wait" {
@@ -39,6 +40,8 @@ test "Wait" {
         return error.SkipZigTest;
     }
     var tp = try ThreadPool.init(1, testing.allocator);
+    defer tp.deinit();
+
     try tp.start();
 
     const Context = struct {
@@ -53,7 +56,6 @@ test "Wait" {
 
     tp.waitIdle();
     tp.stop();
-    tp.deinit();
 
     try testing.expect(ctx.done);
 }
@@ -87,6 +89,7 @@ test "Many Tasks" {
         return error.SkipZigTest;
     }
     var tp = try ThreadPool.init(4, testing.allocator);
+    defer tp.deinit();
     try tp.start();
 
     const task_count: usize = 17;
@@ -104,7 +107,6 @@ test "Many Tasks" {
     }
     tp.waitIdle();
     tp.stop();
-    tp.deinit();
     try testing.expectEqual(task_count, ctx.tasks.load(.seq_cst));
 }
 
@@ -113,20 +115,17 @@ test "Parallel" {
         return error.SkipZigTest;
     }
     var tp = try ThreadPool.init(4, testing.allocator);
+    defer tp.deinit();
     try tp.start();
     var tasks = std.atomic.Value(usize).init(0);
     const Context = struct {
         tasks: *std.atomic.Value(usize),
         sleep_nanoseconds: u64,
         pub fn Run(self: *@This()) void {
-            std.debug.print("running!\n", .{});
             if (self.sleep_nanoseconds > 0) {
-                std.debug.print("gonna sleep for {}ns!\n", .{self.sleep_nanoseconds});
                 std.time.sleep(self.sleep_nanoseconds);
             }
-            std.debug.print("about to add !\n", .{});
-            const res = self.tasks.fetchAdd(1, .seq_cst);
-            std.debug.print("fetch add result {}!\n", .{res + 1});
+            _ = self.tasks.fetchAdd(1, .seq_cst);
         }
     };
     var ctx_a = Context{
@@ -141,10 +140,70 @@ test "Parallel" {
     try tp.submit(Context.Run, .{&ctx_b});
     std.time.sleep(std.time.ns_per_ms * 500);
     try testing.expectEqual(1, tasks.load(.seq_cst));
-    std.debug.print("about to wait Idle\n", .{});
     tp.waitIdle();
-    std.debug.print("wait Idle returned\n", .{});
     tp.stop();
-    tp.deinit();
     try testing.expectEqual(2, tasks.load(.seq_cst));
+}
+
+test "Two Pools" {
+    if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
+    var tp1 = try ThreadPool.init(1, testing.allocator);
+    var tp2 = try ThreadPool.init(1, testing.allocator);
+    defer tp1.deinit();
+    defer tp2.deinit();
+    try tp1.start();
+    try tp2.start();
+    var tasks = std.atomic.Value(usize).init(0);
+    const Context = struct {
+        tasks: *std.atomic.Value(usize),
+        sleep_nanoseconds: u64,
+        pub fn Run(self: *@This()) void {
+            if (self.sleep_nanoseconds > 0) {
+                std.time.sleep(self.sleep_nanoseconds);
+            }
+            _ = self.tasks.fetchAdd(1, .seq_cst);
+        }
+    };
+    var ctx = Context{
+        .tasks = &tasks,
+        .sleep_nanoseconds = std.time.ns_per_s,
+    };
+
+    const start_time = try std.time.Instant.now();
+
+    try tp1.submit(Context.Run, .{&ctx});
+    try tp2.submit(Context.Run, .{&ctx});
+
+    tp2.waitIdle();
+    tp2.stop();
+    tp1.waitIdle();
+    tp1.stop();
+
+    const end_time = try std.time.Instant.now();
+    const elapsed_ns = std.time.Instant.since(end_time, start_time);
+
+    try testing.expectEqual(2, tasks.load(.seq_cst));
+    try testing.expect(elapsed_ns / std.time.ns_per_ms < 1500);
+}
+
+test "Stop" {
+    if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
+    var tp = try ThreadPool.init(1, testing.allocator);
+    defer tp.deinit();
+    try tp.start();
+    const Context = struct {
+        pub fn Run(_: *@This()) void {
+            std.time.sleep(std.time.ns_per_ms * 128);
+        }
+    };
+    var ctx = Context{};
+    for (0..3) |_| {
+        try tp.submit(Context.Run, .{&ctx});
+    }
+    tp.stop();
+    try testing.expectEqual(0, tp.tasks.backing_queue.len);
 }

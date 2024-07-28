@@ -2,6 +2,7 @@ const std = @import("std");
 const log = std.log.scoped(.queue);
 const Mutex = std.Thread.Mutex;
 const CondVar = std.Thread.Condition;
+const assert = std.debug.assert;
 
 pub fn UnboundedBlockingQueue(comptime T: type) type {
     const BackingQueue = std.DoublyLinkedList(T);
@@ -17,7 +18,7 @@ pub fn UnboundedBlockingQueue(comptime T: type) type {
         pub fn deinit(self: *Impl) void {
             self.mutex.lock();
             defer self.mutex.unlock();
-            while (self.backing_queue.pop()) |node| {
+            while (self.backing_queue.popFirst()) |node| {
                 self.allocator.destroy(node);
             }
         }
@@ -45,12 +46,12 @@ pub fn UnboundedBlockingQueue(comptime T: type) type {
             while (self.backing_queue.len == 0 and !self.closed) {
                 self.has_entries_or_is_closed.wait(&self.mutex);
             }
-            if (self.closed) {
-                return null;
+            if (self.backing_queue.popFirst()) |node| {
+                defer self.allocator.destroy(node);
+                return node.data;
             }
-            const node = self.backing_queue.popFirst().?;
-            defer self.allocator.destroy(node);
-            return node.data;
+            assert(self.closed);
+            return null;
         }
 
         pub fn close(self: *Impl) void {

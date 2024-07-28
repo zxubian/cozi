@@ -10,6 +10,7 @@ const atomic = std.atomic.Value;
 const Status = enum(u8) {
     not_started,
     running_or_idle,
+    // No new tasks may be submitted. Already submitted tasks will run to completion.
     stopped,
 };
 
@@ -67,7 +68,7 @@ fn threadEntryPoint(thread_pool: *ThreadPool, i: usize, self: *const Thread) voi
     while (true) {
         const current_status = current.status.load(.seq_cst);
         switch (current_status) {
-            .running_or_idle => {
+            .running_or_idle, .stopped => {
                 const next_task = current.tasks.takeBlocking() orelse {
                     break;
                 };
@@ -75,7 +76,6 @@ fn threadEntryPoint(thread_pool: *ThreadPool, i: usize, self: *const Thread) voi
                 next_task.runFn(next_task);
                 thread_pool.waitgroup.finish();
             },
-            .stopped => break,
             .not_started => unreachable,
         }
     }
