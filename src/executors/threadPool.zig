@@ -68,12 +68,10 @@ fn threadEntryPoint(thread_pool: *ThreadPool, i: usize, self: *const Thread) voi
         const current_status = current.status.load(.seq_cst);
         switch (current_status) {
             .running_or_idle => {
-                // std.debug.print("{s}: about to take task!\n", .{name});
                 const next_task = current.tasks.takeBlocking() orelse {
-                    // std.debug.print("{s}: task came back as null -> assume closed!\n", .{name});
                     break;
                 };
-                // std.debug.print("{s}: got task!\n", .{name});
+                log.debug("{s} acquired a new task\n", .{name});
                 next_task.runFn(next_task);
                 thread_pool.waitgroup.finish();
             },
@@ -81,7 +79,7 @@ fn threadEntryPoint(thread_pool: *ThreadPool, i: usize, self: *const Thread) voi
             .not_started => unreachable,
         }
     }
-    std.debug.print("{s}: exiting\n", .{name});
+    log.debug("{s} exiting", .{name});
 }
 
 const SubmitError = error{
