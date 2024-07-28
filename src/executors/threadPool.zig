@@ -44,30 +44,44 @@ pub fn init(thread_count: usize, allocator: std.mem.Allocator) !ThreadPool {
 }
 
 pub fn start(self: *ThreadPool) !void {
-    self.mutex.lock();
-    defer self.mutex.unlock();
-    assert(self.status.load(.seq_cst) == .not_started);
-    for (self.threads) |*thread| {
+    assert(self.status.cmpxchgStrong(.not_started, .running_or_idle, .seq_cst, .seq_cst) == null);
+    for (self.threads, 0..) |*thread, i| {
         thread.* = try Thread.spawn(
             .{ .allocator = self.allocator },
             threadEntryPoint,
-            .{self},
+            .{ self, i, thread },
         );
     }
-    self.status.store(.running_or_idle, .seq_cst);
 }
 
 fn getCurrent() *const ThreadPool {
     return current;
 }
 
-fn threadEntryPoint(thread_pool: *ThreadPool) void {
+fn threadEntryPoint(thread_pool: *ThreadPool, i: usize, self: *const Thread) void {
     current = thread_pool;
-    while (current.status.load(.seq_cst) == .running_or_idle) {
-        const next_task = thread_pool.tasks.takeBlocking() orelse continue;
-        next_task.runFn(next_task);
-        thread_pool.waitgroup.finish();
+    assert(current.status.load(.seq_cst) != .not_started);
+    var thread_pool_name_buf: [512]u8 = undefined;
+    const name = std.fmt.bufPrint(&thread_pool_name_buf, "Thread Pool@{}/Thread #{}", .{ @intFromPtr(thread_pool), i }) catch "Thread Pool@(unknown) Thread#(unknown)";
+    self.setName(name) catch {};
+    while (true) {
+        const current_status = current.status.load(.seq_cst);
+        switch (current_status) {
+            .running_or_idle => {
+                // std.debug.print("{s}: about to take task!\n", .{name});
+                const next_task = current.tasks.takeBlocking() orelse {
+                    // std.debug.print("{s}: task came back as null -> assume closed!\n", .{name});
+                    break;
+                };
+                // std.debug.print("{s}: got task!\n", .{name});
+                next_task.runFn(next_task);
+                thread_pool.waitgroup.finish();
+            },
+            .stopped => break,
+            .not_started => unreachable,
+        }
     }
+    std.debug.print("{s}: exiting\n", .{name});
 }
 
 const SubmitError = error{
@@ -119,11 +133,10 @@ pub fn submit(self: *ThreadPool, comptime func: anytype, args: anytype) !void {
 
 pub fn waitIdle(self: *ThreadPool) void {
     self.waitgroup.wait();
+    self.waitgroup.reset();
 }
 
 pub fn stop(self: *ThreadPool) void {
-    self.mutex.lock();
-    defer self.mutex.unlock();
     assert(self.status.load(.seq_cst) == .running_or_idle);
     self.status.store(.stopped, .seq_cst);
     self.tasks.close();
@@ -134,8 +147,6 @@ pub fn stop(self: *ThreadPool) void {
 }
 
 pub fn deinit(self: *ThreadPool) void {
-    self.mutex.lock();
-    defer self.mutex.unlock();
     assert(self.status.load(.seq_cst) == .stopped);
     self.status.store(undefined, .seq_cst);
     self.tasks.deinit();

@@ -57,7 +57,7 @@ pub fn UnboundedBlockingQueue(comptime T: type) type {
             self.mutex.lock();
             defer self.mutex.unlock();
             self.closed = true;
-            self.has_entries_or_is_closed.signal();
+            self.has_entries_or_is_closed.broadcast();
         }
     };
 }
