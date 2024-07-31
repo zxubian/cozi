@@ -7,7 +7,14 @@ test "Thread Pool Capture" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
-    var tp = try ThreadPool.init(1, testing.allocator);
+
+    var thread_safe_alloc = std.heap.ThreadSafeAllocator{
+        .child_allocator = std.testing.allocator,
+        .mutex = .{},
+    };
+    const alloc = thread_safe_alloc.allocator();
+
+    var tp = try ThreadPool.init(1, alloc);
     defer tp.deinit();
 
     const Context = struct {
@@ -17,18 +24,18 @@ test "Thread Pool Capture" {
         }
     };
     var ctx = Context{ .a = 0 };
-    try tp.submit(Context.run, .{&ctx});
+    try tp.executor.submit(Context.run, .{&ctx}, alloc);
     try testing.expectEqual(0, ctx.a);
     try tp.start();
     std.time.sleep(std.time.ns_per_ms);
     try testing.expectEqual(1, ctx.a);
 
-    try tp.submit(Context.run, .{&ctx});
+    try tp.executor.submit(Context.run, .{&ctx}, alloc);
     std.time.sleep(std.time.ns_per_ms);
     try testing.expectEqual(2, ctx.a);
 
-    try tp.submit(Context.run, .{&ctx});
-    try tp.submit(Context.run, .{&ctx});
+    try tp.executor.submit(Context.run, .{&ctx}, alloc);
+    try tp.executor.submit(Context.run, .{&ctx}, alloc);
     tp.waitIdle();
     try testing.expectEqual(4, ctx.a);
 
@@ -39,7 +46,14 @@ test "Wait" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
-    var tp = try ThreadPool.init(1, testing.allocator);
+
+    var thread_safe_alloc = std.heap.ThreadSafeAllocator{
+        .child_allocator = std.testing.allocator,
+        .mutex = .{},
+    };
+    const alloc = thread_safe_alloc.allocator();
+
+    var tp = try ThreadPool.init(1, alloc);
     defer tp.deinit();
 
     try tp.start();
@@ -52,7 +66,7 @@ test "Wait" {
         }
     };
     var ctx = Context{ .done = false };
-    try tp.submit(Context.run, .{&ctx});
+    try tp.executor.submit(Context.run, .{&ctx}, alloc);
 
     tp.waitIdle();
     tp.stop();
@@ -64,7 +78,14 @@ test "MultiWait" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
-    var tp = try ThreadPool.init(1, testing.allocator);
+
+    var thread_safe_alloc = std.heap.ThreadSafeAllocator{
+        .child_allocator = std.testing.allocator,
+        .mutex = .{},
+    };
+    const alloc = thread_safe_alloc.allocator();
+
+    var tp = try ThreadPool.init(1, alloc);
     try tp.start();
 
     const Context = struct {
@@ -74,9 +95,10 @@ test "MultiWait" {
             self.done = true;
         }
     };
+
     for (0..3) |_| {
         var ctx = Context{ .done = false };
-        try tp.submit(Context.run, .{&ctx});
+        try tp.executor.submit(Context.run, .{&ctx}, alloc);
         tp.waitIdle();
         try testing.expect(ctx.done);
     }
@@ -88,7 +110,14 @@ test "Many Tasks" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
-    var tp = try ThreadPool.init(4, testing.allocator);
+
+    var thread_safe_alloc = std.heap.ThreadSafeAllocator{
+        .child_allocator = std.testing.allocator,
+        .mutex = .{},
+    };
+    const alloc = thread_safe_alloc.allocator();
+
+    var tp = try ThreadPool.init(4, alloc);
     defer tp.deinit();
     try tp.start();
 
@@ -101,9 +130,10 @@ test "Many Tasks" {
             _ = self.tasks.fetchAdd(1, .acq_rel);
         }
     };
+
     var ctx = Context{ .tasks = std.atomic.Value(usize).init(0) };
     for (0..task_count) |_| {
-        try tp.submit(Context.run, .{&ctx});
+        try tp.executor.submit(Context.run, .{&ctx}, alloc);
     }
     tp.waitIdle();
     tp.stop();
@@ -114,7 +144,14 @@ test "Parallel" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
-    var tp = try ThreadPool.init(4, testing.allocator);
+
+    var thread_safe_alloc = std.heap.ThreadSafeAllocator{
+        .child_allocator = std.testing.allocator,
+        .mutex = .{},
+    };
+    const alloc = thread_safe_alloc.allocator();
+
+    var tp = try ThreadPool.init(4, alloc);
     defer tp.deinit();
     try tp.start();
     var tasks = std.atomic.Value(usize).init(0);
@@ -132,12 +169,12 @@ test "Parallel" {
         .tasks = &tasks,
         .sleep_nanoseconds = std.time.ns_per_s,
     };
-    try tp.submit(Context.Run, .{&ctx_a});
+    try tp.executor.submit(Context.Run, .{&ctx_a}, alloc);
     var ctx_b = Context{
         .tasks = &tasks,
         .sleep_nanoseconds = 0,
     };
-    try tp.submit(Context.Run, .{&ctx_b});
+    try tp.executor.submit(Context.Run, .{&ctx_b}, alloc);
     std.time.sleep(std.time.ns_per_ms * 500);
     try testing.expectEqual(1, tasks.load(.seq_cst));
     tp.waitIdle();
@@ -149,8 +186,15 @@ test "Two Pools" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
-    var tp1 = try ThreadPool.init(1, testing.allocator);
-    var tp2 = try ThreadPool.init(1, testing.allocator);
+
+    var thread_safe_alloc = std.heap.ThreadSafeAllocator{
+        .child_allocator = std.testing.allocator,
+        .mutex = .{},
+    };
+    const alloc = thread_safe_alloc.allocator();
+
+    var tp1 = try ThreadPool.init(1, alloc);
+    var tp2 = try ThreadPool.init(1, alloc);
     defer tp1.deinit();
     defer tp2.deinit();
     try tp1.start();
@@ -171,19 +215,17 @@ test "Two Pools" {
         .sleep_nanoseconds = std.time.ns_per_s,
     };
 
-    const start_time = try std.time.Instant.now();
+    var timer = try std.time.Timer.start();
 
-    try tp1.submit(Context.Run, .{&ctx});
-    try tp2.submit(Context.Run, .{&ctx});
+    try tp1.executor.submit(Context.Run, .{&ctx}, alloc);
+    try tp2.executor.submit(Context.Run, .{&ctx}, alloc);
 
     tp2.waitIdle();
     tp2.stop();
     tp1.waitIdle();
     tp1.stop();
 
-    const end_time = try std.time.Instant.now();
-    const elapsed_ns = std.time.Instant.since(end_time, start_time);
-
+    const elapsed_ns = timer.read();
     try testing.expectEqual(2, tasks.load(.seq_cst));
     try testing.expect(elapsed_ns / std.time.ns_per_ms < 1500);
 }
@@ -192,7 +234,14 @@ test "Stop" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
-    var tp = try ThreadPool.init(1, testing.allocator);
+
+    var thread_safe_alloc = std.heap.ThreadSafeAllocator{
+        .child_allocator = std.testing.allocator,
+        .mutex = .{},
+    };
+    const alloc = thread_safe_alloc.allocator();
+
+    var tp = try ThreadPool.init(1, alloc);
     defer tp.deinit();
     try tp.start();
     const Context = struct {
@@ -202,7 +251,7 @@ test "Stop" {
     };
     var ctx = Context{};
     for (0..3) |_| {
-        try tp.submit(Context.Run, .{&ctx});
+        try tp.executor.submit(Context.Run, .{&ctx}, alloc);
     }
     tp.stop();
     try testing.expectEqual(0, tp.tasks.backing_queue.len);

@@ -6,6 +6,9 @@ const Queue = @import("./threadPool/queue.zig").UnboundedBlockingQueue;
 const builtin = @import("builtin");
 const assert = std.debug.assert;
 const atomic = std.atomic.Value;
+const Executors = @import("../executors.zig");
+const Runnable = Executors.Runnable;
+const Executor = Executors.Executor;
 
 const Status = enum(u8) {
     not_started,
@@ -20,18 +23,13 @@ waitgroup: Thread.WaitGroup = .{},
 allocator: std.mem.Allocator,
 mutex: Thread.Mutex = .{},
 status: atomic(Status) = undefined,
+executor: Executor = .{
+    .vtable = .{
+        .submitFn = ThreadPool.submit,
+    },
+},
 
 threadlocal var current: *ThreadPool = undefined;
-
-pub const Runnable = struct {
-    runFn: RunProto,
-    pub const RunProto = *const fn (runnable: *Runnable) void;
-};
-
-pub const Executor = struct {
-    submitFn: SubmitProto,
-    pub const SubmitProto = *const fn (ctx: *Executor, task: Runnable) void;
-};
 
 pub fn init(thread_count: usize, allocator: std.mem.Allocator) !ThreadPool {
     const threads = try allocator.alloc(Thread, thread_count);
@@ -86,47 +84,20 @@ const SubmitError = error{
     thread_pool_stopped,
 };
 
-pub fn submit(self: *ThreadPool, comptime func: anytype, args: anytype) !void {
-    const Args = @TypeOf(args);
-    const Closure = struct {
-        arguments: Args,
-        pool: *ThreadPool,
-        runnable: Runnable,
-
-        fn runFn(runnable: *Runnable) void {
-            const closure: *@This() = @fieldParentPtr("runnable", runnable);
-            @call(.auto, func, closure.arguments);
-
-            // save the pointer to the pool so we can keep using it
-            // even after closure is destroyed
-            const pool = closure.pool;
-            pool.mutex.lock();
-            defer pool.mutex.unlock();
-
-            // The thread pool's allocator is protected by the mutex.
-            pool.allocator.destroy(closure);
-        }
-    };
-
-    {
-        if (self.status.load(.seq_cst) == .stopped) {
-            return SubmitError.thread_pool_stopped;
-        }
-
-        self.mutex.lock();
-        defer self.mutex.unlock();
-        const closure = try self.allocator.create(Closure);
-        closure.* = .{
-            .arguments = args,
-            .pool = self,
-            .runnable = .{
-                .runFn = Closure.runFn,
-            },
-        };
-
-        self.waitgroup.start();
-        try self.tasks.put(&closure.runnable);
+fn submit_internal(self: *ThreadPool, runnable: *Runnable) !void {
+    if (self.status.load(.seq_cst) == .stopped) {
+        return SubmitError.thread_pool_stopped;
     }
+    self.waitgroup.start();
+    try self.tasks.put(runnable);
+}
+
+pub fn submit(exec: *Executor, runnable: *Runnable) void {
+    var self: *ThreadPool = @fieldParentPtr("executor", exec);
+
+    self.submit_internal(runnable) catch |e| {
+        log.err("{}", .{e});
+    };
 }
 
 pub fn waitIdle(self: *ThreadPool) void {
