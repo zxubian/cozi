@@ -2,6 +2,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 
 pub const ThreadPool = @import("./executors/threadPool.zig");
+pub const Manual = @import("./executors/manual.zig");
 
 pub const Runnable = struct {
     runFn: RunProto,
@@ -52,6 +53,8 @@ pub const Executor = struct {
         self.vtable.submitFn(self, &closure.runnable);
     }
 };
+
 test {
     _ = @import("./executors/threadPool.zig");
+    _ = @import("./executors/manual.zig");
 }
