@@ -21,7 +21,7 @@ pub const Executor = struct {
         comptime func: anytype,
         args: anytype,
         allocator: std.mem.Allocator,
-    ) !void {
+    ) void {
         const Args = @TypeOf(args);
         const Closure = struct {
             arguments: Args,
@@ -35,7 +35,12 @@ pub const Executor = struct {
                 closure.allocator.destroy(closure);
             }
         };
-        const closure = try allocator.create(Closure);
+        // No way to recover here. Just crash.
+        // Don't want to propagate the error up.
+        const closure = allocator.create(Closure) catch |e| std.debug.panic(
+            "Failed to allocate closure in {s}: {}",
+            .{ @typeName(Executor), e },
+        );
         closure.* = .{
             .arguments = args,
             .executor = self,
