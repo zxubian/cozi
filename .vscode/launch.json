@@ -7,10 +7,19 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug",
+            "name": "Debug Test",
             "program": "${workspaceFolder}/zig-out/bin/my-test",
             "args": [],
             "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug app",
+            "program": "${workspaceFolder}/zig-out/bin/zig-async",
+            "args": [],
+            "cwd": "${workspaceFolder}"
         }
+
     ]
 }

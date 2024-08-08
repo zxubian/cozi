@@ -1,6 +1,6 @@
 const std = @import("std");
 const Executor = @import("../executors.zig").Executor;
-const Runnable = @import("../executors.zig").Runnable;
+const Runnable = @import("../runnable.zig");
 const Queue = std.DoublyLinkedList(*Runnable);
 
 /// Single-threaded manually-executed task queue

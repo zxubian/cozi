@@ -1,13 +1,9 @@
 const std = @import("std");
 const assert = std.debug.assert;
+const Runnable = @import("./runnable.zig");
 
 pub const ThreadPool = @import("./executors/threadPool.zig");
 pub const Manual = @import("./executors/manual.zig");
-
-pub const Runnable = struct {
-    runFn: RunProto,
-    pub const RunProto = *const fn (runnable: *Runnable) void;
-};
 
 pub const Executor = struct {
     vtable: Vtable,

@@ -7,7 +7,7 @@ const builtin = @import("builtin");
 const assert = std.debug.assert;
 const atomic = std.atomic.Value;
 const Executors = @import("../executors.zig");
-const Runnable = Executors.Runnable;
+const Runnable = @import("../runnable.zig");
 const Executor = Executors.Executor;
 
 const Status = enum(u8) {

@@ -2,7 +2,7 @@ const std = @import("std");
 const testing = std.testing;
 const ManualExecutor = @import("../manual.zig");
 const Executor = @import("../../executors.zig").Executor;
-const Runnable = @import("../../executors.zig").Runnable;
+const Runnable = @import("../../runnable.zig");
 
 const allocator = std.testing.allocator;
 
