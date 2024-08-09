@@ -1,8 +1,8 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const ThreadPool = @import("../threadPool.zig");
+const ThreadPool = @import("../compute.zig");
 const testing = std.testing;
-const TimeLimit = @import("../../testing/TimeLimit.zig");
+const TimeLimit = @import("../../../testing/TimeLimit.zig");
 
 test "Submit Lambda" {
     if (builtin.single_threaded) {

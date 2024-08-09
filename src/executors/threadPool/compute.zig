@@ -1,13 +1,16 @@
+//! Compute thread pool, suitable for small number of independent tasks
+//! Singular work-queue
+//! For fiber workloads, consider using "fast" thread pool.
 const std = @import("std");
 const log = std.log.scoped(.thread_pool);
 const ThreadPool = @This();
 const Thread = std.Thread;
-const Queue = @import("./threadPool/queue.zig").UnboundedBlockingQueue;
+const Queue = @import("./compute/queue.zig").UnboundedBlockingQueue;
 const builtin = @import("builtin");
 const assert = std.debug.assert;
 const atomic = std.atomic.Value;
-const Executors = @import("../executors.zig");
-const Runnable = @import("../runnable.zig");
+const Executors = @import("../../executors.zig");
+const Runnable = @import("../../runnable.zig");
 const Executor = Executors.Executor;
 
 const Status = enum(u8) {
@@ -123,5 +126,5 @@ pub fn deinit(self: *ThreadPool) void {
 }
 
 test {
-    _ = @import("./threadPool/tests.zig");
+    _ = @import("./compute/tests.zig");
 }

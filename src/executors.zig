@@ -2,7 +2,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 const Runnable = @import("./runnable.zig");
 
-pub const ThreadPool = @import("./executors/threadPool.zig");
+pub const ThreadPools = @import("./executors/threadPools.zig");
 pub const Manual = @import("./executors/manual.zig");
 
 pub const Executor = struct {
@@ -51,6 +51,6 @@ pub const Executor = struct {
 };
 
 test {
-    _ = @import("./executors/threadPool.zig");
+    _ = @import("./executors/threadPools.zig");
     _ = @import("./executors/manual.zig");
 }
