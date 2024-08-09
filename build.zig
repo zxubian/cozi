@@ -21,11 +21,16 @@ pub fn build(b: *std.Build) void {
     options.addOption(SanitizerOption, "sanitize", sanitize);
     exe.root_module.addOptions("build_config", options);
 
-    if (sanitize != .none) {
-        exe.linkLibCpp();
-    }
-    if (sanitize == .thread) {
-        exe.pie = true;
+    switch (sanitize) {
+        .address => {
+            exe.linkLibCpp();
+            exe.pie = true;
+        },
+        .thread => {
+            exe.linkLibCpp();
+            exe.pie = true;
+        },
+        else => {},
     }
 
     b.installArtifact(exe);
