@@ -1,6 +1,20 @@
 const std = @import("std");
 const SanitizerOption = @import("./src/sanitizerOption.zig").SanitizerOption;
 
+fn addAssemblyForMachineContext(b: *std.Build, c: *std.Build.Step.Compile, target: *const std.Build.ResolvedTarget) void {
+    const path = switch (target.result.cpu.arch) {
+        .aarch64 => b.path("./src/coroutine/context/machine/aarch64.s"),
+        else => std.debug.panic(
+            "Target architecture {s}-{s} is not yet supported",
+            .{
+                @tagName(target.result.os.tag),
+                @tagName(target.result.cpu.arch),
+            },
+        ),
+    };
+    c.addAssemblyFile(path);
+}
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -15,6 +29,8 @@ pub fn build(b: *std.Build) void {
         .sanitize_thread = sanitize == .thread,
         .use_llvm = true,
     });
+
+    addAssemblyForMachineContext(b, exe, &target);
 
     const options = b.addOptions();
 
@@ -47,11 +63,9 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    addAssemblyForMachineContext(b, exe_unit_tests, &target);
+
     exe_unit_tests.root_module.addOptions("build_config", options);
-    if (target.result.cpu.arch == .aarch64) {
-        exe.addAssemblyFile(b.path("./src/coroutine/context/machine/aarch64.s"));
-        exe_unit_tests.addAssemblyFile(b.path("./src/coroutine/context/machine/aarch64.s"));
-    }
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
     const test_step = b.step("test", "Run unit tests");
