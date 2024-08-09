@@ -3,15 +3,18 @@
 //! For fiber workloads, consider using "fast" thread pool.
 const std = @import("std");
 const log = std.log.scoped(.thread_pool);
-const ThreadPool = @This();
 const Thread = std.Thread;
-const Queue = @import("./compute/queue.zig").UnboundedBlockingQueue;
 const builtin = @import("builtin");
 const assert = std.debug.assert;
 const atomic = std.atomic.Value;
+const Allocator = std.mem.Allocator;
+
 const Executors = @import("../../executors.zig");
 const Runnable = @import("../../runnable.zig");
 const Executor = Executors.Executor;
+const Queue = @import("./compute/queue.zig").UnboundedBlockingQueue;
+
+const ThreadPool = @This();
 
 const Status = enum(u8) {
     not_started,
@@ -23,7 +26,7 @@ const Status = enum(u8) {
 threads: []Thread = undefined,
 tasks: Queue(*Runnable) = undefined,
 waitgroup: Thread.WaitGroup = .{},
-allocator: std.mem.Allocator,
+allocator: Allocator,
 mutex: Thread.Mutex = .{},
 status: atomic(Status) = undefined,
 executor: Executor = .{
@@ -34,7 +37,7 @@ executor: Executor = .{
 
 threadlocal var current_: ?*ThreadPool = null;
 
-pub fn init(thread_count: usize, allocator: std.mem.Allocator) !ThreadPool {
+pub fn init(thread_count: usize, allocator: Allocator) !ThreadPool {
     const threads = try allocator.alloc(Thread, thread_count);
     const queue = Queue(*Runnable){ .allocator = allocator };
     return ThreadPool{

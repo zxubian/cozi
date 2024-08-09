@@ -3,6 +3,7 @@ const log = std.log.scoped(.queue);
 const Mutex = std.Thread.Mutex;
 const CondVar = std.Thread.Condition;
 const assert = std.debug.assert;
+const Allocator = std.mem.Allocator;
 
 pub fn UnboundedBlockingQueue(comptime T: type) type {
     const BackingQueue = std.DoublyLinkedList(T);
@@ -12,7 +13,7 @@ pub fn UnboundedBlockingQueue(comptime T: type) type {
         backing_queue: BackingQueue = undefined,
         mutex: Mutex = .{},
         has_entries_or_is_closed: CondVar = .{},
-        allocator: std.mem.Allocator,
+        allocator: Allocator,
         closed: bool = false,
 
         pub fn deinit(self: *Impl) void {

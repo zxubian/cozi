@@ -3,6 +3,7 @@ const testing = std.testing;
 const ManualExecutor = @import("../manual.zig");
 const Executor = @import("../../executors.zig").Executor;
 const Runnable = @import("../../runnable.zig");
+const Allocator = std.mem.Allocator;
 
 const allocator = std.testing.allocator;
 
@@ -44,7 +45,7 @@ test "Run At Most" {
     const Looper = struct {
         iterations: usize,
         manual: *ManualExecutor,
-        allocator: std.mem.Allocator,
+        allocator: Allocator,
 
         pub fn run(self: *@This()) void {
             self.iterations -= 1;
@@ -82,7 +83,7 @@ test "Drain" {
     const Looper = struct {
         iterations: usize,
         manual: *ManualExecutor,
-        allocator: std.mem.Allocator,
+        allocator: Allocator,
 
         pub fn run(self: *@This()) void {
             self.iterations -= 1;

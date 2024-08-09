@@ -18,32 +18,14 @@ stack: Stack = undefined,
 execution_context: ExecutionContext = undefined,
 is_completed: bool = false,
 
-const DEFAULT_STACK_SIZE_BYTES = 64 * 1024;
-
 pub fn init(
     self: *Coroutine,
     comptime routine: anytype,
     args: anytype,
     allocator: Allocator,
 ) !void {
-    return self.initWithStackSize(
-        DEFAULT_STACK_SIZE_BYTES,
-        routine,
-        args,
-        allocator,
-    );
-}
-
-pub fn initWithStackSize(
-    self: *Coroutine,
-    stack_size: usize,
-    comptime routine: anytype,
-    args: anytype,
-    allocator: Allocator,
-) !void {
-    const stack = try Stack.init(stack_size, allocator);
-    return initWithStack(
-        self,
+    const stack = try Stack.init(allocator);
+    return self.initWithStack(
         stack,
         routine,
         args,

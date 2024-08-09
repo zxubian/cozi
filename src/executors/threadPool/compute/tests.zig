@@ -3,6 +3,7 @@ const builtin = @import("builtin");
 const ThreadPool = @import("../compute.zig");
 const testing = std.testing;
 const TimeLimit = @import("../../../testing/TimeLimit.zig");
+const Allocator = std.mem.Allocator;
 
 test "Submit Lambda" {
     if (builtin.single_threaded) {
@@ -303,7 +304,7 @@ test "Submit after wait idle" {
     try tp.start();
     const ContextB = struct {
         done: *bool,
-        alloc: std.mem.Allocator,
+        alloc: Allocator,
 
         pub fn Run(self: *@This()) void {
             std.time.sleep(std.time.ns_per_ms * 500);
@@ -313,7 +314,7 @@ test "Submit after wait idle" {
     };
     const ContextA = struct {
         done: *bool,
-        alloc: std.mem.Allocator,
+        alloc: Allocator,
 
         pub fn Run(self: *@This()) void {
             std.time.sleep(std.time.ns_per_ms * 500);
@@ -433,7 +434,7 @@ test "Keep Alive" {
         try tp.start();
 
         const Context = struct {
-            pub fn run(limit_: *TimeLimit, alloc_: std.mem.Allocator) void {
+            pub fn run(limit_: *TimeLimit, alloc_: Allocator) void {
                 if (limit_.remaining() > std.time.ns_per_ms * 300) {
                     ThreadPool.current().?.executor.submit(@This().run, .{ limit_, alloc_ }, alloc_);
                 }

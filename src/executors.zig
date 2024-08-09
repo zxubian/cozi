@@ -1,5 +1,6 @@
 const std = @import("std");
 const assert = std.debug.assert;
+const Allocator = std.mem.Allocator;
 const Runnable = @import("./runnable.zig");
 
 pub const ThreadPools = @import("./executors/threadPools.zig");
@@ -17,14 +18,14 @@ pub const Executor = struct {
         self: *Executor,
         comptime func: anytype,
         args: anytype,
-        allocator: std.mem.Allocator,
+        allocator: Allocator,
     ) void {
         const Args = @TypeOf(args);
         const Closure = struct {
             arguments: Args,
             executor: *Executor,
             runnable: Runnable,
-            allocator: std.mem.Allocator,
+            allocator: Allocator,
 
             fn runFn(runnable: *Runnable) void {
                 const closure: *@This() = @fieldParentPtr("runnable", runnable);

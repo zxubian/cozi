@@ -2,18 +2,19 @@ const std = @import("std");
 const Executor = @import("../executors.zig").Executor;
 const Runnable = @import("../runnable.zig");
 const Queue = std.DoublyLinkedList(*Runnable);
+const Allocator = std.mem.Allocator;
 
 /// Single-threaded manually-executed task queue
 const ManualExecutor = @This();
 tasks: Queue = .{},
-allocator: std.mem.Allocator,
+allocator: Allocator,
 executor: Executor = .{
     .vtable = .{
         .submitFn = ManualExecutor.submit,
     },
 },
 
-pub fn init(allocator: std.mem.Allocator) ManualExecutor {
+pub fn init(allocator: Allocator) ManualExecutor {
     return ManualExecutor{
         .allocator = allocator,
     };
