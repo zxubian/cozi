@@ -1,9 +1,9 @@
-const Coroutine = @import("../coroutine.zig");
+const builtin = @import("builtin");
 const std = @import("std");
 const testing = std.testing;
+const alloc = testing.allocator;
 const Allocator = std.mem.Allocator;
-const alloc = std.testing.allocator;
-const builtin = @import("builtin");
+const Coroutine = @import("../coroutine.zig");
 
 test "Suspend" {
     var step: usize = 0;
