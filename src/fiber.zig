@@ -1,3 +1,11 @@
+const Fiber = @This();
+
+const std = @import("std");
+const Allocator = std.mem.Allocator;
+
+const Coroutine = @import("./coroutine.zig");
+const Executor = @import("./executors.zig").Executor;
+
 threadlocal var current_fiber: ?*Fiber = null;
 coroutine: *Coroutine,
 executor: *Executor,
@@ -8,7 +16,7 @@ pub fn go(
     args: anytype,
     allocator: Allocator,
     executor: *Executor,
-) !*Fiber {
+) !void {
     const coroutine = try allocator.create(Coroutine);
     const fiber = try allocator.create(Fiber);
     fiber.* = .{
@@ -18,11 +26,14 @@ pub fn go(
     };
     try coroutine.init(routine, args, allocator);
     fiber.scheduleSelf();
-    return fiber;
 }
 
 pub fn isInFiber() bool {
     return current_fiber != null;
+}
+
+pub fn current() ?*const Fiber {
+    return current_fiber;
 }
 
 pub fn yield() void {
@@ -62,11 +73,3 @@ fn tick(this: *Fiber) void {
 test {
     _ = @import("./fiber/tests.zig");
 }
-
-const Fiber = @This();
-
-const std = @import("std");
-const Allocator = std.mem.Allocator;
-
-const Coroutine = @import("./coroutine.zig");
-const Executor = @import("./executors.zig").Executor;

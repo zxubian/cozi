@@ -12,7 +12,7 @@ test "Fiber basic" {
         }
     };
     var manual_executor = ManualExecutor.init(alloc);
-    _ = try Fiber.go(Ctx.run, .{&step}, alloc, &manual_executor.executor);
+    try Fiber.go(Ctx.run, .{&step}, alloc, &manual_executor.executor);
     _ = manual_executor.drain();
     try testing.expectEqual(step, 1);
 }
@@ -27,7 +27,7 @@ test "Fiber context" {
     };
     try testing.expect(!Fiber.isInFiber());
     var manual_executor = ManualExecutor.init(alloc);
-    _ = try Fiber.go(Ctx.run, .{}, alloc, &manual_executor.executor);
+    try Fiber.go(Ctx.run, .{}, alloc, &manual_executor.executor);
     _ = manual_executor.drain();
     try testing.expect(!Fiber.isInFiber());
 }
