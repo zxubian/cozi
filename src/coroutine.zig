@@ -5,6 +5,7 @@ const Allocator = std.mem.Allocator;
 const assert = std.debug.assert;
 
 const Runnable = @import("./runnable.zig");
+const Closure = @import("./closure.zig");
 const ExecutionContext = @import("./coroutine/executionContext.zig");
 const Trampoline = ExecutionContext.Trampoline;
 
@@ -40,47 +41,20 @@ pub fn initWithStack(
     args: anytype,
     allocator: Allocator,
 ) !void {
-    const routine_runnable = try initClosureForRoutine(
+    //TODO: consider allocating this closure on the coroutine stack?
+    const closure = try Closure.init(
         routine,
         args,
         allocator,
     );
     self.* = .{
         .stack = stack,
-        .routine = routine_runnable,
+        .routine = &closure.runnable,
     };
     self.execution_context.init(
         stack,
         self.trampoline(),
     );
-}
-
-fn initClosureForRoutine(
-    comptime routine: anytype,
-    args: anytype,
-    allocator: Allocator,
-) !*Runnable {
-    const Args = @TypeOf(args);
-    const Closure = struct {
-        arguments: Args,
-        allocator: Allocator,
-        runnable: Runnable,
-
-        fn runFn(runnable: *Runnable) void {
-            const closure: *@This() = @fieldParentPtr("runnable", runnable);
-            @call(.auto, routine, closure.arguments);
-            closure.allocator.destroy(closure);
-        }
-    };
-    const closure = try allocator.create(Closure);
-    closure.* = .{
-        .arguments = args,
-        .runnable = .{
-            .runFn = Closure.runFn,
-        },
-        .allocator = allocator,
-    };
-    return &closure.runnable;
 }
 
 fn trampoline(self: *Coroutine) Trampoline {
