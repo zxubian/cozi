@@ -37,35 +37,35 @@ pub fn current() ?*const Fiber {
 }
 
 pub fn yield() void {
-    if (current_fiber) |ctx| {
-        ctx._yield();
+    if (current_fiber) |curr| {
+        curr._yield();
     } else {
         std.debug.panic("Cannot call Fiber.yield when from outside of a Fiber.", .{});
     }
 }
 
-fn _yield(this: *Fiber) void {
-    this.coroutine.@"suspend"();
+fn _yield(self: *Fiber) void {
+    self.coroutine.@"suspend"();
 }
 
-fn scheduleSelf(this: *Fiber) void {
-    this.executor.submit(tick, .{this}, this.allocator);
+fn scheduleSelf(self: *Fiber) void {
+    self.executor.submit(tick, .{self}, self.allocator);
 }
 
-fn deinit(this: *Fiber) void {
-    this.coroutine.deinit();
-    this.allocator.destroy(this.coroutine);
-    this.allocator.destroy(this);
+fn deinit(self: *Fiber) void {
+    self.coroutine.deinit();
+    self.allocator.destroy(self.coroutine);
+    self.allocator.destroy(self);
 }
 
-fn tick(this: *Fiber) void {
+fn tick(self: *Fiber) void {
     const old_ctx = current_fiber;
-    current_fiber = this;
-    this.coroutine.@"resume"();
-    if (this.coroutine.is_completed) {
-        this.deinit();
+    current_fiber = self;
+    self.coroutine.@"resume"();
+    if (self.coroutine.is_completed) {
+        self.deinit();
     } else {
-        this.scheduleSelf();
+        self.scheduleSelf();
     }
     current_fiber = old_ctx;
 }
