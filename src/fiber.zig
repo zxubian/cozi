@@ -1,3 +1,4 @@
+//! Cooperatively-scheduled user-space thread.
 const Fiber = @This();
 
 const std = @import("std");
