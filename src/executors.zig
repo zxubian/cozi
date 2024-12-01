@@ -8,15 +8,19 @@ pub const ThreadPools = @import("./executors/threadPools.zig");
 pub const Manual = @import("./executors/manual.zig");
 
 pub const Executor = struct {
+    ptr: *anyopaque,
     vtable: Vtable,
 
     const Vtable = struct {
-        pub const Submit = *const fn (*Executor, *Runnable) void;
-        submitFn: Submit,
+        submit: *const fn (ctx: *anyopaque, *Runnable) void,
     };
 
-    pub fn submit(
-        self: *Executor,
+    pub inline fn submitRunnable(self: *Executor, runnable: *Runnable) void {
+        self.vtable.submit(self.ptr, runnable);
+    }
+
+    pub inline fn submit(
+        self: *const Executor,
         comptime func: anytype,
         args: anytype,
         allocator: Allocator,
@@ -34,7 +38,7 @@ pub const Executor = struct {
             },
             .allocator = allocator,
         };
-        self.vtable.submitFn(self, &closure.runnable);
+        self.vtable.submit(self.ptr, &closure.runnable);
     }
 };
 

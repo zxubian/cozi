@@ -8,14 +8,14 @@ const Executor = @import("./executors.zig").Executor;
 
 threadlocal var current_fiber: ?*Fiber = null;
 coroutine: *Coroutine,
-executor: *Executor,
+executor: Executor,
 allocator: Allocator,
 
 pub fn go(
     comptime routine: anytype,
     args: anytype,
     allocator: Allocator,
-    executor: *Executor,
+    executor: Executor,
 ) !void {
     const coroutine = try allocator.create(Coroutine);
     const fiber = try allocator.create(Fiber);

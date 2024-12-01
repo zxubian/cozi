@@ -14,7 +14,7 @@ test "Fiber basic" {
         }
     };
     var manual_executor = ManualExecutor.init(alloc);
-    try Fiber.go(Ctx.run, .{&step}, alloc, &manual_executor.executor);
+    try Fiber.go(Ctx.run, .{&step}, alloc, manual_executor.executor());
     _ = manual_executor.drain();
     try testing.expectEqual(step, 1);
 }
@@ -29,7 +29,7 @@ test "Fiber context" {
     };
     try testing.expect(!Fiber.isInFiber());
     var manual_executor = ManualExecutor.init(alloc);
-    try Fiber.go(Ctx.run, .{}, alloc, &manual_executor.executor);
+    try Fiber.go(Ctx.run, .{}, alloc, manual_executor.executor());
     _ = manual_executor.drain();
     try testing.expect(!Fiber.isInFiber());
 }
@@ -43,7 +43,7 @@ test "Fiber Thread Pool" {
     };
     var thread_pool = try ThreadPool.init(1, alloc);
     defer thread_pool.deinit();
-    try Fiber.go(Ctx.run, .{&step}, alloc, &thread_pool.executor);
+    try Fiber.go(Ctx.run, .{&step}, alloc, thread_pool.executor());
     try thread_pool.start();
     thread_pool.waitIdle();
     thread_pool.stop();
@@ -61,7 +61,7 @@ test "Fiber Yield" {
         }
     };
     var manual_executor = ManualExecutor.init(alloc);
-    try Fiber.go(Ctx.run, .{&step}, alloc, &manual_executor.executor);
+    try Fiber.go(Ctx.run, .{&step}, alloc, manual_executor.executor());
     _ = manual_executor.drain();
     try testing.expectEqual(step, 3);
 }
@@ -78,7 +78,7 @@ test "Fiber threadpool child" {
     };
     var thread_pool = try ThreadPool.init(1, alloc);
     defer thread_pool.deinit();
-    try Fiber.go(Ctx.run, .{&step}, alloc, &thread_pool.executor);
+    try Fiber.go(Ctx.run, .{&step}, alloc, thread_pool.executor());
     try thread_pool.start();
     thread_pool.waitIdle();
     thread_pool.stop();
@@ -111,8 +111,8 @@ test "Ping Pong" {
     };
     var thread_pool = try ThreadPool.init(1, alloc);
     defer thread_pool.deinit();
-    try Fiber.go(CtxA.run, .{&state}, alloc, &thread_pool.executor);
-    try Fiber.go(CtxB.run, .{&state}, alloc, &thread_pool.executor);
+    try Fiber.go(CtxA.run, .{&state}, alloc, thread_pool.executor());
+    try Fiber.go(CtxB.run, .{&state}, alloc, thread_pool.executor());
     try thread_pool.start();
     thread_pool.waitIdle();
     thread_pool.stop();
@@ -129,7 +129,12 @@ test "Two Pools" {
                         try testing.expectEqual(expected_, ThreadPool.current().?);
                     }
                 };
-                try Fiber.go(CtxInner.run, .{expected}, testing.allocator, &expected.executor);
+                try Fiber.go(
+                    CtxInner.run,
+                    .{expected},
+                    testing.allocator,
+                    expected.executor(),
+                );
             }
         }
     };
@@ -139,8 +144,18 @@ test "Two Pools" {
     defer thread_pool_b.deinit();
     try thread_pool_a.start();
     try thread_pool_b.start();
-    try Fiber.go(Ctx.run, .{&thread_pool_a}, alloc, &thread_pool_a.executor);
-    try Fiber.go(Ctx.run, .{&thread_pool_b}, alloc, &thread_pool_b.executor);
+    try Fiber.go(
+        Ctx.run,
+        .{&thread_pool_a},
+        alloc,
+        thread_pool_a.executor(),
+    );
+    try Fiber.go(
+        Ctx.run,
+        .{&thread_pool_b},
+        alloc,
+        thread_pool_b.executor(),
+    );
     thread_pool_a.waitIdle();
     thread_pool_b.waitIdle();
     thread_pool_a.stop();

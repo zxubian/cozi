@@ -19,16 +19,17 @@ test "Just Works" {
             step_.* += 1;
         }
     };
-    manual.executor.submit(Step.run, .{&step}, allocator);
+    const executor = manual.executor();
+    executor.submit(Step.run, .{&step}, allocator);
     try testing.expect(!manual.isEmpty());
     try testing.expectEqual(1, manual.count());
     try testing.expectEqual(0, step);
-    manual.executor.submit(Step.run, .{&step}, allocator);
+    executor.submit(Step.run, .{&step}, allocator);
     try testing.expectEqual(2, manual.count());
     try testing.expectEqual(0, step);
     try testing.expect(manual.runNext());
     try testing.expectEqual(1, step);
-    manual.executor.submit(Step.run, .{&step}, allocator);
+    executor.submit(Step.run, .{&step}, allocator);
     try testing.expectEqual(2, manual.count());
     try testing.expectEqual(2, manual.runAtMost(99));
     try testing.expectEqual(3, step);
@@ -55,7 +56,7 @@ test "Run At Most" {
         }
 
         fn submit(self: *@This()) void {
-            self.manual.executor.submit(@This().run, .{self}, self.allocator);
+            self.manual.executor().submit(@This().run, .{self}, self.allocator);
         }
 
         pub fn start(self: *@This()) void {
@@ -93,7 +94,7 @@ test "Drain" {
         }
 
         fn submit(self: *@This()) void {
-            self.manual.executor.submit(@This().run, .{self}, self.allocator);
+            self.manual.executor().submit(@This().run, .{self}, self.allocator);
         }
 
         pub fn start(self: *@This()) void {

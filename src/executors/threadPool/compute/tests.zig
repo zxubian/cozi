@@ -26,18 +26,19 @@ test "Submit Lambda" {
         }
     };
     var ctx = Context{ .a = 0 };
-    tp.executor.submit(Context.run, .{&ctx}, alloc);
+    const executor = tp.executor();
+    executor.submit(Context.run, .{&ctx}, alloc);
     try testing.expectEqual(0, ctx.a);
     try tp.start();
     std.time.sleep(std.time.ns_per_ms);
     try testing.expectEqual(1, ctx.a);
 
-    tp.executor.submit(Context.run, .{&ctx}, alloc);
+    executor.submit(Context.run, .{&ctx}, alloc);
     std.time.sleep(std.time.ns_per_ms);
     try testing.expectEqual(2, ctx.a);
 
-    tp.executor.submit(Context.run, .{&ctx}, alloc);
-    tp.executor.submit(Context.run, .{&ctx}, alloc);
+    executor.submit(Context.run, .{&ctx}, alloc);
+    executor.submit(Context.run, .{&ctx}, alloc);
     tp.waitIdle();
     try testing.expectEqual(4, ctx.a);
 
@@ -67,7 +68,8 @@ test "Wait" {
         }
     };
     var ctx = Context{ .done = false };
-    tp.executor.submit(Context.run, .{&ctx}, alloc);
+    const executor = tp.executor();
+    executor.submit(Context.run, .{&ctx}, alloc);
 
     tp.waitIdle();
     tp.stop();
@@ -97,9 +99,10 @@ test "Multi-wait" {
         }
     };
 
+    const executor = tp.executor();
     for (0..3) |_| {
         var ctx = Context{ .done = false };
-        tp.executor.submit(Context.run, .{&ctx}, alloc);
+        executor.submit(Context.run, .{&ctx}, alloc);
         tp.waitIdle();
         try testing.expect(ctx.done);
     }
@@ -133,8 +136,9 @@ test "Many Tasks" {
     };
 
     var ctx = Context{ .tasks = std.atomic.Value(usize).init(0) };
+    const executor = tp.executor();
     for (0..task_count) |_| {
-        tp.executor.submit(Context.run, .{&ctx}, alloc);
+        executor.submit(Context.run, .{&ctx}, alloc);
     }
     tp.waitIdle();
     tp.stop();
@@ -170,12 +174,13 @@ test "Parallel" {
         .tasks = &tasks,
         .sleep_nanoseconds = std.time.ns_per_s,
     };
-    tp.executor.submit(Context.Run, .{&ctx_a}, alloc);
+    const executor = tp.executor();
+    executor.submit(Context.Run, .{&ctx_a}, alloc);
     var ctx_b = Context{
         .tasks = &tasks,
         .sleep_nanoseconds = 0,
     };
-    tp.executor.submit(Context.Run, .{&ctx_b}, alloc);
+    executor.submit(Context.Run, .{&ctx_b}, alloc);
     std.time.sleep(std.time.ns_per_ms * 500);
     try testing.expectEqual(1, tasks.load(.seq_cst));
     tp.waitIdle();
@@ -218,8 +223,8 @@ test "Two Pools" {
 
     var timer = try std.time.Timer.start();
 
-    tp1.executor.submit(Context.Run, .{&ctx}, alloc);
-    tp2.executor.submit(Context.Run, .{&ctx}, alloc);
+    tp1.executor().submit(Context.Run, .{&ctx}, alloc);
+    tp2.executor().submit(Context.Run, .{&ctx}, alloc);
 
     tp2.waitIdle();
     tp2.stop();
@@ -251,8 +256,9 @@ test "Stop" {
         }
     };
     var ctx = Context{};
+    const executor = tp.executor();
     for (0..3) |_| {
-        tp.executor.submit(Context.Run, .{&ctx}, alloc);
+        executor.submit(Context.Run, .{&ctx}, alloc);
     }
     tp.stop();
     try testing.expectEqual(0, tp.tasks.backing_queue.len);
@@ -284,7 +290,8 @@ test "Current" {
         }
     };
     var ctx = Context{ .tp = &tp };
-    tp.executor.submit(Context.Run, .{&ctx}, alloc);
+    const executor = tp.executor();
+    executor.submit(Context.Run, .{&ctx}, alloc);
     tp.stop();
 }
 
@@ -327,12 +334,13 @@ test "Submit after wait idle" {
                 .done = self.done,
                 .alloc = self.alloc,
             };
-            ThreadPool.current().?.executor.submit(ContextB.Run, .{ctx}, self.alloc);
+            ThreadPool.current().?.executor().submit(ContextB.Run, .{ctx}, self.alloc);
         }
     };
     var done = false;
     var ctx = ContextA{ .done = &done, .alloc = alloc };
-    tp.executor.submit(ContextA.Run, .{&ctx}, alloc);
+    const executor = tp.executor();
+    executor.submit(ContextA.Run, .{&ctx}, alloc);
     tp.waitIdle();
     tp.stop();
     try testing.expectEqual(true, done);
@@ -367,8 +375,9 @@ test "Use Threads" {
         };
 
         var ctx = Context{ .tasks = std.atomic.Value(usize).init(0) };
+        const executor = tp.executor();
         for (0..task_count) |_| {
-            tp.executor.submit(Context.run, .{&ctx}, alloc);
+            executor.submit(Context.run, .{&ctx}, alloc);
         }
         tp.waitIdle();
         tp.stop();
@@ -406,8 +415,9 @@ test "Too Many Threads" {
         };
 
         var ctx = Context{ .tasks = std.atomic.Value(usize).init(0) };
+        const executor = tp.executor();
         for (0..task_count) |_| {
-            tp.executor.submit(Context.run, .{&ctx}, alloc);
+            executor.submit(Context.run, .{&ctx}, alloc);
         }
         tp.waitIdle();
         tp.stop();
@@ -436,12 +446,13 @@ test "Keep Alive" {
         const Context = struct {
             pub fn run(limit_: *TimeLimit, alloc_: Allocator) void {
                 if (limit_.remaining() > std.time.ns_per_ms * 300) {
-                    ThreadPool.current().?.executor.submit(@This().run, .{ limit_, alloc_ }, alloc_);
+                    ThreadPool.current().?.executor().submit(@This().run, .{ limit_, alloc_ }, alloc_);
                 }
             }
         };
+        const executor = tp.executor();
         for (0..5) |_| {
-            tp.executor.submit(Context.run, .{ &limit, alloc }, alloc);
+            executor.submit(Context.run, .{ &limit, alloc }, alloc);
         }
         var timer = try std.time.Timer.start();
         tp.waitIdle();
@@ -484,8 +495,9 @@ test "Racy" {
         .tasks = &tasks,
         .shared_counter = &sharead_counter,
     };
+    const executor = tp.executor();
     for (0..task_count) |_| {
-        tp.executor.submit(Context.run, .{&ctx}, alloc);
+        executor.submit(Context.run, .{&ctx}, alloc);
     }
     tp.waitIdle();
     tp.stop();

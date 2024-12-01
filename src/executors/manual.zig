@@ -8,11 +8,6 @@ const Allocator = std.mem.Allocator;
 const ManualExecutor = @This();
 tasks: Queue = .{},
 allocator: Allocator,
-executor: Executor = .{
-    .vtable = .{
-        .submitFn = ManualExecutor.submit,
-    },
-},
 
 pub fn init(allocator: Allocator) ManualExecutor {
     return ManualExecutor{
@@ -20,8 +15,8 @@ pub fn init(allocator: Allocator) ManualExecutor {
     };
 }
 
-pub fn submit(exec: *Executor, runnable: *Runnable) void {
-    var self: *ManualExecutor = @fieldParentPtr("executor", exec);
+pub fn submit(ctx: *anyopaque, runnable: *Runnable) void {
+    var self: *ManualExecutor = @alignCast(@ptrCast(ctx));
     const node = self.allocator.create(Queue.Node) catch |e| {
         std.debug.panic("{}", .{e});
     };
@@ -69,6 +64,15 @@ pub fn drain(self: *ManualExecutor) usize {
         self.runNode(node);
     }
     return run_count;
+}
+
+pub fn executor(self: *ManualExecutor) Executor {
+    return Executor{
+        .vtable = .{
+            .submit = ManualExecutor.submit,
+        },
+        .ptr = self,
+    };
 }
 
 test {

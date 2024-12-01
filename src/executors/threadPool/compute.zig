@@ -29,11 +29,6 @@ waitgroup: Thread.WaitGroup = .{},
 allocator: Allocator,
 mutex: Thread.Mutex = .{},
 status: atomic(Status) = undefined,
-executor: Executor = .{
-    .vtable = .{
-        .submitFn = ThreadPool.submit,
-    },
-},
 
 threadlocal var current_: ?*ThreadPool = null;
 
@@ -98,11 +93,20 @@ fn submitImpl(self: *ThreadPool, runnable: *Runnable) !void {
     try self.tasks.put(runnable);
 }
 
-pub fn submit(exec: *Executor, runnable: *Runnable) void {
-    var self: *ThreadPool = @fieldParentPtr("executor", exec);
+pub fn submit(ctx: *anyopaque, runnable: *Runnable) void {
+    var self: *ThreadPool = @alignCast(@ptrCast(ctx));
 
     self.submitImpl(runnable) catch |e| {
         log.err("{}", .{e});
+    };
+}
+
+pub fn executor(self: *ThreadPool) Executor {
+    return Executor{
+        .vtable = .{
+            .submit = ThreadPool.submit,
+        },
+        .ptr = @ptrCast(self),
     };
 }
 
