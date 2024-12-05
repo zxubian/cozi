@@ -1,3 +1,3 @@
 test {
-    _ = @import("./timerQueue.zig");
+    _ = @import("./dispatch.zig");
 }

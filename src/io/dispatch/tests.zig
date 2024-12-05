@@ -3,16 +3,16 @@ const time = std.time;
 const testing = std.testing;
 const gpa = testing.allocator;
 
-const ThreadPool = @import("../executors.zig").ThreadPools.Compute;
-const TimerQueue = @import("../TimerQueue.zig");
+const ThreadPool = @import("../../executors.zig").ThreadPools.Compute;
+const IoDispatch = @import("../dispatch.zig");
 
-test "Timer Queue" {
+test "IO Dispatch" {
     var thread_pool = try ThreadPool.init(1, gpa);
     defer thread_pool.deinit();
     try thread_pool.start();
     defer thread_pool.stop();
 
-    var timer_queue = try TimerQueue.init(
+    var timer_queue = try IoDispatch.init(
         .{ .callback_entry_allocator = gpa },
         thread_pool.executor(),
         gpa,
@@ -29,7 +29,7 @@ test "Timer Queue" {
 
     var ctx = Ctx{};
 
-    try timer_queue.submit(
+    try timer_queue.timer(
         time.ns_per_s * 3,
         Ctx.run,
         &ctx,
