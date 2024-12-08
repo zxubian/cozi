@@ -62,7 +62,7 @@ pub fn goWithStack(
     args: anytype,
     stack: Stack,
     executor: Executor,
-    comptime owns_stack: bool,
+    comptime own_stack: bool,
 ) !void {
     var fixed_buffer_allocator = stack.bufferAllocator();
     const gpa = fixed_buffer_allocator.allocator();
@@ -76,13 +76,14 @@ pub fn goWithStack(
     const padding = try gpa.alignedAlloc(u8, Stack.STACK_ALIGNMENT_BYTES, 1);
     _ = padding;
     coroutine.initNoAlloc(&routine_closure.*.runnable, stack);
-    const tick_closure = try gpa.create(Closure.Impl(tick, false));
+    const tick_closure = try gpa.create(
+        Closure.Impl(tick(own_stack).*, false),
+    );
     tick_closure.*.init(.{fiber});
     fiber.* = .{
         .coroutine = coroutine,
         .executor = executor,
         .tick_runnable = &tick_closure.*.runnable,
-        .owns_stack = owns_stack,
     };
     fiber.scheduleSelf();
 }
@@ -111,16 +112,22 @@ fn scheduleSelf(self: *Fiber) void {
     self.executor.submitRunnable(self.tick_runnable);
 }
 
-fn tick(self: *Fiber) void {
-    const old_ctx = current_fiber;
-    current_fiber = self;
-    self.coroutine.@"resume"();
-    if (self.owns_stack and self.coroutine.is_completed) {
-        self.coroutine.deinit();
-    } else {
-        self.scheduleSelf();
-    }
-    current_fiber = old_ctx;
+fn tick(comptime owns_stack: bool) *const fn (self: *Fiber) void {
+    return struct {
+        pub fn tick(self: *Fiber) void {
+            const old_ctx = current_fiber;
+            current_fiber = self;
+            self.coroutine.@"resume"();
+            if (self.coroutine.is_completed) {
+                if (owns_stack) {
+                    self.coroutine.deinit();
+                }
+            } else {
+                self.scheduleSelf();
+            }
+            current_fiber = old_ctx;
+        }
+    }.tick;
 }
 
 test {
