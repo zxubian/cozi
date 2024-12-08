@@ -18,7 +18,7 @@ pub fn Impl(
             allocator: Allocator,
             runnable: Runnable,
 
-            pub fn runFn(runnable: *Runnable) void {
+            pub fn run(runnable: *Runnable) void {
                 const closure: *@This() = @fieldParentPtr("runnable", runnable);
                 if (comptime returnsErrorUnion(routine)) {
                     @call(.auto, routine, closure.arguments) catch |e| {
@@ -40,12 +40,12 @@ pub fn Impl(
                 self.* = .{
                     .arguments = args,
                     .runnable = .{
-                        .runFn = ClosureType.runFn,
+                        .run = ClosureType.run,
                     },
                 };
             }
 
-            pub fn runFn(runnable: *Runnable) void {
+            pub fn run(runnable: *Runnable) void {
                 const closure: *@This() = @fieldParentPtr("runnable", runnable);
                 if (comptime returnsErrorUnion(routine)) {
                     @call(.auto, routine, closure.arguments) catch |e| {
@@ -85,7 +85,7 @@ pub fn init(
     closure.* = .{
         .arguments = args,
         .runnable = .{
-            .runFn = ClosureType.runFn,
+            .run = ClosureType.run,
         },
         .allocator = allocator,
     };

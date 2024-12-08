@@ -32,7 +32,7 @@ pub inline fn submit(
     closure.* = .{
         .arguments = args,
         .runnable = .{
-            .runFn = @TypeOf(closure.*).runFn,
+            .run = @TypeOf(closure.*).run,
         },
         .allocator = allocator,
     };

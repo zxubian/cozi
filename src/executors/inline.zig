@@ -8,5 +8,5 @@ executor: Executor = .{
 },
 
 pub fn Submit(_: *Executor, runnable: *Runnable) void {
-    runnable.runFn();
+    runnable.run(runnable);
 }

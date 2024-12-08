@@ -51,7 +51,7 @@ pub fn init(
         .executor = executor,
         .impl = impl,
         .runnable = .{
-            .runFn = &Dispatch.run,
+            .run = &Dispatch.run,
         },
         .config = config,
     };
