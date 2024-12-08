@@ -9,9 +9,8 @@ const assert = std.debug.assert;
 const atomic = std.atomic.Value;
 const Allocator = std.mem.Allocator;
 
-const Executors = @import("../../executors.zig");
 const Runnable = @import("../../runnable.zig");
-const Executor = Executors.Executor;
+const Executor = @import("../../executor.zig");
 const Queue = @import("./compute/queue.zig").UnboundedBlockingQueue;
 
 const ThreadPool = @This();

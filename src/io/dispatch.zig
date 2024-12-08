@@ -6,7 +6,7 @@ const assert = std.debug.assert;
 const atomic = std.atomic;
 
 const Dispatch = @This();
-const Executor = @import("../executors.zig").Executor;
+const Executor = @import("../executor.zig");
 const Runnable = @import("../runnable.zig");
 
 pub const CallbackFn = *const fn (?*anyopaque) void;

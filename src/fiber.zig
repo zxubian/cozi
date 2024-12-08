@@ -5,7 +5,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 const Coroutine = @import("./coroutine.zig");
-const Executor = @import("./executors.zig").Executor;
+const Executor = @import("./executor.zig");
 const Stack = @import("./stack.zig");
 const Closure = @import("./closure.zig");
 const Runnable = @import("./runnable.zig");

@@ -1,5 +1,5 @@
 const std = @import("std");
-const Executor = @import("../executors.zig").Executor;
+const Executor = @import("../executor.zig");
 const Runnable = @import("../runnable.zig");
 const Queue = std.DoublyLinkedList(*Runnable);
 const Allocator = std.mem.Allocator;
@@ -57,7 +57,7 @@ fn runNode(self: *ManualExecutor, node: *Queue.Node) void {
 
 /// Run tasks until queue is empty
 /// Returns number of completed tasks
-/// Post-condition: IsEmpty() == true
+/// Post-condition: isEmpty() == true
 pub fn drain(self: *ManualExecutor) usize {
     var run_count: usize = 0;
     while (self.tasks.popFirst()) |node| : (run_count += 1) {

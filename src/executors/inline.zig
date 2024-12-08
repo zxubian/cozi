@@ -1,5 +1,5 @@
 const std = @import("std");
-const Executor = @import("../executors.zig").Executor;
+const Executor = @import("../executor.zig");
 const Runnable = @import("../executors.zig").Runnable;
 const InlineExecutor = @This();
 
