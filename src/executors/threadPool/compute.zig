@@ -23,7 +23,7 @@ const Status = enum(u8) {
 };
 
 threads: []Thread = undefined,
-tasks: Queue(*Runnable) = undefined,
+tasks: Queue(Runnable) = undefined,
 waitgroup: Thread.WaitGroup = .{},
 allocator: Allocator,
 mutex: Thread.Mutex = .{},
@@ -33,7 +33,7 @@ threadlocal var current_: ?*ThreadPool = null;
 
 pub fn init(thread_count: usize, allocator: Allocator) !ThreadPool {
     const threads = try allocator.alloc(Thread, thread_count);
-    const queue = Queue(*Runnable){ .allocator = allocator };
+    const queue = Queue(Runnable){};
     return ThreadPool{
         .threads = threads,
         .allocator = allocator,
@@ -67,7 +67,7 @@ fn threadEntryPoint(thread_pool: *ThreadPool, i: usize, self: *const Thread) voi
         const current_status = current_.?.status.load(.seq_cst);
         switch (current_status) {
             .running_or_idle, .stopped => {
-                const next_task = current_.?.tasks.takeBlocking() orelse {
+                const next_task = current_.?.tasks.takeBlocking() catch {
                     break;
                 };
                 log.debug("{s} acquired a new task\n", .{name});

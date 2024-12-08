@@ -261,7 +261,7 @@ test "Stop" {
         executor.submit(Context.Run, .{&ctx}, alloc);
     }
     tp.stop();
-    try testing.expectEqual(0, tp.tasks.backing_queue.len);
+    try testing.expectEqual(0, tp.tasks.backing_queue.count);
 }
 
 test "Current" {

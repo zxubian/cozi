@@ -51,8 +51,8 @@ test "Stack - Basic" {
         queue.pushFront(d);
     }
 
-    var i: usize = 99;
+    var i: isize = 99;
     while (queue.popFront()) |data| : (i -= 1) {
-        try testing.expectEqual(i, data.value);
+        try testing.expectEqual(@as(usize, @intCast(i)), data.value);
     }
 }

@@ -3,56 +3,48 @@ const log = std.log.scoped(.queue);
 const Mutex = std.Thread.Mutex;
 const CondVar = std.Thread.Condition;
 const assert = std.debug.assert;
-const Allocator = std.mem.Allocator;
+const Queue = @import("../../../containers/intrusive/forwardList.zig").IntrusiveForwardList;
 
 pub fn UnboundedBlockingQueue(comptime T: type) type {
-    const BackingQueue = std.DoublyLinkedList(T);
+    const BackingQueue = Queue(T);
     return struct {
         const Impl = @This();
 
         backing_queue: BackingQueue = undefined,
         mutex: Mutex = .{},
         has_entries_or_is_closed: CondVar = .{},
-        allocator: Allocator,
         closed: bool = false,
 
         pub fn deinit(self: *Impl) void {
-            self.mutex.lock();
-            defer self.mutex.unlock();
-            while (self.backing_queue.popFirst()) |node| {
-                self.allocator.destroy(node);
-            }
+            self.backing_queue.reset();
         }
 
-        const PutError = error{
+        const QueueError = error{
             queue_closed,
         };
 
-        pub fn put(self: *Impl, value: T) !void {
+        pub fn put(self: *Impl, value: *T) !void {
             self.mutex.lock();
             defer self.mutex.unlock();
             if (self.closed) {
-                return PutError.queue_closed;
+                return QueueError.queue_closed;
             }
-            var node = try self.allocator.create(BackingQueue.Node);
-            node.data = value;
-            self.backing_queue.append(node);
+            self.backing_queue.pushBack(value);
             self.has_entries_or_is_closed.signal();
         }
 
-        pub fn takeBlocking(self: *Impl) ?T {
+        pub fn takeBlocking(self: *Impl) !*T {
             self.mutex.lock();
             defer self.mutex.unlock();
 
-            while (self.backing_queue.len == 0 and !self.closed) {
+            while (self.backing_queue.count == 0 and !self.closed) {
                 self.has_entries_or_is_closed.wait(&self.mutex);
             }
-            if (self.backing_queue.popFirst()) |node| {
-                defer self.allocator.destroy(node);
-                return node.data;
+            if (self.backing_queue.popFront()) |t| {
+                return t;
             }
             assert(self.closed);
-            return null;
+            return QueueError.queue_closed;
         }
 
         pub fn close(self: *Impl) void {

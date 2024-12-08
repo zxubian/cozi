@@ -14,24 +14,27 @@ pub fn IntrusiveForwardList(T: type) type {
 
         head: ?*Node = null,
         tail: ?*Node = null,
+        count: usize = 0,
 
         pub fn isEmpty(self: List) bool {
-            return self.head == null;
+            return self.count == 0;
         }
 
         pub fn pushBack(self: *List, data: *T) void {
             const node: *Node = &data.intrusive_list_node;
+            defer self.count += 1;
             if (self.isEmpty()) {
                 self.head = node;
                 self.tail = node;
                 return;
             }
-            self.tail.?.*.next = node;
+            self.tail.?.next = node;
             self.tail = node;
         }
 
         pub fn pushFront(self: *List, data: *T) void {
             const node: *Node = &data.intrusive_list_node;
+            defer self.count += 1;
             if (self.isEmpty()) {
                 self.head = node;
                 self.tail = node;
@@ -44,6 +47,7 @@ pub fn IntrusiveForwardList(T: type) type {
 
         pub fn popFront(self: *List) ?*T {
             if (self.head) |head| {
+                self.count -= 1;
                 if (head == self.tail.?) {
                     self.head = null;
                     self.tail = null;
@@ -60,6 +64,7 @@ pub fn IntrusiveForwardList(T: type) type {
         pub fn reset(self: *List) void {
             self.head = null;
             self.tail = null;
+            self.count = 0;
         }
 
         pub fn print(self: *List) void {
@@ -83,6 +88,12 @@ pub fn ThreadSafeIntrusiveForwardList(T: type) type {
 
         impl: Impl,
         mutex: std.Thread.Mutex,
+
+        pub fn count(self: *List) usize {
+            self.mutex.lock();
+            defer self.mutex.unlock();
+            return self.impl.count;
+        }
 
         pub fn isEmpty(self: *List) bool {
             self.mutex.lock();

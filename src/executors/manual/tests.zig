@@ -8,7 +8,7 @@ const Allocator = std.mem.Allocator;
 const allocator = std.testing.allocator;
 
 test "Just Works" {
-    var manual = ManualExecutor.init(allocator);
+    var manual = ManualExecutor{};
     var step: usize = 0;
     try testing.expect(manual.isEmpty());
     try testing.expect(!manual.runNext());
@@ -38,7 +38,7 @@ test "Just Works" {
 }
 
 test "Run At Most" {
-    var manual = ManualExecutor.init(allocator);
+    var manual = ManualExecutor{};
     try testing.expect(manual.isEmpty());
     try testing.expect(!manual.runNext());
     try testing.expectEqual(0, manual.runAtMost(99));
@@ -79,7 +79,7 @@ test "Run At Most" {
 }
 
 test "Drain" {
-    var manual = ManualExecutor.init(allocator);
+    var manual = ManualExecutor{};
 
     const Looper = struct {
         iterations: usize,
