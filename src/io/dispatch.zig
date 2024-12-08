@@ -105,6 +105,7 @@ fn onEntryCompleted(self: *Dispatch, entry: *Entry) void {
 
 pub fn deinit(self: *Dispatch) void {
     self.impl.deinit(self.allocator);
+    self.allocator.destroy(self);
 }
 
 test {

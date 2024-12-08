@@ -12,12 +12,12 @@ test "IO Dispatch" {
     try thread_pool.start();
     defer thread_pool.stop();
 
-    var timer_queue = try IoDispatch.init(
+    var dispatch = try IoDispatch.init(
         .{ .callback_entry_allocator = gpa },
         thread_pool.executor(),
         gpa,
     );
-    defer timer_queue.deinit();
+    defer dispatch.deinit();
 
     const Ctx = struct {
         step: usize = 0,
@@ -29,7 +29,7 @@ test "IO Dispatch" {
 
     var ctx = Ctx{};
 
-    try timer_queue.timer(
+    try dispatch.timer(
         time.ns_per_s * 3,
         Ctx.run,
         &ctx,

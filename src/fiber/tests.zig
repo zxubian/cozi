@@ -1,11 +1,14 @@
 const std = @import("std");
+const builtin = @import("builtin");
+
 const testing = std.testing;
 const alloc = testing.allocator;
+const atomic = std.atomic;
+
 const Fiber = @import("../fiber.zig");
 const ManualExecutor = @import("../executors.zig").Manual;
 const ThreadPool = @import("../executors.zig").ThreadPools.Compute;
-const atomic = std.atomic;
-const builtin = @import("builtin");
+const Stack = @import("../stack.zig");
 
 test "Fiber basic" {
     var step: usize = 0;
@@ -164,4 +167,26 @@ test "Two Pools" {
     thread_pool_b.waitIdle();
     thread_pool_a.stop();
     thread_pool_b.stop();
+}
+
+test "Pre-supplied stack" {
+    var stack = try Stack.init(alloc);
+    defer stack.deinit();
+
+    var step: usize = 0;
+    const Ctx = struct {
+        pub fn run(step_: *usize) void {
+            step_.* += 1;
+        }
+    };
+    var manual_executor = ManualExecutor{};
+    try Fiber.goWithStack(
+        Ctx.run,
+        .{&step},
+        stack,
+        manual_executor.executor(),
+        false,
+    );
+    _ = manual_executor.drain();
+    try testing.expectEqual(step, 1);
 }
