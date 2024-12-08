@@ -6,11 +6,15 @@ const Allocator = std.mem.Allocator;
 
 const Coroutine = @import("./coroutine.zig");
 const Executor = @import("./executors.zig").Executor;
+const Stack = @import("./stack.zig");
+const Closure = @import("./closure.zig");
+const Runnable = @import("./runnable.zig");
 
 threadlocal var current_fiber: ?*Fiber = null;
 coroutine: *Coroutine,
 executor: Executor,
-allocator: Allocator,
+tick_runnable: *Runnable,
+owns_stack: bool = false,
 
 pub fn go(
     comptime routine: anytype,
@@ -18,14 +22,68 @@ pub fn go(
     allocator: Allocator,
     executor: Executor,
 ) !void {
-    const coroutine = try allocator.create(Coroutine);
-    const fiber = try allocator.create(Fiber);
+    return goOptions(
+        routine,
+        args,
+        allocator,
+        executor,
+        .{},
+    );
+}
+
+pub const Options = struct {
+    stack_size: usize = Coroutine.Stack.InitOptions.DEFAULT_STACK_SIZE_BYTES,
+};
+
+pub fn goOptions(
+    comptime routine: anytype,
+    args: anytype,
+    allocator: Allocator,
+    executor: Executor,
+    options: Options,
+) !void {
+    const stack = try Stack.initOptions(
+        .{
+            .size = options.stack_size,
+        },
+        allocator,
+    );
+    return goWithStack(
+        routine,
+        args,
+        stack,
+        executor,
+        true,
+    );
+}
+
+pub fn goWithStack(
+    comptime routine: anytype,
+    args: anytype,
+    stack: Stack,
+    executor: Executor,
+    comptime owns_stack: bool,
+) !void {
+    var fixed_buffer_allocator = stack.bufferAllocator();
+    const gpa = fixed_buffer_allocator.allocator();
+    // place fiber & coroutine on coroutine stack
+    // in order to avoid additional dynamic allocations
+    const fiber = try gpa.create(Fiber);
+    const coroutine = try gpa.create(Coroutine);
+    const routine_closure = try gpa.create(Closure.Impl(routine, false));
+    routine_closure.*.init(args);
+    // TODO: protect top of stack
+    const padding = try gpa.alignedAlloc(u8, Stack.STACK_ALIGNMENT_BYTES, 1);
+    _ = padding;
+    coroutine.initNoAlloc(&routine_closure.*.runnable, stack);
+    const tick_closure = try gpa.create(Closure.Impl(tick, false));
+    tick_closure.*.init(.{fiber});
     fiber.* = .{
         .coroutine = coroutine,
         .executor = executor,
-        .allocator = allocator,
+        .tick_runnable = &tick_closure.*.runnable,
+        .owns_stack = owns_stack,
     };
-    try coroutine.init(routine, args, allocator);
     fiber.scheduleSelf();
 }
 
@@ -50,21 +108,15 @@ fn _yield(self: *Fiber) void {
 }
 
 fn scheduleSelf(self: *Fiber) void {
-    self.executor.submit(tick, .{self}, self.allocator);
-}
-
-fn deinit(self: *Fiber) void {
-    self.coroutine.deinit();
-    self.allocator.destroy(self.coroutine);
-    self.allocator.destroy(self);
+    self.executor.submitRunnable(self.tick_runnable);
 }
 
 fn tick(self: *Fiber) void {
     const old_ctx = current_fiber;
     current_fiber = self;
     self.coroutine.@"resume"();
-    if (self.coroutine.is_completed) {
-        self.deinit();
+    if (self.owns_stack and self.coroutine.is_completed) {
+        self.coroutine.deinit();
     } else {
         self.scheduleSelf();
     }

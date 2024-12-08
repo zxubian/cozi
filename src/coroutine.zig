@@ -13,7 +13,7 @@ pub const Stack = ExecutionContext.Stack;
 
 const Coroutine = @This();
 
-routine: *Runnable = undefined,
+runnable: *Runnable = undefined,
 previous_context: ExecutionContext = undefined,
 stack: Stack = undefined,
 execution_context: ExecutionContext = undefined,
@@ -26,30 +26,25 @@ pub fn init(
     allocator: Allocator,
 ) !void {
     const stack = try Stack.init(allocator);
-    return self.initWithStack(
-        stack,
-        routine,
-        args,
-        allocator,
-    );
-}
-
-pub fn initWithStack(
-    self: *Coroutine,
-    stack: Stack,
-    comptime routine: anytype,
-    args: anytype,
-    allocator: Allocator,
-) !void {
-    //TODO: consider allocating this closure on the coroutine stack?
     const closure = try Closure.init(
         routine,
         args,
         allocator,
     );
+    return self.initNoAlloc(
+        &closure.*.runnable,
+        stack,
+    );
+}
+
+pub fn initNoAlloc(
+    self: *Coroutine,
+    runnable: *Runnable,
+    stack: Stack,
+) void {
     self.* = .{
+        .runnable = runnable,
         .stack = stack,
-        .routine = &closure.runnable,
     };
     self.execution_context.init(
         stack,
@@ -68,7 +63,7 @@ fn trampoline(self: *Coroutine) Trampoline {
 
 fn run(ctx: *anyopaque) noreturn {
     var self: *Coroutine = @ptrCast(@alignCast(ctx));
-    self.routine.runFn(self.routine);
+    self.runnable.runFn(self.runnable);
     self.complete();
 }
 
