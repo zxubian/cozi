@@ -1,5 +1,5 @@
 const MachineContext = @This();
-const Stack = @import("./stack.zig");
+const Stack = @import("../../stack.zig");
 const Trampoline = @import("./trampoline.zig");
 const builtin = @import("builtin");
 const std = @import("std");

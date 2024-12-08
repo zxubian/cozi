@@ -3,7 +3,7 @@ const log = std.log.scoped(.execution_context);
 const MachineContext = @import("./context/machineContext.zig");
 const SanitizerContext = @import("./context/sanitizerContext.zig");
 
-pub const Stack = @import("./context/stack.zig");
+pub const Stack = @import("../stack.zig");
 pub const Trampoline = @import("./context/trampoline.zig");
 
 const ExecutionContext = @This();

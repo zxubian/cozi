@@ -1,6 +1,6 @@
 const builtin = @import("builtin");
 const ThreadSanitizerContext = @This();
-const Stack = @import("../stack.zig");
+const Stack = @import("../../../stack.zig");
 const std = @import("std");
 
 const tsan = struct {

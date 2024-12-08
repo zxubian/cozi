@@ -2,7 +2,7 @@ const builtin = @import("builtin");
 const build_config = @import("build_config");
 const ThreadSanitizerContext = @import("./sanitizer/threadSanitizerContext.zig");
 const AddressSanitizerContext = @import("./sanitizer/AddressSanitizerContext.zig");
-const Stack = @import("./stack.zig");
+const Stack = @import("../../stack.zig");
 
 pub const Context = @This();
 
