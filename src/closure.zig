@@ -18,8 +18,8 @@ pub fn Impl(
             allocator: Allocator,
             runnable: Runnable,
 
-            pub fn run(runnable: *Runnable) void {
-                const closure: *@This() = @fieldParentPtr("runnable", runnable);
+            pub fn run(ctx: *anyopaque) void {
+                const closure: *@This() = @alignCast(@ptrCast(ctx));
                 if (comptime returnsErrorUnion(routine)) {
                     @call(.auto, routine, closure.arguments) catch |e| {
                         std.debug.panic("Unhandled error in closure {}", .{e});
@@ -40,13 +40,14 @@ pub fn Impl(
                 self.* = .{
                     .arguments = args,
                     .runnable = .{
-                        .run = ClosureType.run,
+                        .runFn = ClosureType.run,
+                        .ptr = self,
                     },
                 };
             }
 
-            pub fn run(runnable: *Runnable) void {
-                const closure: *@This() = @fieldParentPtr("runnable", runnable);
+            pub fn run(ctx: *anyopaque) void {
+                const closure: *@This() = @alignCast(@ptrCast(ctx));
                 if (comptime returnsErrorUnion(routine)) {
                     @call(.auto, routine, closure.arguments) catch |e| {
                         std.debug.panic("Unhandled error in closure {}", .{e});
@@ -85,7 +86,8 @@ pub fn init(
     closure.* = .{
         .arguments = args,
         .runnable = .{
-            .run = ClosureType.run,
+            .runFn = ClosureType.run,
+            .ptr = closure,
         },
         .allocator = allocator,
     };

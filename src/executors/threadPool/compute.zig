@@ -71,7 +71,7 @@ fn threadEntryPoint(thread_pool: *ThreadPool, i: usize, self: *const Thread) voi
                     break;
                 };
                 log.debug("{s} acquired a new task\n", .{name});
-                next_task.run(next_task);
+                next_task.run();
                 thread_pool.waitgroup.finish();
             },
             .not_started => unreachable,

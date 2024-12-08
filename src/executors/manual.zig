@@ -19,7 +19,7 @@ pub fn runAtMost(self: *ManualExecutor, limit: usize) usize {
     var run_count: usize = 0;
     while (run_count < limit) : (run_count += 1) {
         const runnable = self.tasks.popFront() orelse break;
-        runnable.run(runnable);
+        runnable.run();
     }
     return run_count;
 }
@@ -41,7 +41,7 @@ pub inline fn isEmpty(self: *const ManualExecutor) bool {
 pub fn drain(self: *ManualExecutor) usize {
     var run_count: usize = 0;
     while (self.tasks.popFront()) |runnable| : (run_count += 1) {
-        runnable.run(runnable);
+        runnable.run();
     }
     return run_count;
 }

@@ -13,7 +13,7 @@ const Runnable = @import("./runnable.zig");
 threadlocal var current_fiber: ?*Fiber = null;
 coroutine: *Coroutine,
 executor: Executor,
-tick_runnable: *Runnable,
+tick_runnable: Runnable,
 owns_stack: bool = false,
 
 pub fn go(
@@ -76,14 +76,10 @@ pub fn goWithStack(
     const padding = try gpa.alignedAlloc(u8, Stack.STACK_ALIGNMENT_BYTES, 1);
     _ = padding;
     coroutine.initNoAlloc(&routine_closure.*.runnable, stack);
-    const tick_closure = try gpa.create(
-        Closure.Impl(tick(own_stack).*, false),
-    );
-    tick_closure.*.init(.{fiber});
     fiber.* = .{
         .coroutine = coroutine,
         .executor = executor,
-        .tick_runnable = &tick_closure.*.runnable,
+        .tick_runnable = fiber.runnable(own_stack),
     };
     fiber.scheduleSelf();
 }
@@ -109,12 +105,13 @@ fn _yield(self: *Fiber) void {
 }
 
 fn scheduleSelf(self: *Fiber) void {
-    self.executor.submitRunnable(self.tick_runnable);
+    self.executor.submitRunnable(&self.tick_runnable);
 }
 
-fn tick(comptime owns_stack: bool) *const fn (self: *Fiber) void {
-    return struct {
-        pub fn tick(self: *Fiber) void {
+fn runnable(fiber: *Fiber, comptime owns_stack: bool) Runnable {
+    const tick_fn = struct {
+        pub fn tick(ctx: *anyopaque) void {
+            const self: *Fiber = @alignCast(@ptrCast(ctx));
             const old_ctx = current_fiber;
             current_fiber = self;
             self.coroutine.@"resume"();
@@ -128,6 +125,10 @@ fn tick(comptime owns_stack: bool) *const fn (self: *Fiber) void {
             current_fiber = old_ctx;
         }
     }.tick;
+    return Runnable{
+        .runFn = tick_fn,
+        .ptr = fiber,
+    };
 }
 
 test {

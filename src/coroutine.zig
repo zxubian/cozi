@@ -63,7 +63,7 @@ fn trampoline(self: *Coroutine) Trampoline {
 
 fn run(ctx: *anyopaque) noreturn {
     var self: *Coroutine = @ptrCast(@alignCast(ctx));
-    self.runnable.run(self.runnable);
+    self.runnable.run();
     self.complete();
 }
 

@@ -44,21 +44,24 @@ pub fn init(
     config: Config,
     executor: Executor,
     allocator: Allocator,
-) !Dispatch {
+) !*Dispatch {
     const impl = try Impl.init(config, allocator);
-    return Dispatch{
+    const result = try allocator.create(Dispatch);
+    result.* = .{
         .allocator = allocator,
         .executor = executor,
         .impl = impl,
         .runnable = .{
-            .run = &Dispatch.run,
+            .runFn = &Dispatch.run,
+            .ptr = result,
         },
         .config = config,
     };
+    return result;
 }
 
-pub fn run(runnable: *Runnable) void {
-    var self: *Dispatch = @fieldParentPtr("runnable", runnable);
+pub fn run(ctx: *anyopaque) void {
+    var self: *Dispatch = @alignCast(@ptrCast(ctx));
     self.pollBatch() catch |e| {
         std.debug.panic("{}", .{e});
     };
