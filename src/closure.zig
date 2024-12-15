@@ -22,7 +22,7 @@ pub fn Impl(
                 const closure: *@This() = @alignCast(@ptrCast(ctx));
                 if (comptime returnsErrorUnion(routine)) {
                     @call(.auto, routine, closure.arguments) catch |e| {
-                        std.debug.panic("Unhandled error in closure {}", .{e});
+                        std.debug.panic("Unhandled error in closure: {}", .{e});
                     };
                 } else {
                     @call(.auto, routine, closure.arguments);

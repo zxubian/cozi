@@ -9,6 +9,11 @@ const Executor = @import("./executor.zig");
 const Stack = @import("./stack.zig");
 const Closure = @import("./closure.zig");
 const Runnable = @import("./runnable.zig");
+const Awaiter = @import("./fiber/awaiter.zig");
+const YieldAwaiter = @import("./fiber/awaiters.zig").YieldAwaiter;
+
+pub const Mutex = @import("./fiber/mutex.zig");
+
 const log = std.log.scoped(.fiber);
 
 threadlocal var current_fiber: ?*Fiber = null;
@@ -17,6 +22,10 @@ executor: Executor,
 tick_runnable: Runnable,
 owns_stack: bool = false,
 name: [:0]const u8,
+awaiter: ?*Awaiter = null,
+
+var yield_awaiter = YieldAwaiter.awaiter();
+
 pub const MAX_FIBER_NAME_LENGTH_BYTES = 100;
 
 pub fn go(
@@ -89,6 +98,7 @@ pub fn goWithStack(
         .executor = executor,
         .tick_runnable = fiber.runnable(own_stack),
         .name = @ptrCast(name[0..options.name.len]),
+        .awaiter = null,
     };
     fiber.scheduleSelf();
 }
@@ -97,23 +107,29 @@ pub fn isInFiber() bool {
     return current_fiber != null;
 }
 
-pub fn current() ?*const Fiber {
+pub fn current() ?*Fiber {
     return current_fiber;
 }
 
 pub fn yield() void {
+    Fiber.@"suspend"(&yield_awaiter);
+}
+
+pub fn @"suspend"(awaiter: *Awaiter) void {
     if (current_fiber) |curr| {
-        curr._yield();
+        curr.suspend_(awaiter);
     } else {
-        std.debug.panic("Cannot call Fiber.yield when from outside of a Fiber.", .{});
+        std.debug.panic("Cannot call Fiber.suspend when from outside of a Fiber.", .{});
     }
 }
 
-fn _yield(self: *Fiber) void {
+fn suspend_(self: *Fiber, awaiter: *Awaiter) void {
+    log.info("{s} about to suspend", .{self.name});
+    self.awaiter = awaiter;
     self.coroutine.@"suspend"();
 }
 
-fn scheduleSelf(self: *Fiber) void {
+pub fn scheduleSelf(self: *Fiber) void {
     self.executor.submitRunnable(&self.tick_runnable);
 }
 
@@ -123,13 +139,17 @@ fn runnable(fiber: *Fiber, comptime owns_stack: bool) Runnable {
             const self: *Fiber = @alignCast(@ptrCast(ctx));
             const old_ctx = current_fiber;
             current_fiber = self;
+            log.info("{s} about to resume", .{self.name});
             self.coroutine.@"resume"();
             if (self.coroutine.is_completed) {
                 if (owns_stack) {
                     self.coroutine.deinit();
                 }
             } else {
-                self.scheduleSelf();
+                if (self.awaiter) |awaiter| {
+                    self.awaiter = null;
+                    awaiter.@"await"(self);
+                }
             }
             current_fiber = old_ctx;
         }
@@ -142,4 +162,5 @@ fn runnable(fiber: *Fiber, comptime owns_stack: bool) Runnable {
 
 test {
     _ = @import("./fiber/tests.zig");
+    _ = @import("./fiber/mutex.zig");
 }
