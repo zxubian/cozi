@@ -51,6 +51,9 @@ test "counter - single thread" {
 }
 
 test "counter - multi-thread" {
+    if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
     var tp = try ThreadPool.init(4, testing.allocator);
     defer tp.deinit();
     try tp.start();
@@ -91,6 +94,9 @@ test "counter - multi-thread" {
 }
 
 test "concurrent add & done" {
+    if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
     var tp = try ThreadPool.init(4, testing.allocator);
     defer tp.deinit();
     try tp.start();
@@ -144,6 +150,9 @@ test "concurrent add & done" {
 }
 
 test "stress" {
+    if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
     var tp = try ThreadPool.init(4, testing.allocator);
     defer tp.deinit();
     try tp.start();

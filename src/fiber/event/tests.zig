@@ -144,6 +144,9 @@ test "park fiber while waiting" {
 }
 
 test "threadpool - stress" {
+    if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
     var tp = try ThreadPool.init(4, testing.allocator);
     defer tp.deinit();
     try tp.start();
