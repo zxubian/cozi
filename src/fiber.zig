@@ -9,12 +9,15 @@ const Executor = @import("./executor.zig");
 const Stack = @import("./stack.zig");
 const Closure = @import("./closure.zig");
 const Runnable = @import("./runnable.zig");
+const log = std.log.scoped(.fiber);
 
 threadlocal var current_fiber: ?*Fiber = null;
 coroutine: *Coroutine,
 executor: Executor,
 tick_runnable: Runnable,
 owns_stack: bool = false,
+name: [:0]const u8,
+pub const MAX_FIBER_NAME_LENGTH_BYTES = 100;
 
 pub fn go(
     comptime routine: anytype,
@@ -33,6 +36,7 @@ pub fn go(
 
 pub const Options = struct {
     stack_size: usize = Coroutine.Stack.InitOptions.DEFAULT_STACK_SIZE_BYTES,
+    name: [:0]const u8 = "Fiber",
 };
 
 pub fn goOptions(
@@ -53,6 +57,7 @@ pub fn goOptions(
         args,
         stack,
         executor,
+        options,
         true,
     );
 }
@@ -62,12 +67,15 @@ pub fn goWithStack(
     args: anytype,
     stack: Stack,
     executor: Executor,
+    options: Options,
     comptime own_stack: bool,
 ) !void {
     var fixed_buffer_allocator = stack.bufferAllocator();
     const gpa = fixed_buffer_allocator.allocator();
     // place fiber & coroutine on coroutine stack
     // in order to avoid additional dynamic allocations
+    var name = try gpa.alloc(u8, MAX_FIBER_NAME_LENGTH_BYTES);
+    std.mem.copyForwards(u8, name, options.name);
     const fiber = try gpa.create(Fiber);
     const coroutine = try gpa.create(Coroutine);
     const routine_closure = try gpa.create(Closure.Impl(routine, false));
@@ -80,6 +88,7 @@ pub fn goWithStack(
         .coroutine = coroutine,
         .executor = executor,
         .tick_runnable = fiber.runnable(own_stack),
+        .name = @ptrCast(name[0..options.name.len]),
     };
     fiber.scheduleSelf();
 }

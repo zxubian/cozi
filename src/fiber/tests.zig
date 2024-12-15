@@ -185,6 +185,7 @@ test "Pre-supplied stack" {
         .{&step},
         stack,
         manual_executor.executor(),
+        .{},
         false,
     );
     _ = manual_executor.drain();
