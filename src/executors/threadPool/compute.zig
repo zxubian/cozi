@@ -1,6 +1,5 @@
-//! Compute thread pool, suitable for small number of independent tasks
-//! Singular work-queue
-//! For fiber workloads, consider using "fast" thread pool.
+//! Compute thread pool, suitable for small number of independent tasks.
+//! For fiber workloads, consider using work-stealing thread pool.
 const std = @import("std");
 const log = std.log.scoped(.thread_pool);
 const Thread = std.Thread;
