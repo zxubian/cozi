@@ -25,7 +25,9 @@ const Status = enum(u8) {
 threads: []Thread = undefined,
 tasks: Queue(Runnable) = undefined,
 waitgroup: Thread.WaitGroup = .{},
+/// used to allocate the Threads. No allocations happen on runnable submit
 allocator: Allocator,
+// protects the queue
 mutex: Thread.Mutex = .{},
 status: atomic(Status) = undefined,
 
