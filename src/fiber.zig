@@ -13,6 +13,7 @@ const Awaiter = @import("./fiber/awaiter.zig");
 const YieldAwaiter = @import("./fiber/awaiters.zig").YieldAwaiter;
 
 pub const Mutex = @import("./fiber/mutex.zig");
+pub const Event = @import("./fiber/event.zig");
 
 const log = std.log.scoped(.fiber);
 
@@ -142,7 +143,9 @@ fn runnable(fiber: *Fiber, comptime owns_stack: bool) Runnable {
             log.info("{s} about to resume", .{self.name});
             self.coroutine.@"resume"();
             if (self.coroutine.is_completed) {
+                log.info("{s} completed", .{self.name});
                 if (owns_stack) {
+                    log.info("{s} deallocating stack", .{self.name});
                     self.coroutine.deinit();
                 }
             } else {
@@ -163,4 +166,5 @@ fn runnable(fiber: *Fiber, comptime owns_stack: bool) Runnable {
 test {
     _ = @import("./fiber/tests.zig");
     _ = @import("./fiber/mutex.zig");
+    _ = @import("./fiber/event.zig");
 }

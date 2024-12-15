@@ -68,14 +68,17 @@ pub fn IntrusiveForwardList(T: type) type {
         }
 
         pub fn print(self: *List) void {
-            std.debug.print("printing intrusive list {}\n", .{@intFromPtr(self)});
+            std.debug.print(
+                "printing intrusive list {*}\n",
+                .{self},
+            );
             if (self.head) |head| {
                 var next = head.next;
                 while (next != null) : (next = next.?.next) {
                     std.debug.print("{} -> ", .{next});
                 }
             } else {
-                std.debug.print("queue: empty", .{});
+                std.debug.print("{*}: empty", .{self});
             }
         }
     };

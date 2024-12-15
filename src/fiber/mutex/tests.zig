@@ -169,7 +169,7 @@ test "threadpool - parallel" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
-    var limit = try TimeLimit.init(std.time.ns_per_s * 10);
+    var limit = try TimeLimit.init(std.time.ns_per_s * 5);
     {
         var tp = try ThreadPool.init(4, testing.allocator);
         defer tp.deinit();
@@ -197,7 +197,7 @@ test "threadpool - parallel" {
             pub fn run(mutex_: *Mutex) void {
                 mutex_.lock();
                 mutex_.unlock();
-                std.Thread.sleep(std.time.ns_per_s * 5);
+                std.Thread.sleep(std.time.ns_per_s);
             }
         };
 

@@ -87,8 +87,8 @@ const MutexAwaiter = struct {
 };
 
 pub fn @"await"(ctx: *anyopaque, fiber: *Fiber) void {
-    var awaiter_: *MutexAwaiter = @alignCast(@ptrCast(ctx));
-    var self = awaiter_.mutex;
+    var awaiter: *MutexAwaiter = @alignCast(@ptrCast(ctx));
+    var self = awaiter.mutex;
     {
         if (self.locked.load(.seq_cst) == false) {
             fiber.scheduleSelf();
@@ -100,10 +100,10 @@ pub fn @"await"(ctx: *anyopaque, fiber: *Fiber) void {
             fiber.name,
             self,
         });
-        awaiter_.queue_node = .{
+        awaiter.queue_node = .{
             .fiber = fiber,
         };
-        self.queue.pushBack(&awaiter_.queue_node);
+        self.queue.pushBack(&awaiter.queue_node);
     }
 }
 
