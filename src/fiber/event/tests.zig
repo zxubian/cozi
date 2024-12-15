@@ -164,7 +164,7 @@ test "threadpool - stress" {
             self.event.fire();
         }
     };
-    for (0..200) |_| {
+    for (0..1000) |_| {
         const ctx = try testing.allocator.create(Ctx);
         ctx.* = .{ .alloc = testing.allocator };
         try Fiber.go(
