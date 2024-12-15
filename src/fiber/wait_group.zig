@@ -1,3 +1,6 @@
+//! Wait Group for Fibers.
+//! Waiting on a WaitGroup does not block the underlying thread -
+//! instead, the fiber is parked until the WaitGroup counter reaches 0.
 const std = @import("std");
 const WaitGroup = @This();
 const Atomic = std.atomic.Value;

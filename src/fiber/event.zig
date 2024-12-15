@@ -1,3 +1,6 @@
+//! One-shot event for fibers.
+//! Waiting on event does not block the underlying thread -
+//! instead, the fiber is parked until the event is fired.
 const std = @import("std");
 const Event = @This();
 const Atomic = std.atomic.Value;

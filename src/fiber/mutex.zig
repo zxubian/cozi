@@ -1,3 +1,8 @@
+//! Mutual exclusion for fibers.
+//! Locking does not block the underyling thread,
+//! even for the contended case.
+//! Instead, the contending fiber will be parked
+//! until the mutex is unlocked.
 const std = @import("std");
 const Atomic = std.atomic.Value;
 
