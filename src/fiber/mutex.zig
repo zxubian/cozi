@@ -47,8 +47,8 @@ pub fn lock(self: *Mutex) void {
             .ptr = undefined,
         },
     };
-    // this is safe because Fiber.wait will not exit
-    // during Fiber.await.
+    // this is safe because Fiber.lock will not exit
+    // during Fiber.await, so the stack will not be reused.
     awaiter.awaiter.ptr = &awaiter;
     Fiber.@"suspend"(&awaiter.awaiter);
 }

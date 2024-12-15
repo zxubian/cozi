@@ -12,8 +12,9 @@ const Runnable = @import("./runnable.zig");
 const Awaiter = @import("./fiber/awaiter.zig");
 const YieldAwaiter = @import("./fiber/awaiters.zig").YieldAwaiter;
 
-pub const Mutex = @import("./fiber/mutex.zig");
+pub const Barrier = @import("./fiber/barrier.zig");
 pub const Event = @import("./fiber/event.zig");
+pub const Mutex = @import("./fiber/mutex.zig");
 pub const WaitGroup = @import("./fiber/wait_group.zig");
 
 const log = std.log.scoped(.fiber);
@@ -166,7 +167,9 @@ fn runnable(fiber: *Fiber, comptime owns_stack: bool) Runnable {
 
 test {
     _ = @import("./fiber/tests.zig");
-    _ = @import("./fiber/mutex.zig");
+
+    _ = @import("./fiber/barrier.zig");
     _ = @import("./fiber/event.zig");
+    _ = @import("./fiber/mutex.zig");
     _ = @import("./fiber/wait_group.zig");
 }
