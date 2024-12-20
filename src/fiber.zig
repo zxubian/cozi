@@ -15,6 +15,7 @@ const YieldAwaiter = @import("./fiber/awaiters.zig").YieldAwaiter;
 pub const Barrier = @import("./fiber/barrier.zig");
 pub const Event = @import("./fiber/event.zig");
 pub const Mutex = @import("./fiber/mutex.zig");
+pub const Strand = @import("./fiber/strand.zig");
 pub const WaitGroup = @import("./fiber/wait_group.zig");
 
 const log = std.log.scoped(.fiber);
@@ -171,5 +172,6 @@ test {
     _ = @import("./fiber/barrier.zig");
     _ = @import("./fiber/event.zig");
     _ = @import("./fiber/mutex.zig");
+    _ = @import("./fiber/strand.zig");
     _ = @import("./fiber/wait_group.zig");
 }

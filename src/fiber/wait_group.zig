@@ -94,7 +94,10 @@ const WaitGroupAwaiter = struct {
     queue_node: Node = undefined,
 };
 
-pub fn @"await"(ctx: *anyopaque, fiber: *Fiber) void {
+pub fn @"await"(
+    ctx: *anyopaque,
+    fiber: *Fiber,
+) void {
     var awaiter: *WaitGroupAwaiter = @ptrCast(@alignCast(ctx));
     var self: *WaitGroup = awaiter.wait_group;
     {

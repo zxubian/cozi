@@ -1,6 +1,5 @@
-pub const Intrusive = struct {
-    pub const ForwardList = @import("./containers/intrusive/forwardList.zig");
-};
+pub const Intrusive = @import("./containers/intrusive.zig");
+
 test {
-    _ = @import("./containers/intrusive/forwardList.zig");
+    _ = @import("./containers/intrusive.zig");
 }
