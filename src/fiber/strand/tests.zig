@@ -163,12 +163,10 @@ test "stress" {
         var fiber_name: [Fiber.MAX_FIBER_NAME_LENGTH_BYTES:0]u8 = undefined;
         const iterations_per_fiber = 100;
         const fiber_count = 100;
-        const rand = std.Random.DefaultPrng.init(std.testing.random_seed);
         const Ctx = struct {
             strand: *Strand,
             counter: usize,
             control: Atomic(usize),
-            rand: std.Random.DefaultPrng,
 
             fn randomRange(self: *@This(), comptime max: usize) usize {
                 const r: usize = self.rand.next();
@@ -178,13 +176,11 @@ test "stress" {
             pub fn run(self: *@This()) void {
                 for (0..iterations_per_fiber) |_| {
                     _ = self.control.fetchAdd(1, .monotonic);
-                    std.Thread.sleep(self.randomRange(3) * std.time.ns_per_ms);
                     self.strand.combine(criticalSection, .{self});
                 }
             }
 
             pub fn criticalSection(self: *@This()) !void {
-                std.Thread.sleep(self.randomRange(3) * std.time.ns_per_us);
                 self.counter += 1;
             }
         };
@@ -192,7 +188,6 @@ test "stress" {
             .strand = &strand,
             .counter = 0,
             .control = .init(0),
-            .rand = rand,
         };
         for (0..fiber_count) |i| {
             const name = try std.fmt.bufPrintZ(
