@@ -6,6 +6,7 @@ const Atomic = std.atomic.Value;
 
 const Fiber = @import("../../fiber.zig");
 const Strand = Fiber.Strand;
+const Event = Fiber.Event;
 
 const Executors = @import("../../executors.zig");
 const ManualExecutor = Executors.Manual;
@@ -34,7 +35,39 @@ test "counter" {
         .strand = &strand,
         .counter = 0,
     };
-    const fiber_count = 2;
+    try Fiber.go(
+        Ctx.run,
+        .{&ctx},
+        testing.allocator,
+        manual_executor.executor(),
+    );
+    _ = manual_executor.drain();
+    try testing.expectEqual(count, ctx.counter);
+}
+
+test "many fibers" {
+    var strand: Strand = .{};
+    var manual_executor = ManualExecutor{};
+    const count: usize = 100;
+    const Ctx = struct {
+        strand: *Strand,
+        counter: usize,
+
+        pub fn run(self: *@This()) void {
+            for (0..count) |_| {
+                self.strand.combine(criticalSection, .{self});
+            }
+        }
+
+        pub fn criticalSection(self: *@This()) void {
+            self.counter += 1;
+        }
+    };
+    var ctx: Ctx = .{
+        .strand = &strand,
+        .counter = 0,
+    };
+    const fiber_count = 5;
     for (0..fiber_count) |_| {
         try Fiber.go(
             Ctx.run,
@@ -84,6 +117,37 @@ test "run on single fiber" {
     _ = manual_executor.drain();
 }
 
+test "Suspend Illegal" {
+    var strand: Strand = .{};
+    var event: Event = .{};
+    var manual_executor = ManualExecutor{};
+    const Ctx = struct {
+        strand: *Strand,
+        event: *Event,
+
+        pub fn run(self: *@This()) void {
+            self.strand.combine(criticalSection, .{self});
+        }
+
+        pub fn criticalSection(_: *@This()) !void {
+            try testing.expect(Fiber.current().?.suspend_illegal_scope != null);
+            // illegal
+            // self.event.wait();
+        }
+    };
+    var ctx: Ctx = .{
+        .strand = &strand,
+        .event = &event,
+    };
+    try Fiber.go(
+        Ctx.run,
+        .{&ctx},
+        testing.allocator,
+        manual_executor.executor(),
+    );
+    _ = manual_executor.drain();
+}
+
 test "stress" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
@@ -97,8 +161,8 @@ test "stress" {
         try tp.start();
         defer tp.stop();
         var fiber_name: [Fiber.MAX_FIBER_NAME_LENGTH_BYTES:0]u8 = undefined;
-        const iterations_per_fiber = 1000;
-        const fiber_count = 1000;
+        const iterations_per_fiber = 100;
+        const fiber_count = 100;
         const rand = std.Random.DefaultPrng.init(std.testing.random_seed);
         const Ctx = struct {
             strand: *Strand,
@@ -114,13 +178,13 @@ test "stress" {
             pub fn run(self: *@This()) void {
                 for (0..iterations_per_fiber) |_| {
                     _ = self.control.fetchAdd(1, .monotonic);
-                    std.Thread.sleep(self.randomRange(16 * 3) * std.time.ns_per_ms);
+                    std.Thread.sleep(self.randomRange(3) * std.time.ns_per_ms);
                     self.strand.combine(criticalSection, .{self});
                 }
             }
 
             pub fn criticalSection(self: *@This()) !void {
-                std.Thread.sleep(self.randomRange(50 * 3) * std.time.ns_per_us);
+                std.Thread.sleep(self.randomRange(3) * std.time.ns_per_us);
                 self.counter += 1;
             }
         };

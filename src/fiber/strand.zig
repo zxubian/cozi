@@ -10,6 +10,7 @@ const SpinLock = @import("../sync.zig").Spinlock;
 const AtomicEnum = @import("../atomic_enum.zig").Value;
 const Awaiter = @import("./awaiter.zig");
 const Fiber = @import("../fiber.zig");
+const SuspendIllegalScope = Fiber.SuspendIllegalScope;
 
 const log = std.log.scoped(.fiber_strand);
 
@@ -93,7 +94,12 @@ fn runBatch(
     var batch_size: usize = self.queue.takeBatch(&batch);
     while (batch_size > 0) : (batch_size = self.queue.takeBatch(&batch)) {
         for (batch[0..batch_size]) |node| {
-            node.critical_section_runnable.run();
+            {
+                var scope: SuspendIllegalScope = .{ .fiber = executing_fiber };
+                scope.Begin();
+                defer scope.End();
+                node.critical_section_runnable.run();
+            }
             if (node.submitting_fiber != executing_fiber) {
                 node.submitting_fiber.scheduleSelf();
             }

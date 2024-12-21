@@ -17,6 +17,7 @@ pub const Event = @import("./fiber/event.zig");
 pub const Mutex = @import("./fiber/mutex.zig");
 pub const Strand = @import("./fiber/strand.zig");
 pub const WaitGroup = @import("./fiber/wait_group.zig");
+pub const SuspendIllegalScope = @import("./fiber/suspendIllegalScope.zig");
 
 const log = std.log.scoped(.fiber);
 
@@ -27,6 +28,9 @@ tick_runnable: Runnable,
 owns_stack: bool = false,
 name: [:0]const u8,
 awaiter: ?*Awaiter = null,
+suspend_illegal_scope: ?*SuspendIllegalScope = null,
+/////nocheckin
+state: std.atomic.Value(u8) = .init(0),
 
 var yield_awaiter = YieldAwaiter.awaiter();
 
@@ -128,8 +132,17 @@ pub fn @"suspend"(awaiter: *Awaiter) void {
 }
 
 fn suspend_(self: *Fiber, awaiter: *Awaiter) void {
+    if (self.suspend_illegal_scope) |scope| {
+        std.debug.panic(
+            "Cannot suspend fiber while in \"suspend illegal\" scope {*}",
+            .{scope},
+        );
+    }
     log.info("{s} about to suspend", .{self.name});
     self.awaiter = awaiter;
+    if (self.state.cmpxchgStrong(1, 0, .seq_cst, .seq_cst)) |_| {
+        std.debug.panic("suspending twice!!", .{});
+    }
     self.coroutine.@"suspend"();
 }
 
@@ -144,6 +157,9 @@ fn runnable(fiber: *Fiber, comptime owns_stack: bool) Runnable {
             const old_ctx = current_fiber;
             current_fiber = self;
             log.info("{s} about to resume", .{self.name});
+            if (self.state.cmpxchgStrong(0, 1, .seq_cst, .seq_cst)) |_| {
+                std.debug.panic("resuming twice!!", .{});
+            }
             self.coroutine.@"resume"();
             if (self.coroutine.is_completed) {
                 log.info("{s} completed", .{self.name});
