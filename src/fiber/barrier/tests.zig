@@ -3,6 +3,7 @@ const builtin = @import("builtin");
 const testing = std.testing;
 const Atomic = std.atomic.Value;
 const Allocator = std.mem.Allocator;
+const WaitGroup = std.Thread.WaitGroup;
 
 const Fiber = @import("../../fiber.zig");
 const Barrier = Fiber.Barrier;
@@ -71,6 +72,7 @@ test "stress" {
         allocator: Allocator,
         executor: Executor,
         done: bool,
+        wait_group: WaitGroup = .{},
 
         pub fn leader(ctx: *@This()) !void {
             for (0..stages) |stage| {
@@ -95,6 +97,7 @@ test "stress" {
                 Fiber.yield();
             }
             ctx.done = true;
+            ctx.wait_group.finish();
         }
 
         pub fn run(ctx: *@This(), i: usize, stage: usize) !void {
@@ -116,16 +119,15 @@ test "stress" {
         .executor = tp.executor(),
         .done = false,
     };
-
+    ctx.wait_group.start();
     try Fiber.go(
         Ctx.leader,
         .{&ctx},
         testing.allocator,
         tp.executor(),
     );
-    while (!ctx.done) {
-        _ = tp.waitIdle();
-    }
+    ctx.wait_group.wait();
+    try testing.expect(ctx.done);
     for (ctx.state) |s| {
         try testing.expectEqual(stages, s.load(.seq_cst));
     }

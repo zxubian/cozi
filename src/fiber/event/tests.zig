@@ -9,6 +9,7 @@ const Fiber = @import("../../fiber.zig");
 const Executors = @import("../../executors.zig");
 const ManualExecutor = Executors.Manual;
 const ThreadPool = Executors.ThreadPools.Compute;
+const WaitGroup = std.Thread.WaitGroup;
 
 const TimeLimit = @import("../../testing/TimeLimit.zig");
 
@@ -151,25 +152,34 @@ test "threadpool - stress" {
     defer tp.deinit();
     try tp.start();
     defer tp.stop();
+    var wait_group: WaitGroup = .{};
     const Ctx = struct {
         event: Event = .{},
         state: Atomic(bool) = .init(false),
         alloc: std.mem.Allocator,
+        wait_group: *WaitGroup,
 
         pub fn runConsumer(self: *@This()) !void {
+            var wg = self.wait_group;
             self.event.wait();
             try testing.expectEqual(true, self.state.load(.seq_cst));
             self.alloc.destroy(self);
+            wg.finish();
         }
 
         pub fn runProducer(self: *@This()) !void {
             self.state.store(true, .seq_cst);
             self.event.fire();
+            self.wait_group.finish();
         }
     };
     for (0..1000) |_| {
         const ctx = try testing.allocator.create(Ctx);
-        ctx.* = .{ .alloc = testing.allocator };
+        ctx.* = .{
+            .alloc = testing.allocator,
+            .wait_group = &wait_group,
+        };
+        ctx.wait_group.startMany(2);
         try Fiber.go(
             Ctx.runConsumer,
             .{ctx},
@@ -183,5 +193,5 @@ test "threadpool - stress" {
             tp.executor(),
         );
     }
-    tp.waitIdle();
+    wait_group.wait();
 }

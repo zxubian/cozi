@@ -9,6 +9,7 @@ const Queue = LockFree.MpscLockFreeQueue;
 const Executors = @import("../../../executors.zig");
 const ManualExecutor = Executors.Manual;
 const ThreadPool = Executors.ThreadPools.Compute;
+const WaitGroup = std.Thread.WaitGroup;
 const Fiber = @import("../../../fiber.zig");
 
 test "stack - basic" {
@@ -106,6 +107,7 @@ test "stack - multiple producers - thread pool" {
         stack: Stack(Node),
         counter: Atomic(usize) = .init(0),
         nodes: []Node,
+        wait_group: WaitGroup = .{},
 
         pub fn run(ctx: *@This()) void {
             for (0..node_per_fiber) |_| {
@@ -114,6 +116,7 @@ test "stack - multiple producers - thread pool" {
                 node.*.data = counter;
                 ctx.stack.pushFront(node);
             }
+            ctx.wait_group.finish();
         }
     };
     var ctx: Ctx = .{
@@ -121,6 +124,7 @@ test "stack - multiple producers - thread pool" {
         .nodes = &nodes,
     };
     for (0..fiber_count) |_| {
+        ctx.wait_group.start();
         try Fiber.go(
             Ctx.run,
             .{&ctx},
@@ -128,7 +132,7 @@ test "stack - multiple producers - thread pool" {
             tp.executor(),
         );
     }
-    tp.waitIdle();
+    ctx.wait_group.wait();
     try testing.expectEqual(node_count, ctx.stack.count.load(.seq_cst));
     var i: usize = 0;
     var array_idx: isize = node_count - 1;
@@ -169,6 +173,7 @@ test "stack - stress" {
         consumer_done: bool = false,
         mutex: Fiber.Mutex = .{},
         consumer_counter: usize = 0,
+        wait_group: WaitGroup = .{},
 
         pub fn producer(ctx: *@This(), i: usize) void {
             ctx.producers_done[i] = false;
@@ -185,6 +190,7 @@ test "stack - stress" {
                 defer ctx.mutex.unlock();
                 ctx.producers_done[i] = true;
             }
+            ctx.wait_group.finish();
         }
 
         pub fn consumer(ctx: *@This()) void {
@@ -200,6 +206,7 @@ test "stack - stress" {
                 node.*.touched_by_consumer = true;
             }
             ctx.consumer_done = true;
+            ctx.wait_group.finish();
         }
 
         pub fn all_producers_done(ctx: *@This(), comptime lock: bool) bool {
@@ -220,6 +227,7 @@ test "stack - stress" {
         .nodes = &nodes,
         .producers_done = [_]bool{false} ** producer_count,
     };
+    ctx.wait_group.start();
     try Fiber.go(
         Ctx.consumer,
         .{&ctx},
@@ -227,6 +235,7 @@ test "stack - stress" {
         tp.executor(),
     );
     for (0..producer_count) |i| {
+        ctx.wait_group.start();
         try Fiber.go(
             Ctx.producer,
             .{ &ctx, i },
@@ -234,7 +243,7 @@ test "stack - stress" {
             tp.executor(),
         );
     }
-    tp.waitIdle();
+    ctx.wait_group.wait();
     const target = comptime blk: {
         @setEvalBranchQuota(std.math.maxInt(u32));
         var i: usize = 0;
@@ -343,6 +352,7 @@ test "queue - multiple producers - thread pool" {
         queue: Queue(Node),
         counter: Atomic(usize) = .init(0),
         nodes: []Node,
+        wait_group: WaitGroup = .{},
 
         pub fn run(ctx: *@This()) void {
             for (0..node_per_fiber) |_| {
@@ -351,6 +361,7 @@ test "queue - multiple producers - thread pool" {
                 node.*.data = counter;
                 ctx.queue.pushBack(node);
             }
+            ctx.wait_group.finish();
         }
     };
     var ctx: Ctx = .{
@@ -358,6 +369,7 @@ test "queue - multiple producers - thread pool" {
         .nodes = &nodes,
     };
     for (0..fiber_count) |_| {
+        ctx.wait_group.start();
         try Fiber.go(
             Ctx.run,
             .{&ctx},
@@ -365,7 +377,7 @@ test "queue - multiple producers - thread pool" {
             tp.executor(),
         );
     }
-    tp.waitIdle();
+    ctx.wait_group.wait();
     try testing.expectEqual(node_count, ctx.queue.count.load(.seq_cst));
     var i: usize = 0;
     while (ctx.queue.popFront()) |node| : (i += 1) {
@@ -401,6 +413,7 @@ test "queue - stress" {
         producers_done: [producer_count]bool = undefined,
         consumer_done: bool = false,
         mutex: Fiber.Mutex = .{},
+        wait_group: WaitGroup = .{},
 
         pub fn producer(ctx: *@This(), i: usize) void {
             ctx.producers_done[i] = false;
@@ -417,6 +430,7 @@ test "queue - stress" {
                 defer ctx.mutex.unlock();
                 ctx.producers_done[i] = true;
             }
+            ctx.wait_group.finish();
         }
 
         pub fn consumer(ctx: *@This()) !void {
@@ -433,6 +447,7 @@ test "queue - stress" {
                 node.*.touched_by_consumer = true;
             }
             ctx.consumer_done = true;
+            ctx.wait_group.finish();
         }
 
         pub fn all_producers_done(ctx: *@This(), comptime lock: bool) bool {
@@ -453,6 +468,7 @@ test "queue - stress" {
         .nodes = &nodes,
         .producers_done = [_]bool{false} ** producer_count,
     };
+    ctx.wait_group.start();
     try Fiber.go(
         Ctx.consumer,
         .{&ctx},
@@ -460,6 +476,7 @@ test "queue - stress" {
         tp.executor(),
     );
     for (0..producer_count) |i| {
+        ctx.wait_group.start();
         try Fiber.go(
             Ctx.producer,
             .{ &ctx, i },
@@ -467,7 +484,7 @@ test "queue - stress" {
             tp.executor(),
         );
     }
-    tp.waitIdle();
+    ctx.wait_group.wait();
     try testing.expect(ctx.all_producers_done(false));
     try testing.expect(ctx.consumer_done);
     for (ctx.nodes) |node| {

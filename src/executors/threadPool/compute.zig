@@ -23,7 +23,6 @@ const Status = enum(u8) {
 
 threads: []Thread = undefined,
 tasks: Queue(Runnable) = undefined,
-waitgroup: Thread.WaitGroup = .{},
 /// used to allocate the Threads. No allocations happen on runnable submit
 allocator: Allocator,
 // protects the queue
@@ -73,7 +72,6 @@ fn threadEntryPoint(thread_pool: *ThreadPool, i: usize, self: *const Thread) voi
                 };
                 log.debug("{s} acquired a new task\n", .{name});
                 next_task.run();
-                thread_pool.waitgroup.finish();
             },
             .not_started => unreachable,
         }
@@ -89,7 +87,6 @@ fn submitImpl(self: *ThreadPool, runnable: *Runnable) !void {
     if (self.status.load(.seq_cst) == .stopped) {
         return SubmitError.thread_pool_stopped;
     }
-    self.waitgroup.start();
     try self.tasks.put(runnable);
 }
 
@@ -110,11 +107,6 @@ pub fn executor(self: *ThreadPool) Executor {
     };
 }
 
-pub fn waitIdle(self: *ThreadPool) void {
-    self.waitgroup.wait();
-    self.waitgroup.reset();
-}
-
 pub fn stop(self: *ThreadPool) void {
     assert(self.status.load(.seq_cst) == .running_or_idle);
     self.status.store(.stopped, .seq_cst);
@@ -122,7 +114,6 @@ pub fn stop(self: *ThreadPool) void {
     for (self.threads) |thread| {
         thread.join();
     }
-    self.waitgroup.reset();
 }
 
 pub fn deinit(self: *ThreadPool) void {

@@ -11,6 +11,7 @@ const Event = Fiber.Event;
 const Executors = @import("../../executors.zig");
 const ManualExecutor = Executors.Manual;
 const ThreadPool = Executors.ThreadPools.Compute;
+const WaitGroup = std.Thread.WaitGroup;
 const TimeLimit = @import("../../testing/TimeLimit.zig");
 
 test "counter" {
@@ -167,6 +168,7 @@ test "stress" {
             strand: *Strand,
             counter: usize,
             control: Atomic(usize),
+            wait_group: WaitGroup = .{},
 
             fn randomRange(self: *@This(), comptime max: usize) usize {
                 const r: usize = self.rand.next();
@@ -178,6 +180,7 @@ test "stress" {
                     _ = self.control.fetchAdd(1, .monotonic);
                     self.strand.combine(criticalSection, .{self});
                 }
+                self.wait_group.finish();
             }
 
             pub fn criticalSection(self: *@This()) !void {
@@ -189,6 +192,7 @@ test "stress" {
             .counter = 0,
             .control = .init(0),
         };
+        ctx.wait_group.startMany(fiber_count);
         for (0..fiber_count) |i| {
             const name = try std.fmt.bufPrintZ(
                 fiber_name[0..],
@@ -205,7 +209,7 @@ test "stress" {
                 },
             );
         }
-        _ = tp.waitIdle();
+        ctx.wait_group.wait();
         try testing.expectEqual(
             ctx.control.load(.monotonic),
             ctx.counter,

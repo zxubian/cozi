@@ -1,8 +1,11 @@
-const Spinlock = @import("../spinlock.zig");
 const std = @import("std");
 const testing = std.testing;
-const ThreadPool = @import("../../executors.zig").ThreadPools.Compute;
 const builtin = @import("builtin");
+
+const WaitGroup = std.Thread.WaitGroup;
+const ThreadPool = @import("../../executors.zig").ThreadPools.Compute;
+
+const Spinlock = @import("../spinlock.zig");
 
 test "basic" {
     var lock: Spinlock = .{};
@@ -23,26 +26,33 @@ test "counter" {
     const thread_count = 4;
     var tp: ThreadPool = try .init(thread_count, testing.allocator);
     defer tp.deinit();
+    var wait_group: WaitGroup = .{};
+
     const Ctx = struct {
         counter: usize = 0,
         lock: *Spinlock,
+        wait_group: *WaitGroup,
 
         pub fn run(self: *@This()) !void {
             var guard = self.lock.lock();
             defer guard.unlock();
             self.counter += 1;
+            self.wait_group.finish();
         }
     };
     var ctx: Ctx = .{
         .lock = &lock,
         .counter = 0,
+        .wait_group = &wait_group,
     };
     const count = 100500;
+    wait_group.startMany(count);
     for (0..count) |_| {
         tp.executor().submit(Ctx.run, .{&ctx}, testing.allocator);
     }
     try tp.start();
     defer tp.stop();
-    tp.waitIdle();
+
+    wait_group.wait();
     try testing.expect(ctx.counter == count);
 }

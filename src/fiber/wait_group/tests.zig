@@ -10,6 +10,7 @@ const WaitGroup = Fiber.WaitGroup;
 const Executors = @import("../../executors.zig");
 const ManualExecutor = Executors.Manual;
 const ThreadPool = Executors.ThreadPools.Compute;
+const ThreadWaitGroup = std.Thread.WaitGroup;
 
 test "counter - single thread" {
     var manual_executor = ManualExecutor{};
@@ -63,18 +64,22 @@ test "counter - multi-thread" {
     const Ctx = struct {
         wg: WaitGroup = .{},
         counter: Atomic(usize) = .init(0),
+        thread_wg: ThreadWaitGroup = .{},
 
         pub fn runProducer(self: *@This()) void {
             _ = self.counter.fetchAdd(1, .seq_cst);
             self.wg.done();
+            self.thread_wg.finish();
         }
         pub fn runConsumer(self: *@This()) !void {
             self.wg.wait();
             try testing.expectEqual(count, self.counter.load(.seq_cst));
+            self.thread_wg.finish();
         }
     };
     var ctx: Ctx = .{};
     ctx.wg.add(count);
+    ctx.thread_wg.startMany(count + 1);
     try Fiber.go(
         Ctx.runConsumer,
         .{&ctx},
@@ -89,7 +94,7 @@ test "counter - multi-thread" {
             tp.executor(),
         );
     }
-    _ = tp.waitIdle();
+    ctx.thread_wg.wait();
     try testing.expectEqual(count, ctx.counter.load(.seq_cst));
 }
 
@@ -107,30 +112,36 @@ test "concurrent add & done" {
         wg: WaitGroup = .{},
         counter: Atomic(usize) = .init(0),
         join_done: bool = false,
+        thread_wg: ThreadWaitGroup = .{},
 
         pub fn runProducer(self: *@This()) void {
             self.wg.add(1);
+            self.thread_wg.finish();
         }
 
         pub fn runConsumer(self: *@This()) !void {
             _ = self.counter.fetchAdd(1, .seq_cst);
             self.wg.done();
+            self.thread_wg.finish();
         }
 
         pub fn join(self: *@This()) !void {
             self.wg.wait();
             try testing.expectEqual(count, self.counter.load(.seq_cst));
             self.join_done = true;
+            self.thread_wg.finish();
         }
     };
     var ctx: Ctx = .{};
     for (0..count) |_| {
+        ctx.thread_wg.start();
         try Fiber.go(
             Ctx.runProducer,
             .{&ctx},
             testing.allocator,
             tp.executor(),
         );
+        ctx.thread_wg.start();
         try Fiber.go(
             Ctx.runConsumer,
             .{&ctx},
@@ -138,13 +149,14 @@ test "concurrent add & done" {
             tp.executor(),
         );
     }
+    ctx.thread_wg.start();
     try Fiber.go(
         Ctx.join,
         .{&ctx},
         testing.allocator,
         tp.executor(),
     );
-    _ = tp.waitIdle();
+    ctx.thread_wg.wait();
     try testing.expectEqual(count, ctx.counter.load(.seq_cst));
     try testing.expectEqual(true, ctx.join_done);
 }
@@ -166,12 +178,14 @@ test "stress" {
         wg: WaitGroup = .{},
         counter: Atomic(usize) = .init(0),
         join_done: bool = false,
+        thread_wg: ThreadWaitGroup = .{},
 
         pub fn runProducer(self: *@This()) void {
             for (0..iterations_per_fiber) |_| {
                 self.wg.add(1);
                 Fiber.yield();
             }
+            self.thread_wg.finish();
         }
 
         pub fn runConsumer(self: *@This()) !void {
@@ -179,6 +193,7 @@ test "stress" {
                 _ = self.counter.fetchAdd(1, .seq_cst);
                 self.wg.done();
             }
+            self.thread_wg.finish();
         }
 
         pub fn join(self: *@This()) !void {
@@ -188,16 +203,19 @@ test "stress" {
                 self.counter.load(.seq_cst),
             );
             self.join_done = true;
+            self.thread_wg.finish();
         }
     };
     var ctx: Ctx = .{};
     for (0..fibers) |_| {
+        ctx.thread_wg.start();
         try Fiber.go(
             Ctx.runProducer,
             .{&ctx},
             testing.allocator,
             tp.executor(),
         );
+        ctx.thread_wg.start();
         try Fiber.go(
             Ctx.runConsumer,
             .{&ctx},
@@ -205,13 +223,14 @@ test "stress" {
             tp.executor(),
         );
     }
+    ctx.thread_wg.start();
     try Fiber.go(
         Ctx.join,
         .{&ctx},
         testing.allocator,
         tp.executor(),
     );
-    _ = tp.waitIdle();
+    ctx.thread_wg.wait();
     try testing.expectEqual(count, ctx.counter.load(.seq_cst));
     try testing.expectEqual(true, ctx.join_done);
 }

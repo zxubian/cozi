@@ -3,7 +3,8 @@ const builtin = @import("builtin");
 
 const testing = std.testing;
 const alloc = testing.allocator;
-const atomic = std.atomic;
+const Atomic = std.atomic.Value;
+const WaitGroup = std.Thread.WaitGroup;
 
 const Fiber = @import("../fiber.zig");
 const ManualExecutor = @import("../executors.zig").Manual;
@@ -39,54 +40,62 @@ test "Fiber context" {
 }
 
 test "Fiber Thread Pool" {
-    var step: usize = 0;
     const Ctx = struct {
-        pub fn run(step_: *usize) void {
-            step_.* += 1;
+        step: usize = 0,
+        wait_group: WaitGroup = .{},
+        pub fn run(self: *@This()) void {
+            self.step += 1;
+            self.wait_group.finish();
         }
     };
     var thread_pool = try ThreadPool.init(1, alloc);
     defer thread_pool.deinit();
-    try Fiber.go(Ctx.run, .{&step}, alloc, thread_pool.executor());
+    var ctx: Ctx = .{};
+    ctx.wait_group.start();
+    try Fiber.go(Ctx.run, .{&ctx}, alloc, thread_pool.executor());
     try thread_pool.start();
-    thread_pool.waitIdle();
-    thread_pool.stop();
-    try testing.expectEqual(step, 1);
+    defer thread_pool.stop();
+    ctx.wait_group.wait();
+    try testing.expectEqual(ctx.step, 1);
 }
 
 test "Fiber Yield" {
-    var step: usize = 0;
     const Ctx = struct {
-        pub fn run(step_: *usize) void {
+        step: usize = 0,
+        pub fn run(self: *@This()) void {
             for (0..3) |_| {
-                step_.* += 1;
+                self.step += 1;
                 Fiber.yield();
             }
         }
     };
     var manual_executor = ManualExecutor{};
-    try Fiber.go(Ctx.run, .{&step}, alloc, manual_executor.executor());
+    var ctx: Ctx = .{};
+    try Fiber.go(Ctx.run, .{&ctx}, alloc, manual_executor.executor());
     _ = manual_executor.drain();
-    try testing.expectEqual(step, 3);
+    try testing.expectEqual(ctx.step, 3);
 }
 
 test "Fiber threadpool child" {
-    const AtomicUsize = std.atomic.Value(usize);
-    var step = AtomicUsize.init(0);
     const Ctx = struct {
-        pub fn run(step_: *AtomicUsize) !void {
-            if (step_.fetchAdd(1, .monotonic) == 0) {
-                try Fiber.go(@This().run, .{step_}, alloc, Fiber.current().?.executor);
+        step: Atomic(usize) = .init(0),
+        wait_group: WaitGroup = .{},
+        pub fn run(self: *@This()) !void {
+            if (self.step.fetchAdd(1, .monotonic) == 0) {
+                try Fiber.go(@This().run, .{self}, alloc, Fiber.current().?.executor);
             }
+            self.wait_group.finish();
         }
     };
     var thread_pool = try ThreadPool.init(1, alloc);
     defer thread_pool.deinit();
-    try Fiber.go(Ctx.run, .{&step}, alloc, thread_pool.executor());
+    var ctx: Ctx = .{};
+    ctx.wait_group.startMany(2);
+    try Fiber.go(Ctx.run, .{&ctx}, alloc, thread_pool.executor());
     try thread_pool.start();
-    thread_pool.waitIdle();
-    thread_pool.stop();
-    try testing.expectEqual(step.load(.monotonic), 2);
+    defer thread_pool.stop();
+    ctx.wait_group.wait();
+    try testing.expectEqual(ctx.step.load(.monotonic), 2);
 }
 
 test "Ping Pong" {
@@ -94,79 +103,93 @@ test "Ping Pong" {
         ping,
         pong,
     };
-    var state: State = .ping;
-    const CtxA = struct {
-        pub fn run(state_: *State) !void {
+    const Ctx = struct {
+        state: State = .ping,
+        wait_group: WaitGroup = .{},
+
+        pub fn runPong(self: *@This()) !void {
             for (0..3) |_| {
-                try std.testing.expect(state_.* == .ping);
-                state_.* = .pong;
+                try std.testing.expect(self.state == .ping);
+                self.state = .pong;
                 Fiber.yield();
             }
+            self.wait_group.finish();
         }
-    };
-    const CtxB = struct {
-        pub fn run(state_: *State) !void {
+        pub fn runPing(self: *@This()) !void {
             for (0..3) |_| {
-                try std.testing.expect(state_.* == .pong);
-                state_.* = .ping;
+                try std.testing.expect(self.state == .pong);
+                self.state = .ping;
                 Fiber.yield();
             }
+            self.wait_group.finish();
         }
     };
     var thread_pool = try ThreadPool.init(1, alloc);
     defer thread_pool.deinit();
-    try Fiber.go(CtxA.run, .{&state}, alloc, thread_pool.executor());
-    try Fiber.go(CtxB.run, .{&state}, alloc, thread_pool.executor());
+    var ctx: Ctx = .{};
+    ctx.wait_group.startMany(2);
+    try Fiber.go(Ctx.runPong, .{&ctx}, alloc, thread_pool.executor());
+    try Fiber.go(Ctx.runPing, .{&ctx}, alloc, thread_pool.executor());
     try thread_pool.start();
-    thread_pool.waitIdle();
-    thread_pool.stop();
+    defer thread_pool.stop();
+    ctx.wait_group.wait();
 }
 
 test "Two Pools" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
+    var wait_group: WaitGroup = .{};
     const Ctx = struct {
-        pub fn run(expected: *ThreadPool) !void {
-            for (0..128) |_| {
+        wait_group: *WaitGroup,
+        pub fn run(self: *@This(), expected: *ThreadPool) !void {
+            const inner_count = 128;
+            self.wait_group.startMany(inner_count);
+            for (0..inner_count) |_| {
                 try testing.expectEqual(expected, ThreadPool.current().?);
                 Fiber.yield();
                 const CtxInner = struct {
-                    pub fn run(expected_: *ThreadPool) !void {
+                    pub fn run(expected_: *ThreadPool, wait_group_: *WaitGroup) !void {
                         try testing.expectEqual(expected_, ThreadPool.current().?);
+                        wait_group_.finish();
                     }
                 };
                 try Fiber.go(
                     CtxInner.run,
-                    .{expected},
+                    .{ expected, self.wait_group },
                     testing.allocator,
                     expected.executor(),
                 );
             }
+            self.wait_group.finish();
         }
     };
+    const outer_count = 2;
+    wait_group.startMany(outer_count);
     var thread_pool_a = try ThreadPool.init(1, alloc);
     defer thread_pool_a.deinit();
     var thread_pool_b = try ThreadPool.init(1, alloc);
     defer thread_pool_b.deinit();
     try thread_pool_a.start();
+    defer thread_pool_a.stop();
     try thread_pool_b.start();
+    defer thread_pool_b.stop();
+    var ctx: Ctx = .{
+        .wait_group = &wait_group,
+    };
     try Fiber.go(
         Ctx.run,
-        .{&thread_pool_a},
+        .{ &ctx, &thread_pool_a },
         alloc,
         thread_pool_a.executor(),
     );
     try Fiber.go(
         Ctx.run,
-        .{&thread_pool_b},
+        .{ &ctx, &thread_pool_b },
         alloc,
         thread_pool_b.executor(),
     );
-    thread_pool_a.waitIdle();
-    thread_pool_b.waitIdle();
-    thread_pool_a.stop();
-    thread_pool_b.stop();
+    wait_group.wait();
 }
 
 test "Pre-supplied stack" {

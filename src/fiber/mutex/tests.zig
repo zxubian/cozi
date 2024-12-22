@@ -7,6 +7,7 @@ const builtin = @import("builtin");
 const Executors = @import("../../executors.zig");
 const ManualExecutor = Executors.Manual;
 const ThreadPool = Executors.ThreadPools.Compute;
+const WaitGroup = std.Thread.WaitGroup;
 const TimeLimit = @import("../../testing/TimeLimit.zig");
 
 test "counter" {
@@ -144,16 +145,20 @@ test "threadpool" {
     const Ctx = struct {
         mutex: Mutex = .{},
         counter: usize = 0,
+        wait_group: WaitGroup = .{},
+
         pub fn run(ctx: *@This()) void {
             ctx.mutex.lock();
             ctx.counter += 1;
             ctx.mutex.unlock();
+            ctx.wait_group.finish();
         }
     };
 
     var ctx = Ctx{};
 
     for (0..3) |_| {
+        ctx.wait_group.start();
         try Fiber.go(
             Ctx.run,
             .{&ctx},
@@ -161,8 +166,7 @@ test "threadpool" {
             tp.executor(),
         );
     }
-
-    tp.waitIdle();
+    ctx.wait_group.wait();
 }
 
 test "threadpool - parallel" {
@@ -176,41 +180,42 @@ test "threadpool - parallel" {
         try tp.start();
         defer tp.stop();
 
-        var mutex: Mutex = .{};
-
         const Ctx = struct {
-            pub fn run(mutex_: *Mutex) void {
-                mutex_.lock();
+            mutex: Mutex = .{},
+            wait_group: WaitGroup = .{},
+
+            pub fn run1(ctx: *@This()) void {
+                ctx.mutex.lock();
                 std.Thread.sleep(std.time.ns_per_s);
-                mutex_.unlock();
+                ctx.mutex.unlock();
+                ctx.wait_group.finish();
+            }
+            pub fn run2(ctx: *@This()) void {
+                ctx.mutex.lock();
+                ctx.mutex.unlock();
+                std.Thread.sleep(std.time.ns_per_s);
+                ctx.wait_group.finish();
             }
         };
-
+        var ctx: Ctx = .{};
+        ctx.wait_group.start();
         try Fiber.go(
-            Ctx.run,
-            .{&mutex},
+            Ctx.run1,
+            .{&ctx},
             testing.allocator,
             tp.executor(),
         );
 
-        const Ctx2 = struct {
-            pub fn run(mutex_: *Mutex) void {
-                mutex_.lock();
-                mutex_.unlock();
-                std.Thread.sleep(std.time.ns_per_s);
-            }
-        };
-
         for (0..3) |_| {
+            ctx.wait_group.start();
             try Fiber.go(
-                Ctx2.run,
-                .{&mutex},
+                Ctx.run2,
+                .{&ctx},
                 testing.allocator,
                 tp.executor(),
             );
         }
-
-        tp.waitIdle();
+        ctx.wait_group.wait();
     }
     try limit.check();
 }
