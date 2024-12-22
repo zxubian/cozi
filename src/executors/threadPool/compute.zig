@@ -70,7 +70,7 @@ fn threadEntryPoint(thread_pool: *ThreadPool, i: usize, self: *const Thread) voi
                 const next_task = current_.?.tasks.takeBlocking() catch {
                     break;
                 };
-                log.debug("{s} acquired a new task\n", .{name});
+                log.debug("{s} acquired a new task: {}", .{ name, next_task.runFn });
                 next_task.run();
             },
             .not_started => unreachable,
@@ -92,7 +92,7 @@ fn submitImpl(self: *ThreadPool, runnable: *Runnable) !void {
 
 pub fn submit(ctx: *anyopaque, runnable: *Runnable) void {
     var self: *ThreadPool = @alignCast(@ptrCast(ctx));
-
+    log.info("{*} got new task submission:{}", .{ self, runnable.runFn });
     self.submitImpl(runnable) catch |e| {
         log.err("{}", .{e});
     };

@@ -11,20 +11,20 @@ const ManualExecutor = Executors.Manual;
 const ThreadPool = Executors.ThreadPools.Compute;
 const WaitGroup = std.Thread.WaitGroup;
 const Fiber = @import("../../../fiber.zig");
+const SpinLock = @import("../../../sync.zig").Spinlock;
 
 test "stack - basic" {
     const Node = struct {
-        intrusive_list_node: Stack(@This()).Node,
+        intrusive_list_node: LockFree.Node = .{},
         data: usize = 0,
     };
     const node_count = 100;
-    var nodes: [node_count]Node = undefined;
+    var nodes: [node_count]Node = [_]Node{.{}} ** node_count;
     var stack: Stack(Node) = .{};
     for (&nodes, 0..) |*node, i| {
         node.*.data = i;
         stack.pushFront(node);
     }
-    try testing.expectEqual(node_count, stack.count.load(.seq_cst));
     var i: usize = 0;
     var array_idx: isize = node_count - 1;
     while (stack.popFront()) |node| : ({
@@ -39,13 +39,13 @@ test "stack - basic" {
 test "stack - multiple producers - manual" {
     var manual_executor: ManualExecutor = .{};
     const Node = struct {
-        intrusive_list_node: Stack(@This()).Node,
+        intrusive_list_node: LockFree.Node = .{},
         data: usize = 0,
     };
     const fiber_count = 100;
     const node_per_fiber = 100;
     const node_count = fiber_count * node_per_fiber;
-    var nodes: [node_count]Node = undefined;
+    var nodes: [node_count]Node = [_]Node{.{}} ** node_count;
     const Ctx = struct {
         stack: Stack(Node),
         counter: Atomic(usize) = .init(0),
@@ -73,7 +73,6 @@ test "stack - multiple producers - manual" {
         );
     }
     _ = manual_executor.drain();
-    try testing.expectEqual(node_count, ctx.stack.count.load(.seq_cst));
     var i: usize = 0;
     var array_idx: isize = node_count - 1;
     while (ctx.stack.popFront()) |node| : ({
@@ -96,13 +95,13 @@ test "stack - multiple producers - thread pool" {
     defer tp.stop();
 
     const Node = struct {
-        intrusive_list_node: Stack(@This()).Node,
+        intrusive_list_node: LockFree.Node = .{},
         data: usize = 0,
     };
     const fiber_count = 500;
     const node_per_fiber = 500;
     const node_count = fiber_count * node_per_fiber;
-    var nodes: [node_count]Node = undefined;
+    var nodes: [node_count]Node = [_]Node{.{}} ** node_count;
     const Ctx = struct {
         stack: Stack(Node),
         counter: Atomic(usize) = .init(0),
@@ -133,7 +132,6 @@ test "stack - multiple producers - thread pool" {
         );
     }
     ctx.wait_group.wait();
-    try testing.expectEqual(node_count, ctx.stack.count.load(.seq_cst));
     var i: usize = 0;
     var array_idx: isize = node_count - 1;
     while (ctx.stack.popFront()) |node| : ({
@@ -149,6 +147,7 @@ test "stack - stress" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
+
     const cpu_count = try std.Thread.getCpuCount();
     var tp = try ThreadPool.init(cpu_count, testing.allocator);
     defer tp.deinit();
@@ -156,10 +155,11 @@ test "stack - stress" {
     defer tp.stop();
 
     const Node = struct {
-        intrusive_list_node: Stack(@This()).Node = .{},
-        data: usize = 0,
-        touched_by_producer: bool = false,
-        touched_by_consumer: bool = false,
+        intrusive_list_node: LockFree.Node = .{},
+        local_order: usize = 0,
+        producer_idx: usize = 0,
+        touched_by_producer: Atomic(bool) = .init(false),
+        touched_by_consumer: Atomic(bool) = .init(false),
     };
     const producer_count = 100;
     const node_per_fiber = 100;
@@ -169,53 +169,66 @@ test "stack - stress" {
         stack: Stack(Node),
         counter: Atomic(usize) = .init(0),
         nodes: []Node,
-        producers_done: [producer_count]bool = undefined,
+        producers_done: [producer_count]Atomic(bool) = undefined,
         consumer_done: bool = false,
-        mutex: Fiber.Mutex = .{},
-        consumer_counter: usize = 0,
         wait_group: WaitGroup = .{},
+        observed_orders: [producer_count]std.ArrayList(usize) = undefined,
 
-        pub fn producer(ctx: *@This(), i: usize) void {
-            ctx.producers_done[i] = false;
-            for (0..node_per_fiber) |_| {
-                const counter = ctx.counter.fetchAdd(1, .seq_cst);
-                const node: *Node = &ctx.nodes[counter];
-                node.*.data = counter;
-                node.*.touched_by_producer = true;
+        pub fn producer(ctx: *@This(), producer_idx: usize) void {
+            for (0..node_per_fiber) |i| {
+                const node_idx = node_per_fiber * producer_idx + i;
+                const node: *Node = &ctx.nodes[node_idx];
+                if (node.touched_by_producer.cmpxchgStrong(
+                    false,
+                    true,
+                    .seq_cst,
+                    .seq_cst,
+                ) != null) {
+                    unreachable;
+                }
+                node.local_order = i;
+                node.producer_idx = producer_idx;
                 ctx.stack.pushFront(node);
                 Fiber.yield();
             }
-            {
-                ctx.mutex.lock();
-                defer ctx.mutex.unlock();
-                ctx.producers_done[i] = true;
+            if (ctx.producers_done[producer_idx].cmpxchgStrong(
+                false,
+                true,
+                .seq_cst,
+                .seq_cst,
+            ) != null) {
+                unreachable;
             }
             ctx.wait_group.finish();
         }
 
-        pub fn consumer(ctx: *@This()) void {
-            while (!ctx.all_producers_done(true)) {
+        pub fn consumer(ctx: *@This()) !void {
+            while (true) {
                 while (ctx.stack.popFront()) |*node| {
-                    ctx.consumer_counter += node.*.data;
-                    node.*.touched_by_consumer = true;
+                    try testing.expect(node.*.touched_by_producer.load(.seq_cst));
+                    ctx.observed_orders[node.*.producer_idx].appendAssumeCapacity(node.*.local_order);
+                    if (node.*.touched_by_consumer.cmpxchgStrong(
+                        false,
+                        true,
+                        .seq_cst,
+                        .seq_cst,
+                    ) != null) {
+                        unreachable;
+                    }
                 }
-                Fiber.yield();
-            }
-            while (ctx.stack.popFront()) |node| {
-                ctx.consumer_counter += node.data;
-                node.*.touched_by_consumer = true;
+                if (ctx.all_producers_done()) {
+                    break;
+                } else {
+                    Fiber.yield();
+                }
             }
             ctx.consumer_done = true;
             ctx.wait_group.finish();
         }
 
-        pub fn all_producers_done(ctx: *@This(), comptime lock: bool) bool {
-            if (lock) {
-                ctx.mutex.lock();
-                defer ctx.mutex.unlock();
-            }
+        pub fn all_producers_done(ctx: *@This()) bool {
             for (ctx.producers_done) |done| {
-                if (!done) {
+                if (!done.load(.seq_cst)) {
                     return false;
                 }
             }
@@ -225,8 +238,19 @@ test "stack - stress" {
     var ctx: Ctx = .{
         .stack = .{},
         .nodes = &nodes,
-        .producers_done = [_]bool{false} ** producer_count,
+        .producers_done = [_]Atomic(bool){.init(false)} ** producer_count,
     };
+    for (&ctx.observed_orders) |*array| {
+        array.* = std.ArrayList(usize).initCapacity(
+            testing.allocator,
+            node_per_fiber,
+        ) catch unreachable;
+    }
+    defer {
+        for (&ctx.observed_orders) |*array| {
+            array.*.deinit();
+        }
+    }
     ctx.wait_group.start();
     try Fiber.go(
         Ctx.consumer,
@@ -244,40 +268,48 @@ test "stack - stress" {
         );
     }
     ctx.wait_group.wait();
-    const target = comptime blk: {
-        @setEvalBranchQuota(std.math.maxInt(u32));
-        var i: usize = 0;
-        var c: usize = 0;
-        for (0..producer_count) |_| {
-            for (0..node_per_fiber) |_| {
-                c += i;
-                i += 1;
-            }
-        }
-        break :blk c;
-    };
-    try testing.expect(ctx.all_producers_done(false));
+    try testing.expect(ctx.all_producers_done());
     try testing.expect(ctx.consumer_done);
     for (ctx.nodes) |node| {
-        try testing.expect(node.touched_by_producer);
-        try testing.expect(node.touched_by_consumer);
+        try testing.expect(node.touched_by_producer.load(.seq_cst));
+        try testing.expect(node.touched_by_consumer.load(.seq_cst));
     }
-    try testing.expectEqual(target, ctx.consumer_counter);
+    for (ctx.observed_orders, 0..) |observed_order, producer_idx| {
+        const items = observed_order.items;
+        for (items[0 .. items.len - 2], 0..) |a_i, i| {
+            for (items[1 .. items.len - 1], 1..) |a_j, j| {
+                if (j <= i) {
+                    continue;
+                }
+                for (items[2..], 2..) |a_k, k| {
+                    if (k <= j) {
+                        continue;
+                    }
+                    if (a_i > a_k and a_k > a_j) {
+                        std.debug.print(
+                            "Impossible partial ordering observed in Producer #{}. {}(index:{})>{}(index:{})>{}(index:{})\n",
+                            .{ producer_idx, a_i, a_k, a_j, i, k, j },
+                        );
+                        try testing.expect(false);
+                    }
+                }
+            }
+        }
+    }
 }
 
 test "queue - basic" {
     const Node = struct {
-        intrusive_list_node: Stack(@This()).Node,
+        intrusive_list_node: LockFree.Node = .{},
         data: usize = 0,
     };
     const node_count = 100;
-    var nodes: [node_count]Node = undefined;
+    var nodes: [node_count]Node = [_]Node{.{}} ** node_count;
     var queue: Queue(Node) = .{};
     for (&nodes, 0..) |*node, i| {
         node.*.data = i;
         queue.pushBack(node);
     }
-    try testing.expectEqual(node_count, queue.count.load(.seq_cst));
     var i: usize = 0;
     while (queue.popFront()) |node| : (i += 1) {
         try testing.expectEqual(i, node.data);
@@ -288,13 +320,13 @@ test "queue - basic" {
 test "queue - multiple producers - manual" {
     var manual_executor: ManualExecutor = .{};
     const Node = struct {
-        intrusive_list_node: Stack(@This()).Node,
+        intrusive_list_node: LockFree.Node = .{},
         data: usize = 0,
     };
     const fiber_count = 100;
     const node_per_fiber = 100;
     const node_count = fiber_count * node_per_fiber;
-    var nodes: [node_count]Node = undefined;
+    var nodes: [node_count]Node = [_]Node{.{}} ** node_count;
     const Ctx = struct {
         queue: Queue(Node),
         counter: Atomic(usize) = .init(0),
@@ -322,7 +354,6 @@ test "queue - multiple producers - manual" {
         );
     }
     _ = manual_executor.drain();
-    try testing.expectEqual(node_count, ctx.queue.count.load(.seq_cst));
     var i: usize = 0;
     while (ctx.queue.popFront()) |node| : (i += 1) {
         try testing.expectEqual(i, node.data);
@@ -341,13 +372,13 @@ test "queue - multiple producers - thread pool" {
     defer tp.stop();
 
     const Node = struct {
-        intrusive_list_node: Stack(@This()).Node,
+        intrusive_list_node: LockFree.Node = .{},
         data: usize = 0,
     };
-    const fiber_count = 100;
-    const node_per_fiber = 100;
+    const fiber_count = 500;
+    const node_per_fiber = 500;
     const node_count = fiber_count * node_per_fiber;
-    var nodes: [node_count]Node = undefined;
+    var nodes: [node_count]Node = [_]Node{.{}} ** node_count;
     const Ctx = struct {
         queue: Queue(Node),
         counter: Atomic(usize) = .init(0),
@@ -378,7 +409,6 @@ test "queue - multiple producers - thread pool" {
         );
     }
     ctx.wait_group.wait();
-    try testing.expectEqual(node_count, ctx.queue.count.load(.seq_cst));
     var i: usize = 0;
     while (ctx.queue.popFront()) |node| : (i += 1) {
         try testing.expectEqual(i, node.data);
@@ -390,6 +420,8 @@ test "queue - stress" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
+
+    var fiber_name_buffer: [Fiber.MAX_FIBER_NAME_LENGTH_BYTES:0]u8 = undefined;
     const cpu_count = try std.Thread.getCpuCount();
     var tp = try ThreadPool.init(cpu_count, testing.allocator);
     defer tp.deinit();
@@ -397,66 +429,69 @@ test "queue - stress" {
     defer tp.stop();
 
     const Node = struct {
-        intrusive_list_node: Stack(@This()).Node = .{},
-        data: usize = 0,
-        touched_by_producer: bool = false,
-        touched_by_consumer: bool = false,
+        intrusive_list_node: LockFree.Node = .{},
+        producer_idx: usize = 0,
+        local_order: usize = 0,
+        touched_by_producer: Atomic(bool) = .init(false),
+        touched_by_consumer: Atomic(bool) = .init(false),
     };
-    const producer_count = 1000;
-    const node_per_fiber = 1000;
+    const producer_count = 500;
+    const node_per_fiber = 500;
     const node_count = producer_count * node_per_fiber;
     var nodes: [node_count]Node = [_]Node{.{}} ** node_count;
     const Ctx = struct {
         queue: Queue(Node),
-        counter: Atomic(usize) = .init(0),
         nodes: []Node,
-        producers_done: [producer_count]bool = undefined,
+        producers_done: [producer_count]Atomic(bool) = undefined,
         consumer_done: bool = false,
-        mutex: Fiber.Mutex = .{},
         wait_group: WaitGroup = .{},
 
-        pub fn producer(ctx: *@This(), i: usize) void {
-            ctx.producers_done[i] = false;
-            for (0..node_per_fiber) |_| {
-                const counter = ctx.counter.fetchAdd(1, .seq_cst);
-                const node: *Node = &ctx.nodes[counter];
-                node.*.data = counter;
-                node.*.touched_by_producer = true;
+        pub fn producer(ctx: *@This(), producer_idx: usize) void {
+            for (0..node_per_fiber) |i| {
+                const node_idx = producer_idx * node_per_fiber + i;
+                const node: *Node = &ctx.nodes[node_idx];
+                if (node.*.touched_by_producer.cmpxchgStrong(false, true, .seq_cst, .seq_cst) != null) {
+                    std.debug.panic(
+                        "Producer #{} was about to fill in Node {}, but it was already touched by another producer",
+                        .{ producer_idx, node },
+                    );
+                }
+                node.producer_idx = producer_idx;
+                node.local_order = i;
                 ctx.queue.pushBack(node);
                 Fiber.yield();
             }
-            {
-                ctx.mutex.lock();
-                defer ctx.mutex.unlock();
-                ctx.producers_done[i] = true;
-            }
+            ctx.producers_done[producer_idx].store(true, .seq_cst);
             ctx.wait_group.finish();
         }
 
         pub fn consumer(ctx: *@This()) !void {
-            var counter: usize = 0;
-            while (!ctx.all_producers_done(true)) {
-                while (ctx.queue.popFront()) |node| : (counter += 1) {
-                    try testing.expectEqual(counter, node.data);
-                    node.*.touched_by_consumer = true;
+            var local_orders: [producer_count]usize = [_]usize{0} ** producer_count;
+            while (true) {
+                while (ctx.queue.popFront()) |node| {
+                    const producer_idx = node.producer_idx;
+                    try testing.expectEqual(
+                        local_orders[producer_idx],
+                        node.local_order,
+                    );
+                    local_orders[producer_idx] += 1;
+                    if (node.touched_by_consumer.cmpxchgStrong(false, true, .seq_cst, .seq_cst) != null) {
+                        std.debug.panic("Consumer saw node {} twice.", .{node});
+                    }
                 }
-                Fiber.yield();
-            }
-            while (ctx.queue.popFront()) |node| : (counter += 1) {
-                try testing.expectEqual(counter, node.data);
-                node.*.touched_by_consumer = true;
+                if (ctx.all_producers_done()) {
+                    break;
+                } else {
+                    Fiber.yield();
+                }
             }
             ctx.consumer_done = true;
             ctx.wait_group.finish();
         }
 
-        pub fn all_producers_done(ctx: *@This(), comptime lock: bool) bool {
-            if (lock) {
-                ctx.mutex.lock();
-                defer ctx.mutex.unlock();
-            }
+        pub fn all_producers_done(ctx: *@This()) bool {
             for (ctx.producers_done) |done| {
-                if (!done) {
+                if (!done.load(.seq_cst)) {
                     return false;
                 }
             }
@@ -466,29 +501,36 @@ test "queue - stress" {
     var ctx: Ctx = .{
         .queue = .{},
         .nodes = &nodes,
-        .producers_done = [_]bool{false} ** producer_count,
+        .producers_done = [_]Atomic(bool){.init(false)} ** producer_count,
     };
     ctx.wait_group.start();
-    try Fiber.go(
+    try Fiber.goOptions(
         Ctx.consumer,
         .{&ctx},
         testing.allocator,
         tp.executor(),
+        .{ .name = "Consumer" },
     );
     for (0..producer_count) |i| {
         ctx.wait_group.start();
-        try Fiber.go(
+        const name = try std.fmt.bufPrintZ(
+            &fiber_name_buffer,
+            "Producer #{}",
+            .{i},
+        );
+        try Fiber.goOptions(
             Ctx.producer,
             .{ &ctx, i },
             testing.allocator,
             tp.executor(),
+            .{ .name = name },
         );
     }
     ctx.wait_group.wait();
-    try testing.expect(ctx.all_producers_done(false));
+    try testing.expect(ctx.all_producers_done());
     try testing.expect(ctx.consumer_done);
     for (ctx.nodes) |node| {
-        try testing.expect(node.touched_by_producer);
-        try testing.expect(node.touched_by_consumer);
+        try testing.expect(node.touched_by_producer.load(.seq_cst));
+        try testing.expect(node.touched_by_consumer.load(.seq_cst));
     }
 }

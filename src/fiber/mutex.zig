@@ -95,12 +95,12 @@ pub fn @"await"(ctx: *anyopaque, fiber: *Fiber) void {
     var awaiter: *MutexAwaiter = @alignCast(@ptrCast(ctx));
     var self = awaiter.mutex;
     {
+        const guard = self.mutex.lock();
+        defer guard.unlock();
         if (self.locked.load(.seq_cst) == false) {
             fiber.scheduleSelf();
             return;
         }
-        const guard = self.mutex.lock();
-        defer guard.unlock();
         log.info("{s} parking itself in {*} waitqueue", .{
             fiber.name,
             self,
