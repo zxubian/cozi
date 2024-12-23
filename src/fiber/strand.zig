@@ -5,7 +5,7 @@ const Runnable = @import("../runnable.zig");
 const Closure = @import("../closure.zig");
 const Containers = @import("../containers.zig");
 const Intrusive = Containers.Intrusive;
-const BatchedQueue = Intrusive.BatchedQueue;
+const Queue = Intrusive.LockFree.MpscLockFreeQueue;
 const SpinLock = @import("../sync.zig").Spinlock;
 const AtomicEnum = @import("../atomic_enum.zig").Value;
 const Awaiter = @import("./awaiter.zig");
@@ -19,7 +19,7 @@ const State = enum(u8) {
     locked,
 };
 
-queue: BatchedQueue(Node) = .{},
+queue: Queue(Node) = .{},
 owner: Atomic(?*Fiber) = .init(null),
 
 const Node = struct {
@@ -84,29 +84,29 @@ pub fn combine(
     }
 }
 
-const MAX_BATCH_SIZE = 100;
-
 fn runBatch(
     self: *Strand,
     executing_fiber: *Fiber,
 ) void {
-    var batch: [MAX_BATCH_SIZE]*Node = undefined;
-    var batch_size: usize = self.queue.takeBatch(&batch);
-    while (batch_size > 0) : (batch_size = self.queue.takeBatch(&batch)) {
-        for (batch[0..batch_size]) |node| {
+    const Ctx = struct {
+        executing_fiber: *Fiber,
+        pub fn handler(node: *Node, ctx_opaque: *anyopaque) void {
+            const ctx: *@This() = @alignCast(@ptrCast(ctx_opaque));
             {
-                var scope: SuspendIllegalScope = .{ .fiber = executing_fiber };
+                var scope: SuspendIllegalScope = .{ .fiber = ctx.executing_fiber };
                 scope.Begin();
                 defer scope.End();
                 node.critical_section_runnable.run();
             }
-            if (node.submitting_fiber != executing_fiber) {
+            if (node.submitting_fiber != ctx.executing_fiber) {
                 node.submitting_fiber.scheduleSelf();
             }
         }
-    }
-    const guard = self.queue.lock.lock();
-    defer guard.unlock();
+    };
+    var ctx: Ctx = .{
+        .executing_fiber = executing_fiber,
+    };
+    self.queue.consumeAll(Ctx.handler, &ctx);
     if (self.owner.cmpxchgStrong(executing_fiber, null, .seq_cst, .seq_cst)) |actual_owner| {
         std.debug.panic(
             "Owner changed! Expected: {*} Actual: {*}",

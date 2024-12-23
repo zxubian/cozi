@@ -162,18 +162,13 @@ test "stress" {
         try tp.start();
         defer tp.stop();
         var fiber_name: [Fiber.MAX_FIBER_NAME_LENGTH_BYTES:0]u8 = undefined;
-        const iterations_per_fiber = 100;
-        const fiber_count = 100;
+        const iterations_per_fiber = 500;
+        const fiber_count = 500;
         const Ctx = struct {
             strand: *Strand,
             counter: usize,
             control: Atomic(usize),
             wait_group: WaitGroup = .{},
-
-            fn randomRange(self: *@This(), comptime max: usize) usize {
-                const r: usize = self.rand.next();
-                return @intFromFloat(@as(f64, @floatFromInt(r)) / std.math.maxInt(@TypeOf(r)) * max);
-            }
 
             pub fn run(self: *@This()) void {
                 for (0..iterations_per_fiber) |_| {

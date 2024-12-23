@@ -1,3 +1,5 @@
+//! Intrusive singly-linked list.
+//! Can be used as either a stack or a queue.
 const std = @import("std");
 const Node = @import("../intrusive.zig").Node;
 

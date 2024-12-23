@@ -77,24 +77,47 @@ pub fn MpscLockFreeQueue(T: type) type {
         const Stack = MpscLockFreeStack(T);
         const Self = @This();
 
-        input: Stack align(std.atomic.cache_line) = .{},
-        output: Stack align(std.atomic.cache_line) = .{},
+        inbox: Stack align(std.atomic.cache_line) = .{},
+        outbox: Stack align(std.atomic.cache_line) = .{},
 
         pub fn pushBack(self: *Self, data: *T) void {
-            self.input.pushFront(data);
+            self.inbox.pushFront(data);
         }
 
         pub fn popFront(self: *Self) ?*T {
-            if (self.output.isEmpty()) {
+            if (self.outbox.isEmpty()) {
                 const Ctx = struct {
                     pub fn handler(data: *T, ctx: *anyopaque) void {
                         var self_: *Self = @alignCast(@ptrCast(ctx));
-                        self_.output.pushFront(data);
+                        self_.outbox.pushFront(data);
                     }
                 };
-                self.input.consumeAll(Ctx.handler, self);
+                self.inbox.consumeAll(Ctx.handler, self);
             }
-            return self.output.popFront();
+            return self.outbox.popFront();
+        }
+
+        pub fn consumeAll(
+            self: *Self,
+            handler: *const fn (
+                next_data_ptr: *T,
+                ctx: *anyopaque,
+            ) void,
+            ctx: *anyopaque,
+        ) void {
+            var temp: Stack = .{};
+            const Ctx = struct {
+                pub fn addToTemp(data: *T, ctx_temp: *anyopaque) void {
+                    var temp_: *Stack = @alignCast(@ptrCast(ctx_temp));
+                    temp_.pushFront(data);
+                }
+            };
+            // move all pending inbox nodes to temp
+            self.inbox.consumeAll(Ctx.addToTemp, &temp);
+            // send out all pending nodes from outbox
+            self.outbox.consumeAll(handler, ctx);
+            // send out all pendings node from temp
+            temp.consumeAll(handler, ctx);
         }
     };
 }
