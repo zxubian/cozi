@@ -2,22 +2,23 @@ const std = @import("std");
 const testing = std.testing;
 const alloc = testing.allocator;
 
-const IntrusiveForwardListT = @import("../forwardList.zig");
-const StackT = IntrusiveForwardListT.IntrusiveForwardList;
+const Containers = @import("../../../containers.zig");
+const List = Containers.Intrusive.ForwardList;
+const Node = Containers.Intrusive.Node;
 
 test "Queue - Basic" {
     const Data = struct {
-        intrusive_list_node: IntrusiveForwardListT.Node,
+        intrusive_list_node: Node,
         value: usize,
     };
-    const Stack = StackT(Data);
+    const Queue = List(Data);
     const test_data = try alloc.alloc(Data, 100);
     defer alloc.free(test_data);
 
     for (test_data, 0..) |*d, i| {
         d.value = i;
     }
-    var queue = Stack{};
+    var queue = Queue{};
 
     try testing.expect(queue.isEmpty());
 
@@ -33,26 +34,26 @@ test "Queue - Basic" {
 
 test "Stack - Basic" {
     const Data = struct {
-        intrusive_list_node: IntrusiveForwardListT.Node,
+        intrusive_list_node: Containers.Intrusive.Node,
         value: usize,
     };
-    const Stack = StackT(Data);
+    const Stack = List(Data);
     const test_data = try alloc.alloc(Data, 100);
     defer alloc.free(test_data);
 
     for (test_data, 0..) |*d, i| {
         d.value = i;
     }
-    var queue = Stack{};
+    var stack = Stack{};
 
-    try testing.expect(queue.isEmpty());
+    try testing.expect(stack.isEmpty());
 
     for (test_data) |*d| {
-        queue.pushFront(d);
+        stack.pushFront(d);
     }
 
     var i: isize = 99;
-    while (queue.popFront()) |data| : (i -= 1) {
+    while (stack.popFront()) |data| : (i -= 1) {
         try testing.expectEqual(@as(usize, @intCast(i)), data.value);
     }
 }

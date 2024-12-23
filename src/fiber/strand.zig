@@ -4,8 +4,8 @@ const Strand = @This();
 const Runnable = @import("../runnable.zig");
 const Closure = @import("../closure.zig");
 const Containers = @import("../containers.zig");
-const BatchedQueue = Containers.Intrusive.BatchedQueue;
-const IntrusiveList = Containers.Intrusive.ForwardList;
+const Intrusive = Containers.Intrusive;
+const BatchedQueue = Intrusive.BatchedQueue;
 const SpinLock = @import("../sync.zig").Spinlock;
 const AtomicEnum = @import("../atomic_enum.zig").Value;
 const Awaiter = @import("./awaiter.zig");
@@ -23,7 +23,7 @@ queue: BatchedQueue(Node) = .{},
 owner: Atomic(?*Fiber) = .init(null),
 
 const Node = struct {
-    intrusive_list_node: IntrusiveList.Node = .{},
+    intrusive_list_node: Intrusive.Node = .{},
     submitting_fiber: *Fiber,
     critical_section_runnable: *Runnable,
 };

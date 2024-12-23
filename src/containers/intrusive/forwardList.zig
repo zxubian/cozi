@@ -1,12 +1,5 @@
 const std = @import("std");
-
-/// Intrusive List Node.
-/// When embedding in another struct,
-/// the field name must be "intrusive_list_node"
-/// for @fieldParentPtr
-pub const Node = struct {
-    next: ?*Node = null,
-};
+const Node = @import("../intrusive.zig").Node;
 
 pub fn IntrusiveForwardList(T: type) type {
     return struct {
@@ -80,52 +73,6 @@ pub fn IntrusiveForwardList(T: type) type {
             } else {
                 std.debug.print("{*}: empty", .{self});
             }
-        }
-    };
-}
-
-pub fn ThreadSafeIntrusiveForwardList(T: type) type {
-    return struct {
-        const List = @This();
-        const Impl = IntrusiveForwardList(T);
-
-        impl: Impl,
-        mutex: std.Thread.Mutex,
-
-        pub fn count(self: *List) usize {
-            self.mutex.lock();
-            defer self.mutex.unlock();
-            return self.impl.count;
-        }
-
-        pub fn isEmpty(self: *List) bool {
-            self.mutex.lock();
-            defer self.mutex.unlock();
-            return self.impl.isEmpty();
-        }
-
-        pub fn pushBack(self: *List, node: *Node) void {
-            self.mutex.lock();
-            defer self.mutex.unlock();
-            return self.impl.pushBack(node);
-        }
-
-        pub fn pushFront(self: *List, node: *Node) void {
-            self.mutex.lock();
-            defer self.mutex.unlock();
-            return self.impl.pushFront(node);
-        }
-
-        pub fn popFront(self: *List) ?*Node {
-            self.mutex.lock();
-            defer self.mutex.unlock();
-            return self.impl.popFront();
-        }
-
-        pub fn reset(self: *List) void {
-            self.mutex.lock();
-            defer self.mutex.unlock();
-            return self.impl.reset();
         }
     };
 }

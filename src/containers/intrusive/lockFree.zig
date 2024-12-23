@@ -1,13 +1,7 @@
 const std = @import("std");
 const Atomic = std.atomic.Value;
 const LockFreeQueue = @This();
-
-/// Intrusive list node
-/// When including in another type, must use
-/// "intrusive_list_node" as field name.
-pub const Node = struct {
-    next: ?*Node = null,
-};
+const Node = @import("../intrusive.zig").Node;
 
 ///Multiple-producer single-consumer lock-free intrusive stack
 pub fn MpscLockFreeStack(T: type) type {

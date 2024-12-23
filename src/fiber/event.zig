@@ -6,8 +6,8 @@ const Event = @This();
 const Atomic = std.atomic.Value;
 
 const Spinlock = @import("../sync.zig").Spinlock;
-const IntrusiveList = @import("../containers.zig").Intrusive.ForwardList;
-const List = IntrusiveList.IntrusiveForwardList(Node);
+const Containers = @import("../containers.zig");
+const Queue = Containers.Intrusive.ForwardList;
 
 const Fiber = @import("../fiber.zig");
 const Awaiter = @import("./awaiter.zig");
@@ -16,7 +16,7 @@ const log = std.log.scoped(.fiber_event);
 
 const Node = struct {
     fiber: *Fiber,
-    intrusive_list_node: IntrusiveList.Node = .{},
+    intrusive_list_node: Containers.Intrusive.Node = .{},
 };
 const State = enum(u8) { init, fired };
 
@@ -24,7 +24,7 @@ state: Atomic(State) = .init(.init),
 // protects list
 mutex: Spinlock = .{},
 // is protected by mutex
-queue: List = .{},
+queue: Queue(Node) = .{},
 
 pub fn wait(self: *Event) void {
     log.info("{s} about to wait for {*}", .{ Fiber.current().?.name, self });

@@ -3,7 +3,8 @@ const testing = std.testing;
 const builtin = @import("builtin");
 const Atomic = std.atomic.Value;
 
-const LockFree = @import("../lockFree.zig");
+const Containers = @import("../../../containers.zig");
+const LockFree = Containers.Intrusive.LockFree;
 const Stack = LockFree.MpscLockFreeStack;
 const Queue = LockFree.MpscLockFreeQueue;
 const Executors = @import("../../../executors.zig");
@@ -15,7 +16,7 @@ const SpinLock = @import("../../../sync.zig").Spinlock;
 
 test "stack - basic" {
     const Node = struct {
-        intrusive_list_node: LockFree.Node = .{},
+        intrusive_list_node: Containers.Intrusive.Node = .{},
         data: usize = 0,
     };
     const node_count = 100;
@@ -39,7 +40,7 @@ test "stack - basic" {
 test "stack - multiple producers - manual" {
     var manual_executor: ManualExecutor = .{};
     const Node = struct {
-        intrusive_list_node: LockFree.Node = .{},
+        intrusive_list_node: Containers.Intrusive.Node = .{},
         data: usize = 0,
     };
     const fiber_count = 100;
@@ -95,7 +96,7 @@ test "stack - multiple producers - thread pool" {
     defer tp.stop();
 
     const Node = struct {
-        intrusive_list_node: LockFree.Node = .{},
+        intrusive_list_node: Containers.Intrusive.Node = .{},
         data: usize = 0,
     };
     const fiber_count = 500;
@@ -155,7 +156,7 @@ test "stack - stress" {
     defer tp.stop();
 
     const Node = struct {
-        intrusive_list_node: LockFree.Node = .{},
+        intrusive_list_node: Containers.Intrusive.Node = .{},
         local_order: usize = 0,
         producer_idx: usize = 0,
         touched_by_producer: Atomic(bool) = .init(false),
@@ -300,7 +301,7 @@ test "stack - stress" {
 
 test "queue - basic" {
     const Node = struct {
-        intrusive_list_node: LockFree.Node = .{},
+        intrusive_list_node: Containers.Intrusive.Node = .{},
         data: usize = 0,
     };
     const node_count = 100;
@@ -320,7 +321,7 @@ test "queue - basic" {
 test "queue - multiple producers - manual" {
     var manual_executor: ManualExecutor = .{};
     const Node = struct {
-        intrusive_list_node: LockFree.Node = .{},
+        intrusive_list_node: Containers.Intrusive.Node = .{},
         data: usize = 0,
     };
     const fiber_count = 100;
@@ -372,7 +373,7 @@ test "queue - multiple producers - thread pool" {
     defer tp.stop();
 
     const Node = struct {
-        intrusive_list_node: LockFree.Node = .{},
+        intrusive_list_node: Containers.Intrusive.Node = .{},
         data: usize = 0,
     };
     const fiber_count = 500;
@@ -429,7 +430,7 @@ test "queue - stress" {
     defer tp.stop();
 
     const Node = struct {
-        intrusive_list_node: LockFree.Node = .{},
+        intrusive_list_node: Containers.Intrusive.Node = .{},
         producer_idx: usize = 0,
         local_order: usize = 0,
         touched_by_producer: Atomic(bool) = .init(false),

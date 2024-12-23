@@ -6,8 +6,8 @@ const WaitGroup = @This();
 const Atomic = std.atomic.Value;
 
 const Spinlock = @import("../sync.zig").Spinlock;
-const IntrusiveList = @import("../containers.zig").Intrusive.ForwardList;
-const List = IntrusiveList.IntrusiveForwardList(Node);
+const Containers = @import("../containers.zig");
+const Queue = Containers.Intrusive.ForwardList;
 
 const Fiber = @import("../fiber.zig");
 const Awaiter = @import("./awaiter.zig");
@@ -16,14 +16,14 @@ const log = std.log.scoped(.fiber_waitgroup);
 
 const Node = struct {
     fiber: *Fiber,
-    intrusive_list_node: IntrusiveList.Node = .{},
+    intrusive_list_node: Containers.Intrusive.Node = .{},
 };
 
 counter: Atomic(isize) = .init(0),
 // protects queue
 mutex: Spinlock = .{},
 // is protected by mutex
-queue: List = .{},
+queue: Queue(Node) = .{},
 
 pub fn add(self: *WaitGroup, count: isize) void {
     const prev_counter = self.counter.fetchAdd(count, .seq_cst);

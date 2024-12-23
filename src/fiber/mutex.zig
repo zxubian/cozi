@@ -11,8 +11,8 @@ const Mutex = @This();
 const Fiber = @import("../fiber.zig");
 const Awaiter = @import("./awaiter.zig");
 const Spinlock = @import("../sync.zig").Spinlock;
-const ForwardList = @import("../containers.zig").Intrusive.ForwardList;
-const Queue = ForwardList.IntrusiveForwardList;
+const Containers = @import("../containers.zig");
+const Queue = Containers.Intrusive.ForwardList;
 
 const log = std.log.scoped(.fiber_mutex);
 
@@ -25,7 +25,7 @@ queue: Queue(Node) = .{},
 
 const Node = struct {
     fiber: *Fiber,
-    intrusive_list_node: ForwardList.Node = .{},
+    intrusive_list_node: Containers.Intrusive.Node = .{},
 };
 
 pub fn lock(self: *Mutex) void {

@@ -1,6 +1,6 @@
 const std = @import("std");
-const IntrusiveList = @import("../intrusive.zig").ForwardList;
-const Queue = IntrusiveList.IntrusiveForwardList;
+const Containers = @import("../../containers.zig");
+const Queue = Containers.Intrusive.ForwardList;
 const SpinLock = @import("../../sync.zig").Spinlock;
 
 pub fn BatchedQueue(T: type) type {

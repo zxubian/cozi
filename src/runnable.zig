@@ -1,10 +1,10 @@
 const Runnable = @This();
 pub const RunProto = *const fn (ctx: *anyopaque) void;
-pub const IntrusiveForwardListNode = @import("./containers/intrusive/forwardList.zig").Node;
+const Containers = @import("containers.zig");
 
 runFn: RunProto,
 ptr: *anyopaque,
-intrusive_list_node: IntrusiveForwardListNode = .{},
+intrusive_list_node: Containers.Intrusive.Node = .{},
 
 pub inline fn run(self: *Runnable) void {
     self.runFn(self.ptr);
