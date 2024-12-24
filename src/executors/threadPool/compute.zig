@@ -21,24 +21,25 @@ const Status = enum(u8) {
     stopped,
 };
 
-threads: []Thread = undefined,
-tasks: Queue(Runnable) = undefined,
+threads: []Thread,
 /// used to allocate the Threads. No allocations happen on runnable submit
-allocator: Allocator,
-// protects the queue
-mutex: Thread.Mutex = .{},
-status: atomic(Status) = undefined,
+gpa: ?Allocator = null,
+tasks: Queue(Runnable) = .{},
+status: atomic(Status) = .init(.not_started),
 
 threadlocal var current_: ?*ThreadPool = null;
 
-pub fn init(thread_count: usize, allocator: Allocator) !ThreadPool {
-    const threads = try allocator.alloc(Thread, thread_count);
-    const queue = Queue(Runnable){};
+pub fn init(thread_count: usize, gpa: Allocator) !ThreadPool {
+    const threads = try gpa.alloc(Thread, thread_count);
     return ThreadPool{
         .threads = threads,
-        .allocator = allocator,
-        .tasks = queue,
-        .status = atomic(Status).init(.not_started),
+        .gpa = gpa,
+    };
+}
+
+pub fn initNoAlloc(threads: []Thread) ThreadPool {
+    return ThreadPool{
+        .threads = threads,
     };
 }
 
@@ -46,7 +47,7 @@ pub fn start(self: *ThreadPool) !void {
     assert(self.status.cmpxchgStrong(.not_started, .running_or_idle, .seq_cst, .seq_cst) == null);
     for (self.threads, 0..) |*thread, i| {
         thread.* = try Thread.spawn(
-            .{ .allocator = self.allocator },
+            .{ .allocator = self.gpa },
             threadEntryPoint,
             .{ self, i, thread },
         );
@@ -62,7 +63,9 @@ fn threadEntryPoint(thread_pool: *ThreadPool, i: usize, self: *const Thread) voi
     assert(current_.?.status.load(.seq_cst) != .not_started);
     var thread_pool_name_buf: [512]u8 = undefined;
     const name = std.fmt.bufPrint(&thread_pool_name_buf, "Thread Pool@{}/Thread #{}", .{ @intFromPtr(thread_pool), i }) catch "Thread Pool@(unknown) Thread#(unknown)";
-    self.setName(name) catch {};
+    self.setName(name) catch {
+        log.err("Failed to set thread name {s} for thread:{}", .{ name, self.getHandle() });
+    };
     while (true) {
         const current_status = current_.?.status.load(.seq_cst);
         switch (current_status) {
@@ -120,7 +123,9 @@ pub fn deinit(self: *ThreadPool) void {
     assert(self.status.load(.seq_cst) == .stopped);
     self.status.store(undefined, .seq_cst);
     self.tasks.deinit();
-    self.allocator.free(self.threads);
+    if (self.gpa) |gpa_| {
+        gpa_.free(self.threads);
+    }
 }
 
 test {
