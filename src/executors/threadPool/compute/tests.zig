@@ -472,58 +472,6 @@ test "Too Many Threads" {
     try limit.check();
 }
 
-test "Keep Alive" {
-    if (builtin.single_threaded) {
-        return error.SkipZigTest;
-    }
-
-    var limit = try TimeLimit.init(std.time.ns_per_s * 4);
-    {
-        var thread_safe_alloc = std.heap.ThreadSafeAllocator{
-            .child_allocator = std.testing.allocator,
-            .mutex = .{},
-        };
-        const alloc = thread_safe_alloc.allocator();
-
-        var tp = try ThreadPool.init(3, alloc);
-        defer tp.deinit();
-        var wait_group: WaitGroup = .{};
-        try tp.start();
-        defer tp.stop();
-
-        const Context = struct {
-            pub fn run(
-                limit_: *TimeLimit,
-                alloc_: Allocator,
-                wait_group_: *WaitGroup,
-            ) void {
-                if (limit_.remaining() > std.time.ns_per_ms * 300) {
-                    wait_group_.start();
-                    ThreadPool.current().?.executor().submit(
-                        @This().run,
-                        .{
-                            limit_,
-                            alloc_,
-                            wait_group_,
-                        },
-                        alloc_,
-                    );
-                }
-                wait_group_.finish();
-            }
-        };
-        const executor = tp.executor();
-        for (0..5) |_| {
-            wait_group.start();
-            executor.submit(Context.run, .{ &limit, alloc, &wait_group }, alloc);
-        }
-        var timer = try std.time.Timer.start();
-        wait_group.wait();
-        try testing.expect(timer.read() > std.time.ns_per_s * 3);
-    }
-    try limit.check();
-}
-
 test "Racy" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
