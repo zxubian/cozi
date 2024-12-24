@@ -13,6 +13,7 @@ const Awaiter = @import("./awaiter.zig");
 const Spinlock = @import("../sync.zig").Spinlock;
 const Containers = @import("../containers.zig");
 const Queue = Containers.Intrusive.ForwardList;
+const Strand = @import("./strand.zig");
 
 const log = std.log.scoped(.fiber_mutex);
 
@@ -22,6 +23,7 @@ locked: Atomic(bool) = .init(false),
 mutex: Spinlock = .{},
 // protected by mutex
 queue: Queue(Node) = .{},
+strand: Strand = .{},
 
 const Node = struct {
     fiber: *Fiber,
