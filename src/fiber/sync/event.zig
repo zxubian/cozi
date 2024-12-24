@@ -71,18 +71,21 @@ const EventAwaiter = struct {
 
     pub fn awaitResume(_: *anyopaque) void {}
 
-    pub fn awaitSuspend(ctx: *anyopaque, handle: *anyopaque) bool {
+    pub fn awaitSuspend(
+        ctx: *anyopaque,
+        handle: *anyopaque,
+    ) Awaiter.AwaitSuspendResult {
         const self: *EventAwaiter = @ptrCast(@alignCast(ctx));
         const fiber: *Fiber = @alignCast(@ptrCast(handle));
         var event: *Event = self.event;
         if (event.state.load(.seq_cst) == .fired) {
-            return true;
+            return Awaiter.AwaitSuspendResult{ .never_suspend = {} };
         }
         self.queue_node = .{
             .fiber = fiber,
         };
         event.queue.pushBack(&self.queue_node);
-        return false;
+        return Awaiter.AwaitSuspendResult{ .always_suspend = {} };
     }
 };
 

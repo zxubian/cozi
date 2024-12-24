@@ -9,7 +9,6 @@ const Queue = Intrusive.LockFree.MpscQueue;
 const Await = @import("../../await.zig").@"await";
 const Awaiter = @import("../../awaiter.zig");
 const Fiber = @import("../../fiber.zig");
-const SuspendIllegalScope = Fiber.SuspendIllegalScope;
 
 const log = std.log.scoped(.fiber_strand);
 
@@ -60,9 +59,8 @@ fn runBatch(
         pub fn handler(node: *Node, ctx_opaque: *anyopaque) void {
             const ctx: *@This() = @alignCast(@ptrCast(ctx_opaque));
             {
-                var scope: SuspendIllegalScope = .{ .fiber = ctx.executing_fiber };
-                scope.Begin();
-                defer scope.End();
+                node.submitting_fiber.beginSuspendIllegalScope();
+                defer node.submitting_fiber.endSuspendIllegalScope();
                 node.critical_section_runnable.run();
             }
             if (node.submitting_fiber != ctx.executing_fiber) {
@@ -103,7 +101,10 @@ const StrandAwaiter = struct {
         ) == null;
     }
 
-    pub fn awaitSuspend(ctx: *anyopaque, handle: *anyopaque) bool {
+    pub fn awaitSuspend(
+        ctx: *anyopaque,
+        handle: *anyopaque,
+    ) Awaiter.AwaitSuspendResult {
         const self: *StrandAwaiter = @alignCast(@ptrCast(ctx));
         const fiber: *Fiber = @alignCast(@ptrCast(handle));
         if (self.strand.owner.cmpxchgStrong(
@@ -112,9 +113,9 @@ const StrandAwaiter = struct {
             .seq_cst,
             .seq_cst,
         ) == null) {
-            return true;
+            return Awaiter.AwaitSuspendResult{ .never_suspend = {} };
         }
-        return false;
+        return Awaiter.AwaitSuspendResult{ .always_suspend = {} };
     }
 
     pub fn awaitResume(_: *anyopaque) void {}

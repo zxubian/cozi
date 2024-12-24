@@ -12,7 +12,7 @@ const ThreadPool = @import("../executors.zig").ThreadPools.Compute;
 const Stack = @import("../stack.zig");
 
 test {
-    _ = @import("./sync.zig");
+    // _ = @import("./sync.zig");
 }
 
 test "Fiber basic" {

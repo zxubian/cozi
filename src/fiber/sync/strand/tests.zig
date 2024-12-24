@@ -130,8 +130,9 @@ test "Suspend Illegal" {
             self.strand.combine(criticalSection, .{self});
         }
 
-        pub fn criticalSection(_: *@This()) !void {
-            try testing.expect(Fiber.current().?.suspend_illegal_scope != null);
+        pub fn criticalSection(self: *@This()) !void {
+            _ = self;
+            try testing.expect(Fiber.current().?.in_suspend_illegal_scope);
             // illegal
             // self.event.wait();
         }

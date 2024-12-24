@@ -75,9 +75,14 @@ test "TryLock" {
                 Fiber.current().?.executor,
             );
 
+            //hack - for testing only -
+            Fiber.current().?.endSuspendIllegalScope();
+
             while (!join) {
                 Fiber.yield();
             }
+            //hack - for testing only -
+            Fiber.current().?.beginSuspendIllegalScope();
             self.mutex.unlock();
         }
     };

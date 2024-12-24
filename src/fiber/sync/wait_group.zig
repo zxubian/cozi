@@ -80,17 +80,17 @@ const WaitGroupAwaiter = struct {
     pub fn awaitSuspend(
         ctx: *anyopaque,
         handle: *anyopaque,
-    ) bool {
+    ) Awaiter.AwaitSuspendResult {
         var self: *WaitGroupAwaiter = @ptrCast(@alignCast(ctx));
         const fiber: *Fiber = @alignCast(@ptrCast(handle));
         if (self.wait_group.counter.load(.seq_cst) == 0) {
-            return true;
+            return Awaiter.AwaitSuspendResult{ .never_suspend = {} };
         }
         self.queue_node = .{
             .fiber = fiber,
         };
         self.wait_group.queue.pushBack(&self.queue_node);
-        return false;
+        return Awaiter.AwaitSuspendResult{ .always_suspend = {} };
     }
 
     pub fn awaitResume(_: *anyopaque) void {}

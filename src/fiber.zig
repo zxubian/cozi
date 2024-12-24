@@ -2,6 +2,7 @@
 const Fiber = @This();
 
 const std = @import("std");
+const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
 
 const Coroutine = @import("./coroutine.zig");
@@ -18,7 +19,6 @@ pub const Event = Sync.Event;
 pub const Mutex = Sync.Mutex;
 pub const Strand = Sync.Strand;
 pub const WaitGroup = Sync.WaitGroup;
-pub const SuspendIllegalScope = @import("./fiber/suspendIllegalScope.zig");
 
 const log = std.log.scoped(.fiber);
 
@@ -28,7 +28,7 @@ executor: Executor,
 tick_runnable: Runnable,
 owns_stack: bool = false,
 name: [:0]const u8,
-suspend_illegal_scope: ?*SuspendIllegalScope = null,
+in_suspend_illegal_scope: bool = false,
 state: std.atomic.Value(u8) = .init(0),
 awaiter: ?Awaiter,
 
@@ -102,9 +102,10 @@ pub fn goWithStack(
     fiber.* = .{
         .coroutine = coroutine,
         .executor = executor,
-        .tick_runnable = fiber.runnable(own_stack),
+        .tick_runnable = fiber.runnable(),
         .name = @ptrCast(name[0..options.name.len]),
         .awaiter = null,
+        .owns_stack = own_stack,
     };
     fiber.scheduleSelf();
 }
@@ -131,13 +132,10 @@ fn yield_(_: *Fiber) void {
 }
 
 pub fn @"suspend"(self: *Fiber, awaiter: Awaiter) void {
-    if (self.suspend_illegal_scope) |scope| {
-        std.debug.panic(
-            "Cannot suspend fiber while in \"suspend illegal\" scope {*}",
-            .{scope},
-        );
+    if (self.in_suspend_illegal_scope) {
+        std.debug.panic("Cannot suspend fiber while in \"suspend illegal\" scope.", .{});
     }
-    log.info("{s} about to suspend", .{self.name});
+    log.debug("{s} about to suspend", .{self.name});
     if (self.state.cmpxchgStrong(1, 0, .seq_cst, .seq_cst)) |_| {
         std.debug.panic("suspending twice!!", .{});
     }
@@ -153,40 +151,67 @@ pub fn scheduleSelf(self: *Fiber) void {
     self.executor.submitRunnable(&self.tick_runnable);
 }
 
-fn runnable(fiber: *Fiber, comptime owns_stack: bool) Runnable {
-    const tick_fn = struct {
-        pub fn tick(ctx: *anyopaque) void {
-            var self: *Fiber = @alignCast(@ptrCast(ctx));
-            const old_ctx = current_fiber;
-            current_fiber = self;
-            log.info("{s} about to resume", .{self.name});
-            if (self.state.cmpxchgStrong(0, 1, .seq_cst, .seq_cst)) |_| {
-                std.debug.panic("resuming twice!!", .{});
-            }
-            while (true) {
-                self.coroutine.@"resume"();
-                if (self.coroutine.is_completed) {
-                    log.info("{s} completed", .{self.name});
-                    if (owns_stack) {
-                        log.info("{s} deallocating stack", .{self.name});
-                        self.coroutine.deinit();
-                    }
-                    break;
-                } else {
-                    if (self.awaiter) |*awaiter| {
-                        if (!awaiter.awaitSuspend(self)) {
-                            break;
-                        }
-                    }
-                }
-            }
-            current_fiber = old_ctx;
+fn runTick(self: *Fiber) void {
+    current_fiber = self;
+    defer current_fiber = null;
+    if (self.state.cmpxchgStrong(0, 1, .seq_cst, .seq_cst)) |_| {
+        std.debug.panic("resuming twice!!", .{});
+    }
+    self.coroutine.@"resume"();
+}
+
+fn runTickAndMaybeTransfer(self: *Fiber) ?*Fiber {
+    log.debug("{s} about to resume", .{self.name});
+    self.runTick();
+    log.debug("{s} returned from coroutine", .{self.name});
+    if (self.coroutine.is_completed) {
+        if (self.owns_stack) {
+            log.debug("{s} deallocating stack", .{self.name});
+            self.coroutine.deinit();
         }
-    }.tick;
+        return null;
+    }
+    if (self.awaiter) |awaiter| {
+        self.awaiter = null;
+        const suspend_result = awaiter.awaitSuspend(self);
+        switch (suspend_result) {
+            .always_suspend => return null,
+            .never_suspend => return self,
+            .symmetric_transfer_next => |next| {
+                return @alignCast(@ptrCast(next));
+            },
+        }
+        return null;
+    } else {
+        std.debug.panic("Fiber coroutine suspended without setting fiber awaiter", .{});
+    }
+}
+
+fn runChain(start: *Fiber) void {
+    var maybe_next: ?*Fiber = start;
+    while (maybe_next) |next| {
+        maybe_next = next.runTickAndMaybeTransfer();
+    }
+}
+
+fn run(ctx: *anyopaque) void {
+    const self: *Fiber = @alignCast(@ptrCast(ctx));
+    runChain(self);
+}
+
+fn runnable(fiber: *Fiber) Runnable {
     return Runnable{
-        .runFn = tick_fn,
+        .runFn = run,
         .ptr = fiber,
     };
+}
+
+pub fn beginSuspendIllegalScope(self: *Fiber) void {
+    self.in_suspend_illegal_scope = true;
+}
+
+pub fn endSuspendIllegalScope(self: *Fiber) void {
+    self.in_suspend_illegal_scope = false;
 }
 
 const YieldAwaiter = struct {
@@ -203,14 +228,15 @@ const YieldAwaiter = struct {
     pub fn awaitSuspend(
         _: *anyopaque,
         handle: *anyopaque,
-    ) bool {
+    ) Awaiter.AwaitSuspendResult {
         var fiber: *Fiber = @alignCast(@ptrCast(handle));
         fiber.scheduleSelf();
-        return false;
+        return Awaiter.AwaitSuspendResult{ .always_suspend = {} };
     }
     pub fn awaitResume(_: *anyopaque) void {}
 };
 
 test {
     _ = @import("./fiber/tests.zig");
+    _ = @import("./fiber/sync.zig");
 }

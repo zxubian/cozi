@@ -95,7 +95,7 @@ fn submitImpl(self: *ThreadPool, runnable: *Runnable) !void {
 
 pub fn submit(ctx: *anyopaque, runnable: *Runnable) void {
     var self: *ThreadPool = @alignCast(@ptrCast(ctx));
-    log.info("{*} got new task submission:{}", .{ self, runnable.runFn });
+    log.debug("{*} got new task submission:{}", .{ self, runnable.runFn });
     self.submitImpl(runnable) catch |e| {
         log.err("{}", .{e});
     };
