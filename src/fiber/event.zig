@@ -5,9 +5,8 @@ const std = @import("std");
 const Event = @This();
 const Atomic = std.atomic.Value;
 
-const Spinlock = @import("../sync.zig").Spinlock;
 const Containers = @import("../containers.zig");
-const Queue = Containers.Intrusive.ForwardList;
+const Queue = Containers.Intrusive.LockFree.MpscLockFreeQueue;
 
 const Fiber = @import("../fiber.zig");
 const Awaiter = @import("./awaiter.zig");
@@ -21,8 +20,6 @@ const Node = struct {
 const State = enum(u8) { init, fired };
 
 state: Atomic(State) = .init(.init),
-// protects list
-mutex: Spinlock = .{},
 // is protected by mutex
 queue: Queue(Node) = .{},
 
@@ -54,18 +51,14 @@ pub fn fire(self: *Event) void {
         self,
     });
     self.state.store(.fired, .seq_cst);
-    {
-        const guard = self.mutex.lock();
-        defer guard.unlock();
-        while (true) {
-            if (self.queue.popFront()) |next| {
-                log.info("{s} about to schedule {s}", .{
-                    Fiber.current().?.name,
-                    next.fiber.name,
-                });
-                next.fiber.scheduleSelf();
-            } else break;
-        }
+    while (true) {
+        if (self.queue.popFront()) |next| {
+            log.info("{s} about to schedule {s}", .{
+                Fiber.current().?.name,
+                next.fiber.name,
+            });
+            next.fiber.scheduleSelf();
+        } else break;
     }
 }
 
@@ -78,18 +71,14 @@ const EventAwaiter = struct {
 pub fn @"await"(ctx: *anyopaque, fiber: *Fiber) void {
     var awaiter: *EventAwaiter = @ptrCast(@alignCast(ctx));
     var self: *Event = awaiter.event;
-    {
-        const guard = self.mutex.lock();
-        defer guard.unlock();
-        if (self.state.load(.seq_cst) == .fired) {
-            fiber.scheduleSelf();
-            return;
-        }
-        awaiter.queue_node = .{
-            .fiber = fiber,
-        };
-        self.queue.pushBack(&awaiter.queue_node);
+    if (self.state.load(.seq_cst) == .fired) {
+        fiber.scheduleSelf();
+        return;
     }
+    awaiter.queue_node = .{
+        .fiber = fiber,
+    };
+    self.queue.pushBack(&awaiter.queue_node);
 }
 
 test {

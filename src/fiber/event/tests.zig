@@ -163,7 +163,6 @@ test "threadpool - stress" {
             var wg = self.wait_group;
             self.event.wait();
             try testing.expectEqual(true, self.state.load(.seq_cst));
-            self.alloc.destroy(self);
             wg.finish();
         }
 
@@ -173,25 +172,41 @@ test "threadpool - stress" {
             self.wait_group.finish();
         }
     };
-    for (0..1000) |_| {
-        const ctx = try testing.allocator.create(Ctx);
-        ctx.* = .{
+    const runs = 5;
+    for (0..runs) |_| {
+        var ctx: Ctx = .{
             .alloc = testing.allocator,
             .wait_group = &wait_group,
         };
-        ctx.wait_group.startMany(2);
-        try Fiber.go(
-            Ctx.runConsumer,
-            .{ctx},
-            testing.allocator,
-            tp.executor(),
-        );
+        const consumers = 1000;
+        for (0..consumers / 2) |_| {
+            ctx.wait_group.start();
+            try Fiber.go(
+                Ctx.runConsumer,
+                .{&ctx},
+                testing.allocator,
+                tp.executor(),
+            );
+        }
+
+        ctx.wait_group.start();
         try Fiber.go(
             Ctx.runProducer,
-            .{ctx},
+            .{&ctx},
             testing.allocator,
             tp.executor(),
         );
+
+        for (0..consumers / 2) |_| {
+            ctx.wait_group.start();
+            try Fiber.go(
+                Ctx.runConsumer,
+                .{&ctx},
+                testing.allocator,
+                tp.executor(),
+            );
+        }
+        wait_group.wait();
+        wait_group.reset();
     }
-    wait_group.wait();
 }
