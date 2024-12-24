@@ -1,23 +1,17 @@
 const std = @import("std");
 const Atomic = std.atomic.Value;
 const Strand = @This();
-const Runnable = @import("../runnable.zig");
-const Closure = @import("../closure.zig");
-const Containers = @import("../containers.zig");
+const Runnable = @import("../../runnable.zig");
+const Closure = @import("../../closure.zig");
+const Containers = @import("../../containers.zig");
 const Intrusive = Containers.Intrusive;
 const Queue = Intrusive.LockFree.MpscLockFreeQueue;
-const AtomicEnum = @import("../atomic_enum.zig").Value;
-const Await = @import("../await.zig").@"await";
-const Awaiter = @import("../awaiter.zig");
-const Fiber = @import("../fiber.zig");
+const Await = @import("../../await.zig").@"await";
+const Awaiter = @import("../../awaiter.zig");
+const Fiber = @import("../../fiber.zig");
 const SuspendIllegalScope = Fiber.SuspendIllegalScope;
 
 const log = std.log.scoped(.fiber_strand);
-
-const State = enum(u8) {
-    unlocked,
-    locked,
-};
 
 queue: Queue(Node) = .{},
 owner: Atomic(?*Fiber) = .init(null),
@@ -80,7 +74,12 @@ fn runBatch(
         .executing_fiber = executing_fiber,
     };
     self.queue.consumeAll(Ctx.handler, &ctx);
-    if (self.owner.cmpxchgStrong(executing_fiber, null, .seq_cst, .seq_cst)) |actual_owner| {
+    if (self.owner.cmpxchgStrong(
+        executing_fiber,
+        null,
+        .seq_cst,
+        .seq_cst,
+    )) |actual_owner| {
         std.debug.panic(
             "Owner changed! Expected: {*} Actual: {*}",
             .{ executing_fiber, actual_owner },

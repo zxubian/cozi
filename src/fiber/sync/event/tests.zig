@@ -4,14 +4,14 @@ const testing = std.testing;
 const Atomic = std.atomic.Value;
 
 const Event = Fiber.Event;
-const Fiber = @import("../../fiber.zig");
+const Fiber = @import("../../../fiber.zig");
 
-const Executors = @import("../../executors.zig");
+const Executors = @import("../../../executors.zig");
 const ManualExecutor = Executors.Manual;
 const ThreadPool = Executors.ThreadPools.Compute;
 const WaitGroup = std.Thread.WaitGroup;
 
-const TimeLimit = @import("../../testing/TimeLimit.zig");
+const TimeLimit = @import("../../../testing/TimeLimit.zig");
 
 test "basic - single waiter" {
     var event: Event = .{};

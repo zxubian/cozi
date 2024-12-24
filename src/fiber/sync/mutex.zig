@@ -8,20 +8,17 @@ const Atomic = std.atomic.Value;
 
 const Mutex = @This();
 
-const Fiber = @import("../fiber.zig");
-const Awaiter = @import("../awaiter.zig");
-const Spinlock = @import("../sync.zig").Spinlock;
-const Containers = @import("../containers.zig");
+const Fiber = @import("../../fiber.zig");
+const Awaiter = @import("../../awaiter.zig");
+const Containers = @import("../../containers.zig");
 const Queue = Containers.Intrusive.LockFree.MpscLockFreeQueue;
-const Strand = @import("./strand.zig");
-const Await = @import("../await.zig").@"await";
+const Await = @import("../../await.zig").@"await";
 
 const log = std.log.scoped(.fiber_mutex);
 
 // for fast path (no contention)
 locked: Atomic(bool) = .init(false),
 queue: Queue(Node) = .{},
-strand: Strand = .{},
 
 const Node = struct {
     fiber: *Fiber,

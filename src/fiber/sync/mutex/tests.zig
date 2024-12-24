@@ -1,14 +1,15 @@
-const Fiber = @import("../../fiber.zig");
-const Mutex = Fiber.Mutex;
 const std = @import("std");
 const testing = std.testing;
 const builtin = @import("builtin");
 
-const Executors = @import("../../executors.zig");
+const Fiber = @import("../../../fiber.zig");
+const Mutex = Fiber.Mutex;
+
+const Executors = @import("../../../executors.zig");
 const ManualExecutor = Executors.Manual;
 const ThreadPool = Executors.ThreadPools.Compute;
 const WaitGroup = std.Thread.WaitGroup;
-const TimeLimit = @import("../../testing/TimeLimit.zig");
+const TimeLimit = @import("../../../testing/TimeLimit.zig");
 
 test "counter" {
     var mutex: Mutex = .{};

@@ -5,12 +5,12 @@ const std = @import("std");
 const WaitGroup = @This();
 const Atomic = std.atomic.Value;
 
-const Containers = @import("../containers.zig");
+const Containers = @import("../../containers.zig");
 const Queue = Containers.Intrusive.LockFree.MpscLockFreeQueue;
 
-const Fiber = @import("../fiber.zig");
-const Await = @import("../await.zig").@"await";
-const Awaiter = @import("../awaiter.zig");
+const Fiber = @import("../..//fiber.zig");
+const Await = @import("../../await.zig").@"await";
+const Awaiter = @import("../../awaiter.zig");
 
 const log = std.log.scoped(.fiber_waitgroup);
 

@@ -5,12 +5,14 @@ const Atomic = std.atomic.Value;
 const Allocator = std.mem.Allocator;
 const WaitGroup = std.Thread.WaitGroup;
 
-const Fiber = @import("../../fiber.zig");
+const Fiber = @import("../../../fiber.zig");
 const Barrier = Fiber.Barrier;
 const Mutex = Fiber.Mutex;
-const ManualExecutor = @import("../../executors.zig").Manual;
-const ThreadPool = @import("../../executors.zig").ThreadPools.Compute;
-const Executor = @import("../../executor.zig");
+const Executors =
+    @import("../../../executors.zig");
+const ManualExecutor = Executors.Manual;
+const ThreadPool = Executors.ThreadPools.Compute;
+const Executor = @import("../../../executor.zig");
 
 test "basic - single thread" {
     var executor = ManualExecutor{};

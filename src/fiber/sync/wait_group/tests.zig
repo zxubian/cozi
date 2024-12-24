@@ -4,10 +4,10 @@ const builtin = @import("builtin");
 const testing = std.testing;
 const Atomic = std.atomic.Value;
 
-const Fiber = @import("../../fiber.zig");
+const Fiber = @import("../../../fiber.zig");
 const WaitGroup = Fiber.WaitGroup;
 
-const Executors = @import("../../executors.zig");
+const Executors = @import("../../../executors.zig");
 const ManualExecutor = Executors.Manual;
 const ThreadPool = Executors.ThreadPools.Compute;
 const ThreadWaitGroup = std.Thread.WaitGroup;

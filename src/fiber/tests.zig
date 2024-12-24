@@ -11,6 +11,10 @@ const ManualExecutor = @import("../executors.zig").Manual;
 const ThreadPool = @import("../executors.zig").ThreadPools.Compute;
 const Stack = @import("../stack.zig");
 
+test {
+    _ = @import("./sync.zig");
+}
+
 test "Fiber basic" {
     var step: usize = 0;
     const Ctx = struct {

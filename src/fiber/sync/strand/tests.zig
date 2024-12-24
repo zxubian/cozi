@@ -4,15 +4,15 @@ const testing = std.testing;
 
 const Atomic = std.atomic.Value;
 
-const Fiber = @import("../../fiber.zig");
+const Fiber = @import("../../../fiber.zig");
 const Strand = Fiber.Strand;
 const Event = Fiber.Event;
 
-const Executors = @import("../../executors.zig");
+const Executors = @import("../../../executors.zig");
 const ManualExecutor = Executors.Manual;
 const ThreadPool = Executors.ThreadPools.Compute;
 const WaitGroup = std.Thread.WaitGroup;
-const TimeLimit = @import("../../testing/TimeLimit.zig");
+const TimeLimit = @import("../../../testing/TimeLimit.zig");
 
 test "counter" {
     var strand: Strand = .{};
@@ -162,8 +162,8 @@ test "stress" {
         try tp.start();
         defer tp.stop();
         var fiber_name: [Fiber.MAX_FIBER_NAME_LENGTH_BYTES:0]u8 = undefined;
-        const iterations_per_fiber = 500;
-        const fiber_count = 500;
+        const iterations_per_fiber = 1000;
+        const fiber_count = 1000;
         const Ctx = struct {
             strand: *Strand,
             counter: usize,
