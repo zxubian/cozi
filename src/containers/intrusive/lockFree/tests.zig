@@ -12,7 +12,6 @@ const ManualExecutor = Executors.Manual;
 const ThreadPool = Executors.ThreadPools.Compute;
 const WaitGroup = std.Thread.WaitGroup;
 const Fiber = @import("../../../fiber.zig");
-const SpinLock = @import("../../../sync.zig").Spinlock;
 
 test "stack - basic" {
     const Node = struct {

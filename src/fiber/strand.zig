@@ -6,7 +6,6 @@ const Closure = @import("../closure.zig");
 const Containers = @import("../containers.zig");
 const Intrusive = Containers.Intrusive;
 const Queue = Intrusive.LockFree.MpscLockFreeQueue;
-const SpinLock = @import("../sync.zig").Spinlock;
 const AtomicEnum = @import("../atomic_enum.zig").Value;
 const Awaiter = @import("./awaiter.zig");
 const Fiber = @import("../fiber.zig");

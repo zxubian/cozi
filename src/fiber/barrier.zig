@@ -4,7 +4,6 @@
 const std = @import("std");
 const Barrier = @This();
 
-const Spinlock = @import("../sync.zig").Spinlock;
 const WaitGroup = @import("./wait_group.zig");
 
 const Fiber = @import("../fiber.zig");
