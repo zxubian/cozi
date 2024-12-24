@@ -5,8 +5,8 @@ const Atomic = std.atomic.Value;
 
 const Containers = @import("../../../containers.zig");
 const LockFree = Containers.Intrusive.LockFree;
-const Stack = LockFree.MpscLockFreeStack;
-const Queue = LockFree.MpscLockFreeQueue;
+const Stack = LockFree.MpscStack;
+const Queue = LockFree.MpscQueue;
 const Executors = @import("../../../executors.zig");
 const ManualExecutor = Executors.Manual;
 const ThreadPool = Executors.ThreadPools.Compute;

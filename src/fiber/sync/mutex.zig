@@ -11,7 +11,7 @@ const Mutex = @This();
 const Fiber = @import("../../fiber.zig");
 const Awaiter = @import("../../awaiter.zig");
 const Containers = @import("../../containers.zig");
-const Queue = Containers.Intrusive.LockFree.MpscLockFreeQueue;
+const Queue = Containers.Intrusive.LockFree.MpscQueue;
 const Await = @import("../../await.zig").@"await";
 
 const log = std.log.scoped(.fiber_mutex);

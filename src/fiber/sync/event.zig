@@ -6,7 +6,7 @@ const Event = @This();
 const Atomic = std.atomic.Value;
 
 const Containers = @import("../../containers.zig");
-const Queue = Containers.Intrusive.LockFree.MpscLockFreeQueue;
+const Queue = Containers.Intrusive.LockFree.MpscQueue;
 
 const Fiber = @import("../../fiber.zig");
 const Await = @import("../../await.zig").@"await";

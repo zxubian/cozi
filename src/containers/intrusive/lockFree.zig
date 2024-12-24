@@ -4,7 +4,7 @@ const LockFreeQueue = @This();
 const Node = @import("../intrusive.zig").Node;
 
 ///Multiple-producer single-consumer lock-free intrusive stack
-pub fn MpscLockFreeStack(T: type) type {
+pub fn MpscStack(T: type) type {
     return struct {
         const Self = @This();
         top: Atomic(?*Node) = .init(null),
@@ -72,9 +72,9 @@ pub fn MpscLockFreeStack(T: type) type {
 }
 
 /// Multiple-producer single-consumer intrusive lock-free queue
-pub fn MpscLockFreeQueue(T: type) type {
+pub fn MpscQueue(T: type) type {
     return struct {
-        const Stack = MpscLockFreeStack(T);
+        const Stack = MpscStack(T);
         const Self = @This();
 
         inbox: Stack align(std.atomic.cache_line) = .{},
