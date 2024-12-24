@@ -9,15 +9,15 @@ const Executor = @import("./executor.zig");
 const Stack = @import("./stack.zig");
 const Closure = @import("./closure.zig");
 const Runnable = @import("./runnable.zig");
-const Awaiter = @import("./fiber/awaiter.zig");
-const YieldAwaiter = @import("./fiber/awaiters.zig").YieldAwaiter;
+const Await = @import("./await.zig").@"await";
+const Awaiter = @import("./awaiter.zig");
 
 pub const Barrier = @import("./fiber/barrier.zig");
 pub const Event = @import("./fiber/event.zig");
 pub const Mutex = @import("./fiber/mutex.zig");
 pub const Strand = @import("./fiber/strand.zig");
-pub const WaitGroup = @import("./fiber/wait_group.zig");
 pub const SuspendIllegalScope = @import("./fiber/suspendIllegalScope.zig");
+pub const WaitGroup = @import("./fiber/wait_group.zig");
 
 const log = std.log.scoped(.fiber);
 
@@ -27,12 +27,9 @@ executor: Executor,
 tick_runnable: Runnable,
 owns_stack: bool = false,
 name: [:0]const u8,
-awaiter: ?*Awaiter = null,
 suspend_illegal_scope: ?*SuspendIllegalScope = null,
-/////nocheckin
 state: std.atomic.Value(u8) = .init(0),
-
-var yield_awaiter = YieldAwaiter.awaiter();
+awaiter: ?Awaiter,
 
 pub const MAX_FIBER_NAME_LENGTH_BYTES = 100;
 
@@ -120,18 +117,19 @@ pub fn current() ?*Fiber {
 }
 
 pub fn yield() void {
-    Fiber.@"suspend"(&yield_awaiter);
-}
-
-pub fn @"suspend"(awaiter: *Awaiter) void {
     if (current_fiber) |curr| {
-        curr.suspend_(awaiter);
+        curr.yield_();
     } else {
-        std.debug.panic("Cannot call Fiber.suspend when from outside of a Fiber.", .{});
+        std.debug.panic("Must use Fiber.Yield only when executing inside of fiber", .{});
     }
 }
 
-fn suspend_(self: *Fiber, awaiter: *Awaiter) void {
+fn yield_(_: *Fiber) void {
+    var yield_awaiter: YieldAwaiter = .{};
+    Await(&yield_awaiter);
+}
+
+pub fn @"suspend"(self: *Fiber, awaiter: Awaiter) void {
     if (self.suspend_illegal_scope) |scope| {
         std.debug.panic(
             "Cannot suspend fiber while in \"suspend illegal\" scope {*}",
@@ -139,11 +137,15 @@ fn suspend_(self: *Fiber, awaiter: *Awaiter) void {
         );
     }
     log.info("{s} about to suspend", .{self.name});
-    self.awaiter = awaiter;
     if (self.state.cmpxchgStrong(1, 0, .seq_cst, .seq_cst)) |_| {
         std.debug.panic("suspending twice!!", .{});
     }
+    self.awaiter = awaiter;
     self.coroutine.@"suspend"();
+}
+
+pub fn @"resume"(self: *Fiber) void {
+    self.tick_runnable.run();
 }
 
 pub fn scheduleSelf(self: *Fiber) void {
@@ -153,24 +155,28 @@ pub fn scheduleSelf(self: *Fiber) void {
 fn runnable(fiber: *Fiber, comptime owns_stack: bool) Runnable {
     const tick_fn = struct {
         pub fn tick(ctx: *anyopaque) void {
-            const self: *Fiber = @alignCast(@ptrCast(ctx));
+            var self: *Fiber = @alignCast(@ptrCast(ctx));
             const old_ctx = current_fiber;
             current_fiber = self;
             log.info("{s} about to resume", .{self.name});
             if (self.state.cmpxchgStrong(0, 1, .seq_cst, .seq_cst)) |_| {
                 std.debug.panic("resuming twice!!", .{});
             }
-            self.coroutine.@"resume"();
-            if (self.coroutine.is_completed) {
-                log.info("{s} completed", .{self.name});
-                if (owns_stack) {
-                    log.info("{s} deallocating stack", .{self.name});
-                    self.coroutine.deinit();
-                }
-            } else {
-                if (self.awaiter) |awaiter| {
-                    self.awaiter = null;
-                    awaiter.@"await"(self);
+            while (true) {
+                self.coroutine.@"resume"();
+                if (self.coroutine.is_completed) {
+                    log.info("{s} completed", .{self.name});
+                    if (owns_stack) {
+                        log.info("{s} deallocating stack", .{self.name});
+                        self.coroutine.deinit();
+                    }
+                    break;
+                } else {
+                    if (self.awaiter) |*awaiter| {
+                        if (!awaiter.awaitSuspend(self)) {
+                            break;
+                        }
+                    }
                 }
             }
             current_fiber = old_ctx;
@@ -182,9 +188,30 @@ fn runnable(fiber: *Fiber, comptime owns_stack: bool) Runnable {
     };
 }
 
+const YieldAwaiter = struct {
+    pub fn awaiter(self: *YieldAwaiter) Awaiter {
+        return Awaiter{ .ptr = self, .vtable = .{
+            .await_ready = awaitReady,
+            .await_suspend = awaitSuspend,
+            .await_resume = awaitResume,
+        } };
+    }
+    pub fn awaitReady(_: *anyopaque) bool {
+        return false;
+    }
+    pub fn awaitSuspend(
+        _: *anyopaque,
+        handle: *anyopaque,
+    ) bool {
+        var fiber: *Fiber = @alignCast(@ptrCast(handle));
+        fiber.scheduleSelf();
+        return false;
+    }
+    pub fn awaitResume(_: *anyopaque) void {}
+};
+
 test {
     _ = @import("./fiber/tests.zig");
-
     _ = @import("./fiber/barrier.zig");
     _ = @import("./fiber/event.zig");
     _ = @import("./fiber/mutex.zig");

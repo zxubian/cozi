@@ -165,13 +165,14 @@ test "stress" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
-    var tp = try ThreadPool.init(4, testing.allocator);
+    const cpu_count = try std.Thread.getCpuCount();
+    var tp = try ThreadPool.init(cpu_count, testing.allocator);
     defer tp.deinit();
     try tp.start();
     defer tp.stop();
 
-    const fibers: usize = 500;
-    const iterations_per_fiber: usize = 500;
+    const fibers: usize = 1000;
+    const iterations_per_fiber: usize = 1000;
     const count = fibers * iterations_per_fiber;
 
     const Ctx = struct {

@@ -9,7 +9,8 @@ const Containers = @import("../containers.zig");
 const Queue = Containers.Intrusive.LockFree.MpscLockFreeQueue;
 
 const Fiber = @import("../fiber.zig");
-const Awaiter = @import("./awaiter.zig");
+const Await = @import("../await.zig").@"await";
+const Awaiter = @import("../awaiter.zig");
 
 const log = std.log.scoped(.fiber_waitgroup);
 
@@ -19,7 +20,6 @@ const Node = struct {
 };
 
 counter: Atomic(isize) = .init(0),
-// is protected by mutex
 queue: Queue(Node) = .{},
 
 pub fn add(self: *WaitGroup, count: isize) void {
@@ -36,24 +36,9 @@ pub fn wait(self: *WaitGroup) void {
         Fiber.current().?.name,
         self,
     });
-
-    if (self.counter.load(.seq_cst) == 0) {
-        return;
-    }
     // place awaiter on Fiber stack
-    var awaiter: WaitGroupAwaiter = .{
-        .awaiter = .{
-            .vtable = .{
-                .@"await" = WaitGroup.@"await",
-            },
-            .ptr = undefined,
-        },
-        .wait_group = self,
-    };
-    // this is safe because Fiber.wait will not exit
-    // during Fiber.await.
-    awaiter.awaiter.ptr = &awaiter;
-    Fiber.@"suspend"(&awaiter.awaiter);
+    var wait_group_awaiter: WaitGroupAwaiter = .{ .wait_group = self };
+    Await(&wait_group_awaiter);
 }
 
 pub fn done(self: *WaitGroup) void {
@@ -84,27 +69,43 @@ pub fn done(self: *WaitGroup) void {
 }
 
 const WaitGroupAwaiter = struct {
-    awaiter: Awaiter,
     wait_group: *WaitGroup,
     queue_node: Node = undefined,
-};
 
-pub fn @"await"(
-    ctx: *anyopaque,
-    fiber: *Fiber,
-) void {
-    var awaiter: *WaitGroupAwaiter = @ptrCast(@alignCast(ctx));
-    var self: *WaitGroup = awaiter.wait_group;
-    const counter = self.counter.load(.seq_cst);
-    if (counter == 0) {
-        fiber.scheduleSelf();
-        return;
+    pub fn awaitReady(ctx: *anyopaque) bool {
+        const self: *WaitGroupAwaiter = @ptrCast(@alignCast(ctx));
+        return self.wait_group.counter.load(.seq_cst) == 0;
     }
-    awaiter.queue_node = .{
-        .fiber = fiber,
-    };
-    self.queue.pushBack(&awaiter.queue_node);
-}
+
+    pub fn awaitSuspend(
+        ctx: *anyopaque,
+        handle: *anyopaque,
+    ) bool {
+        var self: *WaitGroupAwaiter = @ptrCast(@alignCast(ctx));
+        const fiber: *Fiber = @alignCast(@ptrCast(handle));
+        if (self.wait_group.counter.load(.seq_cst) == 0) {
+            return true;
+        }
+        self.queue_node = .{
+            .fiber = fiber,
+        };
+        self.wait_group.queue.pushBack(&self.queue_node);
+        return false;
+    }
+
+    pub fn awaitResume(_: *anyopaque) void {}
+
+    pub fn awaiter(self: *WaitGroupAwaiter) Awaiter {
+        return Awaiter{
+            .ptr = self,
+            .vtable = .{
+                .await_suspend = awaitSuspend,
+                .await_resume = awaitResume,
+                .await_ready = awaitReady,
+            },
+        };
+    }
+};
 
 test {
     _ = @import("./wait_group/tests.zig");

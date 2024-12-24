@@ -9,7 +9,8 @@ const Containers = @import("../containers.zig");
 const Queue = Containers.Intrusive.LockFree.MpscLockFreeQueue;
 
 const Fiber = @import("../fiber.zig");
-const Awaiter = @import("./awaiter.zig");
+const Await = @import("../await.zig").@"await";
+const Awaiter = @import("../awaiter.zig");
 
 const log = std.log.scoped(.fiber_event);
 
@@ -25,23 +26,9 @@ queue: Queue(Node) = .{},
 
 pub fn wait(self: *Event) void {
     log.info("{s} about to wait for {*}", .{ Fiber.current().?.name, self });
-    if (self.state.load(.seq_cst) == .fired) {
-        return;
-    }
     // place awaiter on Fiber stack
-    var awaiter: EventAwaiter = .{
-        .awaiter = .{
-            .vtable = .{
-                .@"await" = Event.@"await",
-            },
-            .ptr = undefined,
-        },
-        .event = self,
-    };
-    // this is safe because Fiber.wait will not exit
-    // during Fiber.await.
-    awaiter.awaiter.ptr = &awaiter;
-    Fiber.@"suspend"(&awaiter.awaiter);
+    var event_awaiter: EventAwaiter = .{ .event = self };
+    Await(&event_awaiter);
 }
 
 /// One-shot fire. Will schedule all waiting fibers.
@@ -63,23 +50,41 @@ pub fn fire(self: *Event) void {
 }
 
 const EventAwaiter = struct {
-    awaiter: Awaiter,
     event: *Event,
     queue_node: Node = undefined,
-};
 
-pub fn @"await"(ctx: *anyopaque, fiber: *Fiber) void {
-    var awaiter: *EventAwaiter = @ptrCast(@alignCast(ctx));
-    var self: *Event = awaiter.event;
-    if (self.state.load(.seq_cst) == .fired) {
-        fiber.scheduleSelf();
-        return;
+    pub fn awaiter(self: *EventAwaiter) Awaiter {
+        return Awaiter{
+            .ptr = self,
+            .vtable = .{
+                .await_suspend = awaitSuspend,
+                .await_resume = awaitResume,
+                .await_ready = awaitReady,
+            },
+        };
     }
-    awaiter.queue_node = .{
-        .fiber = fiber,
-    };
-    self.queue.pushBack(&awaiter.queue_node);
-}
+
+    pub fn awaitReady(ctx: *anyopaque) bool {
+        const self: *EventAwaiter = @ptrCast(@alignCast(ctx));
+        return self.event.state.load(.seq_cst) == .fired;
+    }
+
+    pub fn awaitResume(_: *anyopaque) void {}
+
+    pub fn awaitSuspend(ctx: *anyopaque, handle: *anyopaque) bool {
+        const self: *EventAwaiter = @ptrCast(@alignCast(ctx));
+        const fiber: *Fiber = @alignCast(@ptrCast(handle));
+        var event: *Event = self.event;
+        if (event.state.load(.seq_cst) == .fired) {
+            return true;
+        }
+        self.queue_node = .{
+            .fiber = fiber,
+        };
+        event.queue.pushBack(&self.queue_node);
+        return false;
+    }
+};
 
 test {
     _ = @import("./event/tests.zig");

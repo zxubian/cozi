@@ -7,7 +7,8 @@ const Containers = @import("../containers.zig");
 const Intrusive = Containers.Intrusive;
 const Queue = Intrusive.LockFree.MpscLockFreeQueue;
 const AtomicEnum = @import("../atomic_enum.zig").Value;
-const Awaiter = @import("./awaiter.zig");
+const Await = @import("../await.zig").@"await";
+const Awaiter = @import("../awaiter.zig");
 const Fiber = @import("../fiber.zig");
 const SuspendIllegalScope = Fiber.SuspendIllegalScope;
 
@@ -27,12 +28,6 @@ const Node = struct {
     critical_section_runnable: *Runnable,
 };
 
-const StrandAwaiter = struct {
-    awaiter: Awaiter,
-    strand: *Strand,
-    node: *Node,
-};
-
 pub fn combine(
     self: *Strand,
     func: anytype,
@@ -46,38 +41,17 @@ pub fn combine(
             .submitting_fiber = current_fiber,
             .critical_section_runnable = &critical_section_closure.runnable,
         };
-        if (self.owner.cmpxchgStrong(
-            null,
-            current_fiber,
-            .seq_cst,
-            .seq_cst,
-        ) == null) {
-            // <=> got the lock
-            // <=> will execute the batch
-            _ = self.queue.pushBack(&node);
-            self.runBatch(current_fiber);
-            return;
-        }
-        // <=> didn't get the lock
-        // <=> suspend & wait for somebody else to wake us up
-        var awaiter: StrandAwaiter = .{
-            .awaiter = .{
-                .vtable = .{
-                    .@"await" = Strand.@"await",
-                },
-                .ptr = undefined,
-            },
+        // place awaiter on Fiber stack
+        var strand_awaiter: StrandAwaiter = .{
             .strand = self,
             .node = &node,
+            .submitting_fiber = current_fiber,
         };
-        // this is safe because combine  will not exit
-        // during Fiber.suspend, so the stack will not be reused.
-        awaiter.awaiter.ptr = &awaiter;
-        Fiber.@"suspend"(&awaiter.awaiter);
+        Await(&strand_awaiter);
+        // ------ Fiber resumes from suspend ------
         if (self.owner.load(.seq_cst) == current_fiber) {
             self.runBatch(current_fiber);
         }
-        // ------ Fiber resumes from suspend ------
     } else {
         std.debug.panic("Can only call Strand.combine while executing inside of a Fiber", .{});
     }
@@ -114,14 +88,49 @@ fn runBatch(
     }
 }
 
-pub fn @"await"(ctx: *anyopaque, fiber: *Fiber) void {
-    const awaiter: *StrandAwaiter = @alignCast(@ptrCast(ctx));
-    var self = awaiter.strand;
-    _ = self.queue.pushBack(awaiter.node);
-    if (self.owner.cmpxchgStrong(null, fiber, .seq_cst, .seq_cst) == null) {
-        fiber.scheduleSelf();
+const StrandAwaiter = struct {
+    strand: *Strand,
+    node: *Node,
+    submitting_fiber: *Fiber,
+
+    pub fn awaitReady(ctx: *anyopaque) bool {
+        const self: *StrandAwaiter = @alignCast(@ptrCast(ctx));
+        self.strand.queue.pushBack(self.node);
+        return self.strand.owner.cmpxchgStrong(
+            null,
+            self.submitting_fiber,
+            .seq_cst,
+            .seq_cst,
+        ) == null;
     }
-}
+
+    pub fn awaitSuspend(ctx: *anyopaque, handle: *anyopaque) bool {
+        const self: *StrandAwaiter = @alignCast(@ptrCast(ctx));
+        const fiber: *Fiber = @alignCast(@ptrCast(handle));
+        if (self.strand.owner.cmpxchgStrong(
+            null,
+            fiber,
+            .seq_cst,
+            .seq_cst,
+        ) == null) {
+            return true;
+        }
+        return false;
+    }
+
+    pub fn awaitResume(_: *anyopaque) void {}
+
+    pub fn awaiter(self: *StrandAwaiter) Awaiter {
+        return Awaiter{
+            .ptr = self,
+            .vtable = .{
+                .await_suspend = awaitSuspend,
+                .await_resume = awaitResume,
+                .await_ready = awaitReady,
+            },
+        };
+    }
+};
 
 test {
     _ = @import("./strand/tests.zig");
