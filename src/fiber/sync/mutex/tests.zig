@@ -225,3 +225,31 @@ test "threadpool - parallel" {
     }
     try limit.check();
 }
+
+test "Suspend Illegal" {
+    var manual_executor = ManualExecutor{};
+    const Ctx = struct {
+        mutex: Mutex = .{},
+
+        pub fn run(self: *@This()) !void {
+            self.mutex.lock();
+            try self.criticalSection();
+            self.mutex.unlock();
+        }
+
+        pub fn criticalSection(self: *@This()) !void {
+            _ = self;
+            try testing.expect(Fiber.current().?.in_suspend_illegal_scope);
+            // illegal
+            // Fiber.yield();
+        }
+    };
+    var ctx: Ctx = .{};
+    try Fiber.go(
+        Ctx.run,
+        .{&ctx},
+        testing.allocator,
+        manual_executor.executor(),
+    );
+    _ = manual_executor.drain();
+}
