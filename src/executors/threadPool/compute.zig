@@ -5,7 +5,7 @@ const log = std.log.scoped(.thread_pool);
 const Thread = std.Thread;
 const builtin = @import("builtin");
 const assert = std.debug.assert;
-const atomic = std.atomic.Value;
+const Atomic = std.atomic.Value;
 const Allocator = std.mem.Allocator;
 
 const Runnable = @import("../../runnable.zig");
@@ -21,11 +21,14 @@ const Status = enum(u8) {
     stopped,
 };
 
+// for internal storage
 threads: []Thread,
 /// used to allocate the Threads. No allocations happen on runnable submit
 gpa: ?Allocator = null,
 tasks: Queue(Runnable) = .{},
-status: atomic(Status) = .init(.not_started),
+status: Atomic(Status) = .init(.not_started),
+finish_init_barrier: Thread.ResetEvent = .{},
+thread_start_barrier: Thread.WaitGroup = .{},
 
 threadlocal var current_: ?*ThreadPool = null;
 
@@ -45,26 +48,47 @@ pub fn initNoAlloc(threads: []Thread) ThreadPool {
 
 pub fn start(self: *ThreadPool) !void {
     assert(self.status.cmpxchgStrong(.not_started, .running_or_idle, .seq_cst, .seq_cst) == null);
+    self.thread_start_barrier.startMany(self.threads.len);
     for (self.threads, 0..) |*thread, i| {
         thread.* = try Thread.spawn(
             .{ .allocator = self.gpa },
             threadEntryPoint,
-            .{ self, i, thread },
+            .{
+                self,
+                i,
+                thread,
+            },
         );
     }
+    self.thread_start_barrier.wait();
+    self.finish_init_barrier.set();
 }
 
 pub fn current() ?*ThreadPool {
     return current_;
 }
 
-fn threadEntryPoint(thread_pool: *ThreadPool, i: usize, self: *const Thread) void {
+fn threadEntryPoint(
+    thread_pool: *ThreadPool,
+    i: usize,
+    self: *Thread,
+) void {
+    thread_pool.thread_start_barrier.finish();
+    thread_pool.finish_init_barrier.wait();
     current_ = thread_pool;
     assert(current_.?.status.load(.seq_cst) != .not_started);
     var thread_pool_name_buf: [512]u8 = undefined;
-    const name = std.fmt.bufPrint(&thread_pool_name_buf, "Thread Pool@{}/Thread #{}", .{ @intFromPtr(thread_pool), i }) catch "Thread Pool@(unknown) Thread#(unknown)";
-    self.setName(name) catch {
-        log.err("Failed to set thread name {s} for thread:{}", .{ name, self.getHandle() });
+    const name = std.fmt.bufPrint(
+        &thread_pool_name_buf,
+        "Thread Pool@{}/Thread #{}",
+        .{ @intFromPtr(thread_pool), i },
+    ) catch "Thread Pool@(unknown) Thread#(unknown)";
+    self.setName(name) catch |e| {
+        std.debug.panic("Failed to set thread name {s} for thread:{} {}", .{
+            name,
+            self.getHandle(),
+            e,
+        });
     };
     while (true) {
         const current_status = current_.?.status.load(.seq_cst);
