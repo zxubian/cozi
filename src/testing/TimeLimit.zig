@@ -16,7 +16,12 @@ pub const LimitError = error{
 };
 
 pub fn remaining(self: *TimeLimit) u64 {
-    return self.time_limit_ns - self.timer.read();
+    const current =
+        self.timer.read();
+    if (current >= self.time_limit_ns) {
+        return 0;
+    }
+    return self.time_limit_ns - current;
 }
 
 pub fn check(self: *TimeLimit) !void {
