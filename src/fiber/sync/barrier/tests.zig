@@ -14,7 +14,7 @@ const ManualExecutor = Executors.Manual;
 const ThreadPool = Executors.ThreadPools.Compute;
 const Executor = @import("../../../executor.zig");
 
-test "basic - single thread" {
+test "barrier - basic - single thread" {
     var executor = ManualExecutor{};
     const fiber_count = 5;
     const Ctx = struct {
@@ -55,83 +55,83 @@ test "basic - single thread" {
     }
 }
 
-test "stress" {
-    return error.SkipZigTest;
-    // var tp = try ThreadPool.init(4, testing.allocator);
-    // defer tp.deinit();
-    // try tp.start();
-    // defer tp.stop();
+test "barrier - stress" {
+    const cpu_count = try std.Thread.getCpuCount();
+    var tp = try ThreadPool.init(
+        cpu_count,
+        testing.allocator,
+    );
+    defer tp.deinit();
+    try tp.start();
+    defer tp.stop();
 
-    // var executor = ManualExecutor{};
-    // _ = &executor;
+    const fiber_count = 1000;
+    const stages = 5;
 
-    // const fiber_count = 100;
-    // const stages = 5;
+    const Ctx = struct {
+        state: [fiber_count]Atomic(usize) = undefined,
+        barrier: Barrier = .{},
+        mutex: Mutex = .{},
+        allocator: Allocator,
+        executor: Executor,
+        done: bool,
+        wait_group: WaitGroup = .{},
 
-    // const Ctx = struct {
-    //     state: [fiber_count]Atomic(usize) = undefined,
-    //     barrier: Barrier = .{},
-    //     mutex: Mutex = .{},
-    //     allocator: Allocator,
-    //     executor: Executor,
-    //     done: bool,
-    //     wait_group: WaitGroup = .{},
+        pub fn leader(ctx: *@This()) !void {
+            for (0..stages) |stage| {
+                ctx.barrier = .{};
+                ctx.barrier.add(fiber_count + 1);
+                for (0..fiber_count) |i| {
+                    try Fiber.go(
+                        @This().run,
+                        .{ ctx, i, stage },
+                        ctx.allocator,
+                        ctx.executor,
+                    );
+                }
+                ctx.barrier.join();
+                {
+                    ctx.mutex.lock();
+                    defer ctx.mutex.unlock();
+                    for (ctx.state) |s| {
+                        try testing.expect(s.load(.seq_cst) >= stage);
+                    }
+                }
+                Fiber.yield();
+            }
+            ctx.done = true;
+            ctx.wait_group.finish();
+        }
 
-    //     pub fn leader(ctx: *@This()) !void {
-    //         for (0..stages) |stage| {
-    //             ctx.barrier = .{};
-    //             ctx.barrier.add(fiber_count + 1);
-    //             for (0..fiber_count) |i| {
-    //                 try Fiber.go(
-    //                     @This().run,
-    //                     .{ ctx, i, stage },
-    //                     ctx.allocator,
-    //                     ctx.executor,
-    //                 );
-    //             }
-    //             ctx.barrier.join();
-    //             {
-    //                 ctx.mutex.lock();
-    //                 defer ctx.mutex.unlock();
-    //                 for (ctx.state) |s| {
-    //                     try testing.expect(s.load(.seq_cst) >= stage);
-    //                 }
-    //             }
-    //             Fiber.yield();
-    //         }
-    //         ctx.done = true;
-    //         ctx.wait_group.finish();
-    //     }
+        pub fn run(ctx: *@This(), i: usize, stage: usize) !void {
+            _ = ctx.state[i].fetchAdd(1, .seq_cst);
+            ctx.barrier.join();
+            {
+                ctx.mutex.lock();
+                defer ctx.mutex.unlock();
+                for (ctx.state) |s| {
+                    try testing.expect(s.load(.seq_cst) >= stage);
+                }
+            }
+        }
+    };
 
-    //     pub fn run(ctx: *@This(), i: usize, stage: usize) !void {
-    //         _ = ctx.state[i].fetchAdd(1, .seq_cst);
-    //         ctx.barrier.join();
-    //         {
-    //             ctx.mutex.lock();
-    //             defer ctx.mutex.unlock();
-    //             for (ctx.state) |s| {
-    //                 try testing.expect(s.load(.seq_cst) >= stage);
-    //             }
-    //         }
-    //     }
-    // };
-
-    // var ctx: Ctx = .{
-    //     .state = std.mem.zeroes([fiber_count]Atomic(usize)),
-    //     .allocator = testing.allocator,
-    //     .executor = tp.executor(),
-    //     .done = false,
-    // };
-    // ctx.wait_group.start();
-    // try Fiber.go(
-    //     Ctx.leader,
-    //     .{&ctx},
-    //     testing.allocator,
-    //     tp.executor(),
-    // );
-    // ctx.wait_group.wait();
-    // try testing.expect(ctx.done);
-    // for (ctx.state) |s| {
-    //     try testing.expectEqual(stages, s.load(.seq_cst));
-    // }
+    var ctx: Ctx = .{
+        .state = std.mem.zeroes([fiber_count]Atomic(usize)),
+        .allocator = testing.allocator,
+        .executor = tp.executor(),
+        .done = false,
+    };
+    ctx.wait_group.start();
+    try Fiber.go(
+        Ctx.leader,
+        .{&ctx},
+        testing.allocator,
+        tp.executor(),
+    );
+    ctx.wait_group.wait();
+    try testing.expect(ctx.done);
+    for (ctx.state) |s| {
+        try testing.expectEqual(stages, s.load(.seq_cst));
+    }
 }

@@ -146,19 +146,16 @@ const LockAwaiter = struct {
                         .seq_cst,
                     ) == null) {
                         // we were the 1st to park in stack
-                        if (mutex.head.cmpxchgStrong(
+                        // try to change head to ourselves
+                        // even if we fail, someone will help us,
+                        // so just break regardless of result
+                        _ = mutex.head.cmpxchgWeak(
                             null,
                             node,
                             .seq_cst,
                             .seq_cst,
-                        )) |head| {
-                            if (head == node) {
-                                // another fiber helped us
-                                break;
-                            } else unreachable;
-                        } else {
-                            break;
-                        }
+                        );
+                        break;
                     } else {
                         // somebody else registered themselves as tail
                         // try again from top
