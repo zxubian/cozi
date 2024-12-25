@@ -26,7 +26,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
-        .sanitize_thread = true,
+        .sanitize_thread = sanitize == .thread,
         .use_llvm = true,
     });
 
