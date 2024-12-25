@@ -14,9 +14,9 @@ pub const Stack = ExecutionContext.Stack;
 const Coroutine = @This();
 
 runnable: *Runnable = undefined,
-previous_context: ExecutionContext = undefined,
+previous_context: ExecutionContext = .{},
 stack: Stack = undefined,
-execution_context: ExecutionContext = undefined,
+execution_context: ExecutionContext = .{},
 is_completed: bool = false,
 
 pub fn init(

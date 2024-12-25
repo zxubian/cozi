@@ -11,7 +11,7 @@ const tsan = struct {
     extern "c" fn __tsan_set_fiber_name(fiber: ?*anyopaque, name: [*:0]const u8) void;
 };
 
-fiber: ?*anyopaque,
+fiber: ?*anyopaque = null,
 exited_from: ?*ThreadSanitizerContext = null,
 
 pub fn init(self: *ThreadSanitizerContext, _: Stack) void {
@@ -35,12 +35,16 @@ pub inline fn afterSwitch(self: *ThreadSanitizerContext) void {
 }
 
 pub inline fn beforeExit(self: *ThreadSanitizerContext, other: *ThreadSanitizerContext) void {
-    other.exited_from = self;
+    other.setExitedFrom(self);
     tsan.__tsan_switch_to_fiber(other.fiber, 0);
 }
 
+fn setExitedFrom(self: *ThreadSanitizerContext, other: *ThreadSanitizerContext) void {
+    self.exited_from = other;
+}
+
 fn maybeCleanUpAfterExit(self: *ThreadSanitizerContext) void {
-    if (self.exited_from) |*other_context| {
+    if (self.exited_from) |other_context| {
         tsan.__tsan_destroy_fiber(other_context.*.fiber.?);
         other_context.*.fiber = null;
     }

@@ -3,8 +3,8 @@ const AddressSanitizerContext = @This();
 const Stack = @import("../../../stack.zig");
 
 stack: Stack,
-fake_stack: *anyopaque,
-previous_context: *AddressSanitizerContext,
+fake_stack: *anyopaque = undefined,
+previous_context: ?*AddressSanitizerContext = null,
 
 const asan = struct {
     extern "c" fn __sanitizer_start_switch_fiber(

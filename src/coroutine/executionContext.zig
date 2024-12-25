@@ -2,15 +2,16 @@ const std = @import("std");
 const log = std.log.scoped(.execution_context);
 const MachineContext = @import("./context/machineContext.zig");
 const SanitizerContext = @import("./context/sanitizerContext.zig");
+const build_config = @import("build_config");
 
 pub const Stack = @import("../stack.zig");
 pub const Trampoline = @import("./context/trampoline.zig");
 
 const ExecutionContext = @This();
 
-machine_context: MachineContext,
-user_trampoline: Trampoline,
-sanitizer_context: SanitizerContext,
+machine_context: MachineContext = undefined,
+user_trampoline: Trampoline = undefined,
+sanitizer_context: SanitizerContext = .{},
 
 pub fn init(
     self: *ExecutionContext,
@@ -30,7 +31,9 @@ pub fn switchTo(self: *ExecutionContext, other: *ExecutionContext) void {
 }
 
 pub fn exitTo(self: *ExecutionContext, other: *ExecutionContext) noreturn {
-    self.sanitizer_context.beforeExit(&other.sanitizer_context);
+    if (build_config.sanitize != .none) {
+        self.sanitizer_context.beforeExit(&other.sanitizer_context);
+    }
     self.machine_context.switchTo(&other.machine_context);
     unreachable;
 }

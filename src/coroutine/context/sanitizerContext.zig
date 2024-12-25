@@ -6,12 +6,20 @@ const Stack = @import("../../stack.zig");
 
 pub const Context = @This();
 
-impl: Impl,
+impl: Impl = .{},
 
 const Impl = switch (build_config.sanitize) {
-    .none => void,
+    .none => NoopContext,
     .address => AddressSanitizerContext,
     .thread => ThreadSanitizerContext,
+};
+
+const NoopContext = struct {
+    pub fn init(_: *NoopContext, _: Stack) void {}
+    pub fn afterStart(_: *NoopContext) void {}
+    pub fn beforeSwitch(_: *NoopContext, _: *NoopContext) void {}
+    pub fn afterSwitch(_: *NoopContext) void {}
+    pub fn beforeExit(_: *NoopContext, _: *NoopContext) void {}
 };
 
 pub fn init(self: *Context, stack: Stack) void {
