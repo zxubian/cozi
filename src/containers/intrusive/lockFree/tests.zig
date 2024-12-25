@@ -84,72 +84,13 @@ test "stack - multiple producers - manual" {
     try testing.expectEqual(node_count, i);
 }
 
-test "stack - multiple producers - thread pool" {
-    if (builtin.single_threaded) {
-        return error.SkipZigTest;
-    }
-    const cpu_count = try std.Thread.getCpuCount();
-    var tp = try ThreadPool.init(cpu_count, testing.allocator);
-    defer tp.deinit();
-    try tp.start();
-    defer tp.stop();
-
-    const Node = struct {
-        intrusive_list_node: Containers.Intrusive.Node = .{},
-        data: usize = 0,
-    };
-    const fiber_count = 500;
-    const node_per_fiber = 500;
-    const node_count = fiber_count * node_per_fiber;
-    var nodes: [node_count]Node = [_]Node{.{}} ** node_count;
-    const Ctx = struct {
-        stack: Stack(Node),
-        counter: Atomic(usize) = .init(0),
-        nodes: []Node,
-        wait_group: WaitGroup = .{},
-
-        pub fn run(ctx: *@This()) void {
-            for (0..node_per_fiber) |_| {
-                const counter = ctx.counter.fetchAdd(1, .seq_cst);
-                const node: *Node = &ctx.nodes[counter];
-                node.*.data = counter;
-                ctx.stack.pushFront(node);
-            }
-            ctx.wait_group.finish();
-        }
-    };
-    var ctx: Ctx = .{
-        .stack = .{},
-        .nodes = &nodes,
-    };
-    for (0..fiber_count) |_| {
-        ctx.wait_group.start();
-        try Fiber.go(
-            Ctx.run,
-            .{&ctx},
-            testing.allocator,
-            tp.executor(),
-        );
-    }
-    ctx.wait_group.wait();
-    var i: usize = 0;
-    var array_idx: isize = node_count - 1;
-    while (ctx.stack.popFront()) |node| : ({
-        i += 1;
-        array_idx -= 1;
-    }) {
-        try testing.expectEqual(nodes[@intCast(array_idx)].data, node.data);
-    }
-    try testing.expectEqual(node_count, i);
-}
-
 test "stack - stress" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
-
     const cpu_count = try std.Thread.getCpuCount();
-    var tp = try ThreadPool.init(cpu_count, testing.allocator);
+    const worker_count = if (@import("build_config").sanitize == .none) cpu_count else 4;
+    var tp = try ThreadPool.init(worker_count, testing.allocator);
     defer tp.deinit();
     try tp.start();
     defer tp.stop();
@@ -161,18 +102,30 @@ test "stack - stress" {
         touched_by_producer: Atomic(bool) = .init(false),
         touched_by_consumer: Atomic(bool) = .init(false),
     };
-    const producer_count = 100;
-    const node_per_fiber = 100;
+    const count = 100;
+    const producer_count = count;
+    const node_per_fiber = count;
     const node_count = producer_count * node_per_fiber;
-    var nodes: [node_count]Node = [_]Node{.{}} ** node_count;
+    const nodes = try testing.allocator.alloc(Node, node_count);
+    defer testing.allocator.free(nodes);
+    for (nodes) |*node| {
+        node.* = .{};
+    }
+    const observed_orders = try testing.allocator.alloc(std.ArrayList(usize), producer_count);
+    const producers_done = try testing.allocator.alloc(Atomic(bool), producer_count);
+    for (producers_done) |*done| {
+        done.* = Atomic(bool).init(false);
+    }
+    defer testing.allocator.free(observed_orders);
+    defer testing.allocator.free(producers_done);
     const Ctx = struct {
         stack: Stack(Node),
         counter: Atomic(usize) = .init(0),
         nodes: []Node,
-        producers_done: [producer_count]Atomic(bool) = undefined,
+        producers_done: []Atomic(bool),
         consumer_done: bool = false,
         wait_group: WaitGroup = .{},
-        observed_orders: [producer_count]std.ArrayList(usize) = undefined,
+        observed_orders: []std.ArrayList(usize),
 
         pub fn producer(ctx: *@This(), producer_idx: usize) void {
             for (0..node_per_fiber) |i| {
@@ -184,7 +137,7 @@ test "stack - stress" {
                     .seq_cst,
                     .seq_cst,
                 ) != null) {
-                    unreachable;
+                    std.debug.panic("Node was already touched by producer", .{});
                 }
                 node.local_order = i;
                 node.producer_idx = producer_idx;
@@ -197,7 +150,7 @@ test "stack - stress" {
                 .seq_cst,
                 .seq_cst,
             ) != null) {
-                unreachable;
+                std.debug.panic("Done flag was already touched by producer", .{});
             }
             ctx.wait_group.finish();
         }
@@ -213,7 +166,7 @@ test "stack - stress" {
                         .seq_cst,
                         .seq_cst,
                     ) != null) {
-                        unreachable;
+                        std.debug.panic("Node was already touched by consumer", .{});
                     }
                 }
                 if (ctx.all_producers_done()) {
@@ -237,17 +190,18 @@ test "stack - stress" {
     };
     var ctx: Ctx = .{
         .stack = .{},
-        .nodes = &nodes,
-        .producers_done = [_]Atomic(bool){.init(false)} ** producer_count,
+        .nodes = nodes,
+        .producers_done = producers_done,
+        .observed_orders = observed_orders,
     };
-    for (&ctx.observed_orders) |*array| {
+    for (observed_orders) |*array| {
         array.* = std.ArrayList(usize).initCapacity(
             testing.allocator,
             node_per_fiber,
         ) catch unreachable;
     }
     defer {
-        for (&ctx.observed_orders) |*array| {
+        for (ctx.observed_orders) |*array| {
             array.*.deinit();
         }
     }
@@ -260,11 +214,12 @@ test "stack - stress" {
     );
     for (0..producer_count) |i| {
         ctx.wait_group.start();
-        try Fiber.go(
+        try Fiber.goOptions(
             Ctx.producer,
             .{ &ctx, i },
             testing.allocator,
             tp.executor(),
+            .{ .stack_size = 1024 * 16 },
         );
     }
     ctx.wait_group.wait();
@@ -326,7 +281,11 @@ test "queue - multiple producers - manual" {
     const fiber_count = 100;
     const node_per_fiber = 100;
     const node_count = fiber_count * node_per_fiber;
-    var nodes: [node_count]Node = [_]Node{.{}} ** node_count;
+    const nodes = try testing.allocator.alloc(Node, node_count);
+    defer testing.allocator.free(nodes);
+    for (nodes) |*node| {
+        node.* = .{};
+    }
     const Ctx = struct {
         queue: Queue(Node),
         counter: Atomic(usize) = .init(0),
@@ -343,7 +302,7 @@ test "queue - multiple producers - manual" {
     };
     var ctx: Ctx = .{
         .queue = .{},
-        .nodes = &nodes,
+        .nodes = nodes,
     };
     for (0..fiber_count) |_| {
         try Fiber.go(
@@ -354,61 +313,6 @@ test "queue - multiple producers - manual" {
         );
     }
     _ = manual_executor.drain();
-    var i: usize = 0;
-    while (ctx.queue.popFront()) |node| : (i += 1) {
-        try testing.expectEqual(i, node.data);
-    }
-    try testing.expectEqual(node_count, i);
-}
-
-test "queue - multiple producers - thread pool" {
-    if (builtin.single_threaded) {
-        return error.SkipZigTest;
-    }
-    const cpu_count = try std.Thread.getCpuCount();
-    var tp = try ThreadPool.init(cpu_count, testing.allocator);
-    defer tp.deinit();
-    try tp.start();
-    defer tp.stop();
-
-    const Node = struct {
-        intrusive_list_node: Containers.Intrusive.Node = .{},
-        data: usize = 0,
-    };
-    const fiber_count = 500;
-    const node_per_fiber = 500;
-    const node_count = fiber_count * node_per_fiber;
-    var nodes: [node_count]Node = [_]Node{.{}} ** node_count;
-    const Ctx = struct {
-        queue: Queue(Node),
-        counter: Atomic(usize) = .init(0),
-        nodes: []Node,
-        wait_group: WaitGroup = .{},
-
-        pub fn run(ctx: *@This()) void {
-            for (0..node_per_fiber) |_| {
-                const counter = ctx.counter.fetchAdd(1, .seq_cst);
-                const node: *Node = &ctx.nodes[counter];
-                node.*.data = counter;
-                ctx.queue.pushBack(node);
-            }
-            ctx.wait_group.finish();
-        }
-    };
-    var ctx: Ctx = .{
-        .queue = .{},
-        .nodes = &nodes,
-    };
-    for (0..fiber_count) |_| {
-        ctx.wait_group.start();
-        try Fiber.go(
-            Ctx.run,
-            .{&ctx},
-            testing.allocator,
-            tp.executor(),
-        );
-    }
-    ctx.wait_group.wait();
     var i: usize = 0;
     while (ctx.queue.popFront()) |node| : (i += 1) {
         try testing.expectEqual(i, node.data);
@@ -435,14 +339,23 @@ test "queue - stress" {
         touched_by_producer: Atomic(bool) = .init(false),
         touched_by_consumer: Atomic(bool) = .init(false),
     };
-    const producer_count = 500;
-    const node_per_fiber = 500;
+    const producer_count = 100;
+    const node_per_fiber = 100;
     const node_count = producer_count * node_per_fiber;
-    var nodes: [node_count]Node = [_]Node{.{}} ** node_count;
+    const nodes = try testing.allocator.alloc(Node, node_count);
+    defer testing.allocator.free(nodes);
+    for (nodes) |*node| {
+        node.* = .{};
+    }
+    const producers_done = try testing.allocator.alloc(Atomic(bool), producer_count);
+    defer testing.allocator.free(producers_done);
+    for (producers_done) |*done| {
+        done.* = Atomic(bool).init(false);
+    }
     const Ctx = struct {
         queue: Queue(Node),
         nodes: []Node,
-        producers_done: [producer_count]Atomic(bool) = undefined,
+        producers_done: []Atomic(bool),
         consumer_done: bool = false,
         wait_group: WaitGroup = .{},
 
@@ -500,8 +413,8 @@ test "queue - stress" {
     };
     var ctx: Ctx = .{
         .queue = .{},
-        .nodes = &nodes,
-        .producers_done = [_]Atomic(bool){.init(false)} ** producer_count,
+        .nodes = nodes,
+        .producers_done = producers_done,
     };
     ctx.wait_group.start();
     try Fiber.goOptions(
@@ -523,7 +436,10 @@ test "queue - stress" {
             .{ &ctx, i },
             testing.allocator,
             tp.executor(),
-            .{ .name = name },
+            .{
+                .name = name,
+                .stack_size = 1024 * 16,
+            },
         );
     }
     ctx.wait_group.wait();

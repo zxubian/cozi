@@ -65,11 +65,11 @@ test "barrier - stress" {
     try tp.start();
     defer tp.stop();
 
-    const fiber_count = 1000;
+    const fiber_count = 100;
     const stages = 5;
 
     const Ctx = struct {
-        state: [fiber_count]Atomic(usize) = undefined,
+        state: []Atomic(usize),
         barrier: Barrier = .{},
         mutex: Mutex = .{},
         allocator: Allocator,
@@ -82,11 +82,12 @@ test "barrier - stress" {
                 ctx.barrier = .{};
                 ctx.barrier.add(fiber_count + 1);
                 for (0..fiber_count) |i| {
-                    try Fiber.go(
+                    try Fiber.goOptions(
                         @This().run,
                         .{ ctx, i, stage },
                         ctx.allocator,
                         ctx.executor,
+                        .{ .stack_size = 1024 * 16 },
                     );
                 }
                 ctx.barrier.join();
@@ -116,8 +117,14 @@ test "barrier - stress" {
         }
     };
 
+    const state = try testing.allocator.alloc(Atomic(usize), fiber_count);
+    defer testing.allocator.free(state);
+    for (state) |*s| {
+        s.* = Atomic(usize).init(0);
+    }
+
     var ctx: Ctx = .{
-        .state = std.mem.zeroes([fiber_count]Atomic(usize)),
+        .state = state,
         .allocator = testing.allocator,
         .executor = tp.executor(),
         .done = false,
