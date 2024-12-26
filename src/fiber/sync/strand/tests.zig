@@ -200,9 +200,7 @@ test "stress" {
                 .{&ctx},
                 testing.allocator,
                 tp.executor(),
-                .{
-                    .name = name,
-                },
+                .{ .name = name, .stack_size = 1024 * 16 * 16 },
             );
         }
         ctx.wait_group.wait();

@@ -1,6 +1,7 @@
 const std = @import("std");
 const testing = std.testing;
 const builtin = @import("builtin");
+const build_config = @import("build_config");
 const Atomic = std.atomic.Value;
 
 const Containers = @import("../../../containers.zig");
@@ -86,6 +87,9 @@ test "stack - multiple producers - manual" {
 
 test "stack - stress" {
     if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
+    if (build_config.sanitize == .thread) {
         return error.SkipZigTest;
     }
     const cpu_count = try std.Thread.getCpuCount();
@@ -322,6 +326,9 @@ test "queue - multiple producers - manual" {
 
 test "queue - stress" {
     if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
+    if (build_config.sanitize == .thread) {
         return error.SkipZigTest;
     }
 

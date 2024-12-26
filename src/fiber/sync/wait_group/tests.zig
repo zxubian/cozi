@@ -33,18 +33,20 @@ test "counter - single thread" {
         .counter = 0,
     };
     ctx.wg.add(count);
-    try Fiber.go(
+    try Fiber.goOptions(
         Ctx.runConsumer,
         .{&ctx},
         testing.allocator,
         manual_executor.executor(),
+        .{ .stack_size = 1024 * 16 },
     );
     for (0..count) |_| {
-        try Fiber.go(
+        try Fiber.goOptions(
             Ctx.runProducer,
             .{&ctx},
             testing.allocator,
             manual_executor.executor(),
+            .{ .stack_size = 1024 * 16 },
         );
     }
     _ = manual_executor.drain();
@@ -80,18 +82,20 @@ test "counter - multi-thread" {
     var ctx: Ctx = .{};
     ctx.wg.add(count);
     ctx.thread_wg.startMany(count + 1);
-    try Fiber.go(
+    try Fiber.goOptions(
         Ctx.runConsumer,
         .{&ctx},
         testing.allocator,
         tp.executor(),
+        .{ .stack_size = 1024 * 16 },
     );
     for (0..count) |_| {
-        try Fiber.go(
+        try Fiber.goOptions(
             Ctx.runProducer,
             .{&ctx},
             testing.allocator,
             tp.executor(),
+            .{ .stack_size = 1024 * 16 },
         );
     }
     ctx.thread_wg.wait();
@@ -135,26 +139,29 @@ test "concurrent add & done" {
     var ctx: Ctx = .{};
     for (0..count) |_| {
         ctx.thread_wg.start();
-        try Fiber.go(
+        try Fiber.goOptions(
             Ctx.runProducer,
             .{&ctx},
             testing.allocator,
             tp.executor(),
+            .{ .stack_size = 1024 * 16 },
         );
         ctx.thread_wg.start();
-        try Fiber.go(
+        try Fiber.goOptions(
             Ctx.runConsumer,
             .{&ctx},
             testing.allocator,
             tp.executor(),
+            .{ .stack_size = 1024 * 16 },
         );
     }
     ctx.thread_wg.start();
-    try Fiber.go(
+    try Fiber.goOptions(
         Ctx.join,
         .{&ctx},
         testing.allocator,
         tp.executor(),
+        .{ .stack_size = 1024 * 16 },
     );
     ctx.thread_wg.wait();
     try testing.expectEqual(count, ctx.counter.load(.seq_cst));
@@ -210,26 +217,29 @@ test "stress" {
     var ctx: Ctx = .{};
     for (0..fibers) |_| {
         ctx.thread_wg.start();
-        try Fiber.go(
+        try Fiber.goOptions(
             Ctx.runProducer,
             .{&ctx},
             testing.allocator,
             tp.executor(),
+            .{ .stack_size = 1024 * 16 },
         );
         ctx.thread_wg.start();
-        try Fiber.go(
+        try Fiber.goOptions(
             Ctx.runConsumer,
             .{&ctx},
             testing.allocator,
             tp.executor(),
+            .{ .stack_size = 1024 * 16 },
         );
     }
     ctx.thread_wg.start();
-    try Fiber.go(
+    try Fiber.goOptions(
         Ctx.join,
         .{&ctx},
         testing.allocator,
         tp.executor(),
+        .{ .stack_size = 1024 * 16 },
     );
     ctx.thread_wg.wait();
     try testing.expectEqual(count, ctx.counter.load(.seq_cst));

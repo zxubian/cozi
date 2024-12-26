@@ -17,7 +17,7 @@ const Sync = @import("./fiber/sync.zig");
 // pub const Barrier = Sync.Barrier;
 pub const Event = Sync.Event;
 pub const Mutex = Sync.Mutex;
-// pub const Strand = Sync.Strand;
+pub const Strand = Sync.Strand;
 // pub const WaitGroup = Sync.WaitGroup;
 
 const log = std.log.scoped(.fiber);
