@@ -179,8 +179,8 @@ fn runTickAndMaybeTransfer(self: *Fiber) ?*Fiber {
             .always_suspend => return null,
             .never_suspend => return self,
             .symmetric_transfer_next => |next| {
-                // TODO: consider if self.resume is better
-                self.scheduleSelf();
+                // TODO: consider if self.resume() or self.scheduleSelf() is better
+                self.@"resume"();
                 return @alignCast(@ptrCast(next));
             },
         }
