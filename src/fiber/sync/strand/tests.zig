@@ -1,6 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const testing = std.testing;
+const build_config = @import("build_config");
 
 const Atomic = std.atomic.Value;
 
@@ -132,7 +133,7 @@ test "Suspend Illegal" {
 
         pub fn criticalSection(self: *@This()) !void {
             _ = self;
-            try testing.expect(Fiber.current().?.in_suspend_illegal_scope);
+            try testing.expect(Fiber.current().?.inSuspendIllegalScope());
             // illegal
             // self.event.wait();
         }
@@ -150,14 +151,72 @@ test "Suspend Illegal" {
     _ = manual_executor.drain();
 }
 
+test "thread pool" {
+    if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
+    var tp = try ThreadPool.init(4, testing.allocator);
+    defer tp.deinit();
+    try tp.start();
+    defer tp.stop();
+    var fiber_name: [Fiber.MAX_FIBER_NAME_LENGTH_BYTES:0]u8 = undefined;
+    const iterations_per_fiber = 3;
+    const fiber_count = 5;
+    const Ctx = struct {
+        strand: Strand = .{},
+        counter: usize,
+        control: Atomic(usize),
+        wait_group: WaitGroup = .{},
+
+        pub fn run(self: *@This()) void {
+            for (0..iterations_per_fiber) |_| {
+                _ = self.control.fetchAdd(1, .monotonic);
+                self.strand.combine(criticalSection, .{self});
+            }
+            self.wait_group.finish();
+        }
+
+        pub fn criticalSection(self: *@This()) !void {
+            self.counter += 1;
+        }
+    };
+    var ctx: Ctx = .{
+        .counter = 0,
+        .control = .init(0),
+    };
+    ctx.wait_group.startMany(fiber_count);
+    for (0..fiber_count) |i| {
+        const name = try std.fmt.bufPrintZ(
+            fiber_name[0..],
+            "Fiber #{}",
+            .{i},
+        );
+        try Fiber.goOptions(
+            Ctx.run,
+            .{&ctx},
+            testing.allocator,
+            tp.executor(),
+            .{ .name = name, .stack_size = 1024 * 16 * 16 },
+        );
+    }
+    ctx.wait_group.wait();
+    try testing.expectEqual(
+        ctx.control.load(.monotonic),
+        ctx.counter,
+    );
+}
+
 test "stress" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
+    if (build_config.sanitize == .thread) {
+        return error.SkipZigTest;
+    }
+
     const cpu_count = try std.Thread.getCpuCount();
     const runs = 5;
     for (0..runs) |_| {
-        var strand: Strand = .{};
         var tp = try ThreadPool.init(cpu_count, testing.allocator);
         defer tp.deinit();
         try tp.start();
@@ -166,7 +225,7 @@ test "stress" {
         const iterations_per_fiber = 1000;
         const fiber_count = 1000;
         const Ctx = struct {
-            strand: *Strand,
+            strand: Strand = .{},
             counter: usize,
             control: Atomic(usize),
             wait_group: WaitGroup = .{},
@@ -184,7 +243,6 @@ test "stress" {
             }
         };
         var ctx: Ctx = .{
-            .strand = &strand,
             .counter = 0,
             .control = .init(0),
         };

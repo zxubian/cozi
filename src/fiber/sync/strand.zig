@@ -40,6 +40,7 @@ pub fn combine(
             .node = &node,
             .submitting_fiber = current_fiber,
         };
+        self.queue.pushBack(&node);
         Await(&strand_awaiter);
         // ------ Fiber resumes from suspend ------
         if (self.owner.load(.seq_cst) == current_fiber) {
@@ -92,8 +93,7 @@ const StrandAwaiter = struct {
 
     pub fn awaitReady(ctx: *anyopaque) bool {
         const self: *StrandAwaiter = @alignCast(@ptrCast(ctx));
-        self.strand.queue.pushBack(self.node);
-        return self.strand.owner.cmpxchgStrong(
+        return self.strand.owner.cmpxchgWeak(
             null,
             self.submitting_fiber,
             .seq_cst,

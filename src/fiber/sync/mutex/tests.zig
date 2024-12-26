@@ -239,7 +239,7 @@ test "Suspend Illegal" {
 
         pub fn criticalSection(self: *@This()) !void {
             _ = self;
-            try testing.expect(Fiber.current().?.in_suspend_illegal_scope);
+            try testing.expect(Fiber.current().?.inSuspendIllegalScope());
             // illegal
             // Fiber.yield();
         }

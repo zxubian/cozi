@@ -4,6 +4,7 @@ const Fiber = @This();
 const std = @import("std");
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
+const Atomic = std.atomic.Value;
 
 const Coroutine = @import("./coroutine.zig");
 const Executor = @import("./executor.zig");
@@ -17,7 +18,7 @@ const Sync = @import("./fiber/sync.zig");
 pub const Barrier = Sync.Barrier;
 pub const Event = Sync.Event;
 pub const Mutex = Sync.Mutex;
-// pub const Strand = Sync.Strand;
+pub const Strand = Sync.Strand;
 pub const WaitGroup = Sync.WaitGroup;
 
 const log = std.log.scoped(.fiber);
@@ -28,9 +29,9 @@ executor: Executor,
 tick_runnable: Runnable,
 owns_stack: bool = false,
 name: [:0]const u8,
-in_suspend_illegal_scope: bool = false,
 state: std.atomic.Value(u8) = .init(0),
 awaiter: ?Awaiter,
+suspend_illegal_scope_depth: Atomic(usize) = .init(0),
 
 pub const MAX_FIBER_NAME_LENGTH_BYTES = 100;
 
@@ -132,7 +133,7 @@ fn yield_(_: *Fiber) void {
 }
 
 pub fn @"suspend"(self: *Fiber, awaiter: Awaiter) void {
-    if (self.in_suspend_illegal_scope) {
+    if (self.inSuspendIllegalScope()) {
         std.debug.panic("Cannot suspend fiber while in \"suspend illegal\" scope.", .{});
     }
     log.debug("{s} about to suspend", .{self.name});
@@ -209,11 +210,15 @@ fn runnable(fiber: *Fiber) Runnable {
 }
 
 pub fn beginSuspendIllegalScope(self: *Fiber) void {
-    self.in_suspend_illegal_scope = true;
+    _ = self.suspend_illegal_scope_depth.fetchAdd(1, .release);
 }
 
 pub fn endSuspendIllegalScope(self: *Fiber) void {
-    self.in_suspend_illegal_scope = false;
+    _ = self.suspend_illegal_scope_depth.fetchSub(1, .release);
+}
+
+pub fn inSuspendIllegalScope(self: *Fiber) bool {
+    return self.suspend_illegal_scope_depth.load(.acquire) > 0;
 }
 
 const YieldAwaiter = struct {
