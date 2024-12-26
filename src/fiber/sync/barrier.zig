@@ -12,7 +12,7 @@ const log = std.log.scoped(.fiber_barrier);
 
 wait_group: WaitGroup = .{},
 
-pub fn add(self: *Barrier, count: isize) void {
+pub fn add(self: *Barrier, count: u32) void {
     self.wait_group.add(count);
 }
 

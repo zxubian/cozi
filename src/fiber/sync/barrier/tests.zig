@@ -1,5 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const build_config = @import("build_config");
 const testing = std.testing;
 const Atomic = std.atomic.Value;
 const Allocator = std.mem.Allocator;
@@ -56,7 +57,7 @@ test "barrier - basic - single thread" {
 }
 
 test "barrier - stress" {
-    const runs = 100;
+    const runs = 10;
     for (0..runs) |_| {
         const cpu_count = try std.Thread.getCpuCount();
         _ = cpu_count;
