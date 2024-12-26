@@ -57,6 +57,9 @@ test "barrier - basic - single thread" {
 }
 
 test "barrier - stress" {
+    if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
     const runs = 10;
     for (0..runs) |_| {
         const cpu_count = try std.Thread.getCpuCount();

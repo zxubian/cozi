@@ -1,5 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const build_config = @import("build_config");
 
 const testing = std.testing;
 const alloc = testing.allocator;
@@ -139,8 +140,18 @@ test "Ping Pong" {
     ctx.wait_group.wait();
 }
 
-test "Two Pools" {
+test "Fiber - Two Pools" {
     if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
+    if (build_config.sanitize == .thread) {
+        // crash in tsan_rtl.h:791
+        //   thr->shadow_stack_pos[0] = pc;
+        // --------------------------------
+        // Stack:
+        // MachineContext.switchTo()
+        // coroutine.resume()
+        // fiber.runTick()
         return error.SkipZigTest;
     }
     var wait_group: WaitGroup = .{};
