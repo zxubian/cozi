@@ -69,6 +69,9 @@ pub fn wait(self: *WaitGroup) void {
 
 pub fn done(self: *WaitGroup) void {
     const prev_state_raw = self.state.fetchSub(1, .seq_cst);
+    if (prev_state_raw == 0) {
+        std.debug.panic("Cannot call WaitGroup.done() before WaitGroup.add()", .{});
+    }
     const state_raw = prev_state_raw - 1;
     const prev_state: State = @bitCast(prev_state_raw);
     var state: State = @bitCast(state_raw);
