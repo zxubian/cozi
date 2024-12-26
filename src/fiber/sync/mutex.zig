@@ -301,28 +301,31 @@ const UnlockAwaiter = struct {
                     const maybe_next = tail.getNext();
                     if (maybe_next) |next| {
                         log.debug(
-                            "{s} saw {s} next of tail",
+                            "{s} saw {s} next of tail. Will try to reach head",
                             .{ fiber.name, next.fiber.name },
                         );
-                        const next_as_enum = StateFromNodePtr(next);
-                        if (mutex.state.cmpxchgWeak(
-                            tail_as_enum,
-                            next_as_enum,
-                            .seq_cst,
-                            .seq_cst,
-                        ) == null) {
+                        var previous = tail;
+                        var head = next;
+                        while (head.getNext()) |n| : ({
                             log.debug(
-                                "{s} set tail: {s}->{s}",
-                                .{ fiber.name, tail.fiber.name, next.fiber.name },
+                                "{s}: {s}->{s}",
+                                .{ fiber.name, head.fiber.name, n.fiber.name },
                             );
-                            log.debug(
-                                "symmetric transfer: {s} -> {s}",
-                                .{ fiber.name, tail.fiber.name },
-                            );
-                            return Awaiter.AwaitSuspendResult{
-                                .symmetric_transfer_next = tail.fiber,
-                            };
-                        }
+                            previous = head;
+                            head = n;
+                        }) {}
+                        log.debug(
+                            "{s}: {s}.next->null",
+                            .{ fiber.name, previous.fiber.name },
+                        );
+                        previous.setNext(null);
+                        log.debug(
+                            "symmetric transfer: {s} -> {s}",
+                            .{ fiber.name, head.fiber.name },
+                        );
+                        return Awaiter.AwaitSuspendResult{
+                            .symmetric_transfer_next = head.fiber,
+                        };
                     } else {
                         log.debug("{s} saw tail.next == null", .{fiber.name});
                         // next was empty
