@@ -14,11 +14,11 @@ const Await = @import("./await.zig").@"await";
 const Awaiter = @import("./awaiter.zig");
 
 const Sync = @import("./fiber/sync.zig");
-pub const Barrier = Sync.Barrier;
+// pub const Barrier = Sync.Barrier;
 pub const Event = Sync.Event;
 pub const Mutex = Sync.Mutex;
-pub const Strand = Sync.Strand;
-pub const WaitGroup = Sync.WaitGroup;
+// pub const Strand = Sync.Strand;
+// pub const WaitGroup = Sync.WaitGroup;
 
 const log = std.log.scoped(.fiber);
 
@@ -178,6 +178,8 @@ fn runTickAndMaybeTransfer(self: *Fiber) ?*Fiber {
             .always_suspend => return null,
             .never_suspend => return self,
             .symmetric_transfer_next => |next| {
+                // TODO: consider if self.resume is better
+                self.scheduleSelf();
                 return @alignCast(@ptrCast(next));
             },
         }

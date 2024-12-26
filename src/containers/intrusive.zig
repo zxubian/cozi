@@ -9,6 +9,10 @@ pub const LockFree = @import("./intrusive/lockFree.zig");
 /// for @fieldParentPtr
 pub const Node = struct {
     next: ?*Node = null,
+
+    pub fn parentPtr(self: *Node, T: anytype) *T {
+        return @fieldParentPtr("intrusive_list_node", self);
+    }
 };
 
 test {

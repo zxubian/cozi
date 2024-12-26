@@ -15,6 +15,8 @@ const Containers = @import("../../containers.zig");
 const Queue = Containers.Intrusive.LockFree.MpscQueue;
 const Await = @import("../../await.zig").@"await";
 
+const log = std.log.scoped(.fiber_mutex);
+
 // for fast path (no contention)
 const State = enum(usize) {
     unlocked = 0,
@@ -23,17 +25,39 @@ const State = enum(usize) {
     _,
 };
 
-// also, tail
+pub fn StateFromNodePtr(node: *Node) State {
+    return @enumFromInt(@intFromPtr(&node.intrusive_list_node));
+}
+
+pub fn NodePtrFromState(state: State) *Node {
+    const intrusive_list_node: *Containers.Intrusive.Node =
+        @ptrFromInt(@intFromEnum(state));
+
+    return intrusive_list_node.parentPtr(Node);
+}
+
 state: Atomic(State) align(std.atomic.cache_line) = .init(.unlocked),
-head: Atomic(?*Node) align(std.atomic.cache_line) = .init(null),
 
 const Node = struct {
     fiber: *Fiber,
     intrusive_list_node: Containers.Intrusive.Node = .{},
+
+    pub fn getNext(self: *Node) ?*Node {
+        if (self.intrusive_list_node.next) |next_intrusive_ptr| {
+            return next_intrusive_ptr.parentPtr(Node);
+        }
+        return null;
+    }
+
+    pub fn setNext(self: *Node, next: ?*Node) void {
+        const next_intrusive_ptr = if (next) |n| &n.intrusive_list_node else null;
+        self.intrusive_list_node.next = next_intrusive_ptr;
+    }
 };
 
 pub fn lock(self: *Mutex) void {
     if (Fiber.current()) |current_fiber| {
+        log.debug("{s} about to attempt locking.", .{current_fiber.name});
         // store the awaiter on the Fiber stack
         var awaiter: LockAwaiter = .{
             .mutex = self,
@@ -41,6 +65,7 @@ pub fn lock(self: *Mutex) void {
         // this is safe because Fiber.lock will not exit
         // during Fiber.await, so the stack will not be reused.
         Await(&awaiter);
+        log.debug("{s} acquired lock.", .{current_fiber.name});
         current_fiber.beginSuspendIllegalScope();
     } else {
         std.debug.panic("Fiber.Mutex.lock can only be called while executing inside of a fiber.", .{});
@@ -101,6 +126,9 @@ const LockAwaiter = struct {
             .seq_cst,
             .seq_cst,
         ) == null;
+        if (acquired_lock) {
+            log.debug("Acquired lock in awaitReady -> no need to suspend.", .{});
+        }
         return acquired_lock;
     }
 
@@ -111,14 +139,16 @@ const LockAwaiter = struct {
         const fiber: *Fiber = @alignCast(@ptrCast(handle));
         var self: *LockAwaiter = @alignCast(@ptrCast(ctx));
         var mutex = self.mutex;
-        self.queue_node = .{
+        self.queue_node = Node{
             .fiber = fiber,
         };
-        const self_as_enum: State = @enumFromInt(@intFromPtr(&self.queue_node));
         const node: *Node = &self.queue_node;
+        const self_as_enum = StateFromNodePtr(node);
+        log.debug("{s} start lock loop", .{fiber.name});
         while (true) {
             switch (mutex.state.load(.seq_cst)) {
                 .unlocked => {
+                    log.debug("{s} saw .unlocked .", .{fiber.name});
                     // currently unlocked
                     // -> try to grab the lock
                     if (mutex.state.cmpxchgWeak(
@@ -127,16 +157,19 @@ const LockAwaiter = struct {
                         .seq_cst,
                         .seq_cst,
                     ) == null) {
+                        log.debug("{s} acquired lock. Will proceed without suspending.", .{fiber.name});
                         // grabbed the lock
                         // -> can continue without suspending
                         return Awaiter.AwaitSuspendResult{ .never_suspend = {} };
                     } else {
+                        log.debug("{s} failed to acquire lock. Retry from top", .{fiber.name});
                         // somebody else grabbed the lock
                         // -> try again from top
                         continue;
                     }
                 },
                 .locked_no_awaiters => {
+                    log.debug("{s} saw .locked_no_awaiters.", .{fiber.name});
                     // some fiber owns lock, but no other awaiters
                     // -> add self to stack as both tail & head
                     if (mutex.state.cmpxchgWeak(
@@ -146,15 +179,7 @@ const LockAwaiter = struct {
                         .seq_cst,
                     ) == null) {
                         // we were the 1st to park in stack
-                        // try to change head to ourselves
-                        // even if we fail, someone will help us,
-                        // so just break regardless of result
-                        _ = mutex.head.cmpxchgWeak(
-                            null,
-                            node,
-                            .seq_cst,
-                            .seq_cst,
-                        );
+                        log.debug("{s} registered self as tail", .{fiber.name});
                         break;
                     } else {
                         // somebody else registered themselves as tail
@@ -163,38 +188,34 @@ const LockAwaiter = struct {
                     }
                 },
                 else => |tail_as_enum| {
-                    const tail: *Node = @ptrFromInt(@intFromEnum(tail_as_enum));
+                    const tail: *Node = NodePtrFromState(tail_as_enum);
+                    log.debug(
+                        "{s} saw {s} as previous tail",
+                        .{ fiber.name, tail.fiber.name },
+                    );
                     // some fiber owns lock, and there is at least
                     // 1 other fiber in the wait stack
-                    // -> add ourselves to the head of the stack
-                    if (mutex.head.load(.seq_cst)) |old_head| {
-                        node.intrusive_list_node.next = &old_head.intrusive_list_node;
-                        if (mutex.head.cmpxchgWeak(
-                            old_head,
-                            node,
-                            .seq_cst,
-                            .seq_cst,
-                        ) == null) {
-                            // succeded in adding ourselves as the head
-                            // -> suspend
-                            break;
-                        } else {
-                            // somebody else registered themselves as head
-                            // -> clean up & retry from top
-                            node.intrusive_list_node.next = null;
-                            continue;
-                        }
-                    } else {
-                        // old_head == null, meaning that
-                        // tail has not registered itself as head yet
-                        // -> let's try helping them, and then
-                        //    retry from the top
-                        _ = mutex.head.cmpxchgStrong(
-                            null,
-                            tail,
-                            .seq_cst,
-                            .seq_cst,
+                    // -> add ourselves to the tail of the stack
+                    node.setNext(tail);
+                    if (mutex.state.cmpxchgWeak(
+                        tail_as_enum,
+                        self_as_enum,
+                        .seq_cst,
+                        .seq_cst,
+                    ) == null) {
+                        log.debug(
+                            "{s} registered self as new tail. Next -> {s}",
+                            .{ fiber.name, tail.fiber.name },
                         );
+                        // added selves as tail
+                        // -> break & proceed in suspended state
+                        break;
+                    } else {
+                        log.debug(
+                            "{s} failed to register self as new tail. Retry from top.",
+                            .{fiber.name},
+                        );
+                        node.setNext(null);
                         continue;
                     }
                 },
@@ -230,6 +251,9 @@ const UnlockAwaiter = struct {
             .seq_cst,
             .seq_cst,
         ) == null;
+        if (released_lock) {
+            log.debug("Released lock in awaitReady -> no need to suspend.", .{});
+        }
         return released_lock;
     }
 
@@ -240,6 +264,8 @@ const UnlockAwaiter = struct {
         const self: *UnlockAwaiter = @alignCast(@ptrCast(ctx));
         const mutex = self.mutex;
         const fiber: *Fiber = @alignCast(@ptrCast(handle));
+
+        log.debug("{s} start unlock loop", .{fiber.name});
         while (true) {
             switch (mutex.state.load(.seq_cst)) {
                 .unlocked => {
@@ -247,6 +273,7 @@ const UnlockAwaiter = struct {
                     std.debug.panic("{*}: Trying to unlock mutex {*} twice.", .{ self, mutex });
                 },
                 .locked_no_awaiters => {
+                    log.debug("{s} saw .locked_no_awaiters", .{fiber.name});
                     // fast path: we hold the lock,
                     // and nobody else is waiting
                     if (mutex.state.cmpxchgWeak(
@@ -257,6 +284,7 @@ const UnlockAwaiter = struct {
                     ) == null) {
                         // unlocked successfully
                         // -> no need to suspend
+                        log.debug("{s} successfully unlocked -> resume self", .{fiber.name});
                         return Awaiter.AwaitSuspendResult{ .never_suspend = {} };
                     } else {
                         // somebody parked themselves in the wait stack
@@ -265,43 +293,53 @@ const UnlockAwaiter = struct {
                     }
                 },
                 else => |tail_as_enum| {
-                    const tail: *Node = @ptrFromInt(@intFromEnum(tail_as_enum));
-                    if (mutex.head.load(.seq_cst)) |old_head| {
-                        const next: ?*Node =
-                            if (old_head.intrusive_list_node.next) |n|
-                            @fieldParentPtr("intrusive_list_node", n)
-                        else
-                            null;
-                        if (mutex.head.cmpxchgWeak(
-                            old_head,
-                            next,
+                    const tail: *Node = NodePtrFromState(tail_as_enum);
+                    log.debug(
+                        "{s} saw {s} as tail",
+                        .{ fiber.name, tail.fiber.name },
+                    );
+                    const maybe_next = tail.getNext();
+                    if (maybe_next) |next| {
+                        log.debug(
+                            "{s} saw {s} next of tail",
+                            .{ fiber.name, next.fiber.name },
+                        );
+                        const next_as_enum = StateFromNodePtr(next);
+                        if (mutex.state.cmpxchgWeak(
+                            tail_as_enum,
+                            next_as_enum,
                             .seq_cst,
                             .seq_cst,
                         ) == null) {
-                            if (next == null) {
-                                assert(old_head == tail);
-                                assert(mutex.state.swap(.locked_no_awaiters, .seq_cst) == tail_as_enum);
-                            }
-                            // symmetric transfer to head
-                            fiber.@"resume"();
+                            log.debug(
+                                "{s} set tail: {s}->{s}",
+                                .{ fiber.name, tail.fiber.name, next.fiber.name },
+                            );
+                            log.debug(
+                                "symmetric transfer: {s} -> {s}",
+                                .{ fiber.name, tail.fiber.name },
+                            );
                             return Awaiter.AwaitSuspendResult{
-                                .symmetric_transfer_next = old_head.fiber,
+                                .symmetric_transfer_next = tail.fiber,
                             };
-                        } else {
-                            // new thread parked at the head
-                            // retry from top
-                            continue;
                         }
                     } else {
-                        // tail exists, but head == null
-                        // try to help tail
-                        _ = mutex.head.cmpxchgWeak(
-                            null,
-                            tail,
+                        log.debug("{s} saw tail.next == null", .{fiber.name});
+                        // next was empty
+                        if (mutex.state.cmpxchgWeak(
+                            tail_as_enum,
+                            .locked_no_awaiters,
                             .seq_cst,
                             .seq_cst,
-                        );
-                        continue;
+                        ) == null) {
+                            log.debug(
+                                "symmetric transfer: {s} -> {s}",
+                                .{ fiber.name, tail.fiber.name },
+                            );
+                            return Awaiter.AwaitSuspendResult{
+                                .symmetric_transfer_next = tail.fiber,
+                            };
+                        }
                     }
                 },
             }
