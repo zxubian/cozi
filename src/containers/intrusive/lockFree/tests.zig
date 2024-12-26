@@ -15,6 +15,9 @@ const WaitGroup = std.Thread.WaitGroup;
 const Fiber = @import("../../../fiber.zig");
 
 test "stack - basic" {
+    if (build_config.sanitize == .thread) {
+        return error.SkipZigTest;
+    }
     const Node = struct {
         intrusive_list_node: Containers.Intrusive.Node = .{},
         data: usize = 0,
@@ -38,6 +41,9 @@ test "stack - basic" {
 }
 
 test "stack - multiple producers - manual" {
+    if (build_config.sanitize == .thread) {
+        return error.SkipZigTest;
+    }
     var manual_executor: ManualExecutor = .{};
     const Node = struct {
         intrusive_list_node: Containers.Intrusive.Node = .{},
@@ -258,6 +264,9 @@ test "stack - stress" {
 }
 
 test "queue - basic" {
+    if (build_config.sanitize == .thread) {
+        return error.SkipZigTest;
+    }
     const Node = struct {
         intrusive_list_node: Containers.Intrusive.Node = .{},
         data: usize = 0,
@@ -277,6 +286,9 @@ test "queue - basic" {
 }
 
 test "queue - multiple producers - manual" {
+    if (build_config.sanitize == .thread) {
+        return error.SkipZigTest;
+    }
     var manual_executor: ManualExecutor = .{};
     const Node = struct {
         intrusive_list_node: Containers.Intrusive.Node = .{},

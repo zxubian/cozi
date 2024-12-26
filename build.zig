@@ -37,18 +37,6 @@ pub fn build(b: *std.Build) void {
     options.addOption(SanitizerOption, "sanitize", sanitize);
     exe.root_module.addOptions("build_config", options);
 
-    switch (sanitize) {
-        .address => {
-            exe.linkLibCpp();
-            exe.pie = true;
-        },
-        .thread => {
-            exe.linkLibCpp();
-            exe.pie = true;
-        },
-        else => {},
-    }
-
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);
@@ -64,7 +52,24 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .filters = if (test_filter_option) |o| o else &.{},
+        .sanitize_thread = sanitize == .thread,
     });
+
+    switch (sanitize) {
+        .address => {
+            exe.linkLibCpp();
+            exe.pie = true;
+            exe_unit_tests.linkLibC();
+            exe_unit_tests.pie = true;
+        },
+        .thread => {
+            exe.linkLibCpp();
+            exe.pie = true;
+            exe_unit_tests.linkLibC();
+            exe_unit_tests.pie = true;
+        },
+        else => {},
+    }
 
     const install_test_step =
         b.addInstallArtifact(exe_unit_tests, .{ .dest_dir = .{ .override = .{ .custom = "test" } } });

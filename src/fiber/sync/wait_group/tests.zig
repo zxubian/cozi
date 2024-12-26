@@ -1,5 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const build_config = @import("build_config");
 
 const testing = std.testing;
 const Atomic = std.atomic.Value;
@@ -13,6 +14,9 @@ const ThreadPool = Executors.ThreadPools.Compute;
 const ThreadWaitGroup = std.Thread.WaitGroup;
 
 test "counter - single thread" {
+    if (build_config.sanitize == .thread) {
+        return error.SkipZigTest;
+    }
     var manual_executor = ManualExecutor{};
     const count: usize = 100;
     const Ctx = struct {
@@ -55,6 +59,9 @@ test "counter - single thread" {
 
 test "counter - multi-thread" {
     if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
+    if (build_config.sanitize == .thread) {
         return error.SkipZigTest;
     }
     var tp = try ThreadPool.init(4, testing.allocator);
@@ -184,6 +191,7 @@ test "stress" {
 
     const Ctx = struct {
         wg: WaitGroup = .{},
+        producer_ready: WaitGroup = .{},
         counter: Atomic(usize) = .init(0),
         join_done: bool = false,
         thread_wg: ThreadWaitGroup = .{},
@@ -193,13 +201,16 @@ test "stress" {
                 self.wg.add(1);
                 Fiber.yield();
             }
+            self.producer_ready.done();
             self.thread_wg.finish();
         }
 
         pub fn runConsumer(self: *@This()) !void {
+            self.producer_ready.wait();
             for (0..iterations_per_fiber) |_| {
                 _ = self.counter.fetchAdd(1, .seq_cst);
                 self.wg.done();
+                Fiber.yield();
             }
             self.thread_wg.finish();
         }
@@ -216,6 +227,7 @@ test "stress" {
     };
     var ctx: Ctx = .{};
     for (0..fibers) |_| {
+        ctx.producer_ready.add(1);
         ctx.thread_wg.start();
         try Fiber.goOptions(
             Ctx.runProducer,

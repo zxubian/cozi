@@ -19,15 +19,26 @@ const Node = struct {
     intrusive_list_node: Containers.Intrusive.Node = .{},
 };
 
-counter: Atomic(isize) = .init(0),
+const State = packed struct(u64) {
+    counter: u32 = 0,
+    num_waiters: u32 = 0,
+};
+
+state: Atomic(u64) = .init(0),
 queue: Queue(Node) = .{},
 
-pub fn add(self: *WaitGroup, count: isize) void {
-    const prev_counter = self.counter.fetchAdd(count, .seq_cst);
+pub fn init(initial_value: u32) WaitGroup {
+    return WaitGroup{
+        .state = @bitCast(State{ .counter = initial_value }),
+    };
+}
+
+pub fn add(self: *WaitGroup, count: u32) void {
+    const prev_counter = self.state.fetchAdd(count, .seq_cst);
     log.debug("{*}: {}->{}", .{
         self,
-        prev_counter,
-        count + prev_counter,
+        @as(State, @bitCast(prev_counter)),
+        @as(State, @bitCast(prev_counter + count)),
     });
 }
 
@@ -36,35 +47,56 @@ pub fn wait(self: *WaitGroup) void {
         Fiber.current().?.name,
         self,
     });
+    // add waiter
+    const prev_state_raw = self.state.fetchAdd(1 << 32, .seq_cst);
+    const state_raw = prev_state_raw + (1 << 32);
+    const prev_state: State = @bitCast(prev_state_raw);
+    const state: State = @bitCast(state_raw);
+    log.debug("{*}: {}->{}", .{
+        self,
+        prev_state,
+        state,
+    });
+    // fast path - no suspend necessary
+    if (state.counter == 0) {
+        _ = self.state.fetchSub(1 << 32, .seq_cst);
+        return;
+    }
     // place awaiter on Fiber stack
     var wait_group_awaiter: WaitGroupAwaiter = .{ .wait_group = self };
     Await(&wait_group_awaiter);
 }
 
 pub fn done(self: *WaitGroup) void {
-    const prev_counter = self.counter.fetchSub(1, .seq_cst);
-    const counter = prev_counter - 1;
+    const prev_state_raw = self.state.fetchSub(1, .seq_cst);
+    const state_raw = prev_state_raw - 1;
+    const prev_state: State = @bitCast(prev_state_raw);
+    var state: State = @bitCast(state_raw);
     log.debug("{s}: {*} {}->{}", .{
         Fiber.current().?.name,
         self,
-        prev_counter,
-        counter,
+        @as(State, @bitCast(prev_state)),
+        @as(State, @bitCast(state)),
     });
-
-    if (counter == 0) {
-        log.debug(
-            "{s} set wait group counter to 0. Will resume all parked fibers.",
-            .{Fiber.current().?.name},
-        );
-        while (true) {
-            if (self.queue.popFront()) |next| {
-                log.debug("{s} about to schedule {s}", .{
-                    Fiber.current().?.name,
-                    next.fiber.name,
-                });
-                next.fiber.scheduleSelf();
-            } else break;
+    if (state.counter > 0) {
+        return;
+    }
+    log.debug(
+        "{s} set wait group counter to 0. Will resume all parked fibers.",
+        .{Fiber.current().?.name},
+    );
+    while (state.num_waiters > 0) : ({
+        state = @bitCast(self.state.load(.seq_cst));
+    }) {
+        while (self.queue.popFront()) |next| {
+            log.debug("{s} about to schedule {s}", .{
+                Fiber.current().?.name,
+                next.fiber.name,
+            });
+            next.fiber.scheduleSelf();
+            state = @bitCast(self.state.fetchSub(1 << 32, .seq_cst) - 1 << 32);
         }
+        std.atomic.spinLoopHint();
     }
 }
 
@@ -74,7 +106,12 @@ const WaitGroupAwaiter = struct {
 
     pub fn awaitReady(ctx: *anyopaque) bool {
         const self: *WaitGroupAwaiter = @ptrCast(@alignCast(ctx));
-        return self.wait_group.counter.load(.seq_cst) == 0;
+        const state: State = @bitCast(self.wait_group.state.load(.seq_cst));
+        if (state.num_waiters == 0) {
+            _ = self.wait_group.state.fetchSub(1 << 32, .seq_cst);
+            return true;
+        }
+        return false;
     }
 
     pub fn awaitSuspend(
@@ -83,7 +120,9 @@ const WaitGroupAwaiter = struct {
     ) Awaiter.AwaitSuspendResult {
         var self: *WaitGroupAwaiter = @ptrCast(@alignCast(ctx));
         const fiber: *Fiber = @alignCast(@ptrCast(handle));
-        if (self.wait_group.counter.load(.seq_cst) == 0) {
+        const state: State = @bitCast(self.wait_group.state.load(.seq_cst));
+        if (state.num_waiters == 0) {
+            _ = self.wait_group.state.fetchSub(1 << 32, .seq_cst);
             return Awaiter.AwaitSuspendResult{ .never_suspend = {} };
         }
         self.queue_node = .{
