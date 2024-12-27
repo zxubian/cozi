@@ -17,6 +17,8 @@ const Await = @import("../../await.zig").@"await";
 
 const log = std.log.scoped(.fiber_mutex);
 
+state: Atomic(State) align(std.atomic.cache_line) = .init(.unlocked),
+
 // for fast path (no contention)
 const State = enum(usize) {
     unlocked = 0,
@@ -25,18 +27,16 @@ const State = enum(usize) {
     _,
 };
 
-pub fn StateFromNodePtr(node: *Node) State {
+fn StateFromNodePtr(node: *Node) State {
     return @enumFromInt(@intFromPtr(&node.intrusive_list_node));
 }
 
-pub fn NodePtrFromState(state: State) *Node {
+fn NodePtrFromState(state: State) *Node {
     const intrusive_list_node: *Containers.Intrusive.Node =
         @ptrFromInt(@intFromEnum(state));
 
     return intrusive_list_node.parentPtr(Node);
 }
-
-state: Atomic(State) align(std.atomic.cache_line) = .init(.unlocked),
 
 const Node = struct {
     fiber: *Fiber,

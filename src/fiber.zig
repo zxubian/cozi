@@ -156,7 +156,7 @@ fn runTick(self: *Fiber) void {
     current_fiber = self;
     defer current_fiber = null;
     if (self.state.cmpxchgStrong(0, 1, .seq_cst, .seq_cst)) |_| {
-        std.debug.panic("resuming twice!!", .{});
+        std.debug.panic("{s} resuming twice!!", .{self.name});
     }
     self.coroutine.@"resume"();
 }

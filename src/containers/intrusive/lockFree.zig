@@ -81,7 +81,7 @@ pub fn MpscQueue(T: type) type {
         outbox: Stack align(std.atomic.cache_line) = .{},
 
         pub fn pushBack(self: *Self, data: *T) void {
-            self.inbox.pushFront(data);
+            return self.inbox.pushFront(data);
         }
 
         pub fn popFront(self: *Self) ?*T {

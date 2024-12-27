@@ -15,7 +15,7 @@ const ThreadPool = Executors.ThreadPools.Compute;
 const WaitGroup = std.Thread.WaitGroup;
 const TimeLimit = @import("../../../testing/TimeLimit.zig");
 
-test "counter" {
+test "strand - counter" {
     var strand: Strand = .{};
     var manual_executor = ManualExecutor{};
     const count: usize = 100;
@@ -47,7 +47,7 @@ test "counter" {
     try testing.expectEqual(count, ctx.counter);
 }
 
-test "many fibers" {
+test "strand - many fibers" {
     var strand: Strand = .{};
     var manual_executor = ManualExecutor{};
     const count: usize = 100;
@@ -82,7 +82,7 @@ test "many fibers" {
     try testing.expectEqual(count * fiber_count, ctx.counter);
 }
 
-test "run on single fiber" {
+test "strand - run on single fiber" {
     var strand: Strand = .{};
     var manual_executor = ManualExecutor{};
     var fiber_name: [Fiber.MAX_FIBER_NAME_LENGTH_BYTES:0]u8 = undefined;
@@ -119,7 +119,7 @@ test "run on single fiber" {
     _ = manual_executor.drain();
 }
 
-test "Suspend Illegal" {
+test "strand - suspend illegal" {
     var strand: Strand = .{};
     var event: Event = .{};
     var manual_executor = ManualExecutor{};
@@ -151,7 +151,7 @@ test "Suspend Illegal" {
     _ = manual_executor.drain();
 }
 
-test "thread pool" {
+test "strand - thread pool" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
@@ -206,7 +206,7 @@ test "thread pool" {
     );
 }
 
-test "stress" {
+test "strand - stress" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
