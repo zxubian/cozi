@@ -5,6 +5,7 @@ const testing = std.testing;
 const TimeLimit = @import("../../../testing/TimeLimit.zig");
 const Allocator = std.mem.Allocator;
 const WaitGroup = std.Thread.WaitGroup;
+const Closure = @import("../../../closure.zig");
 
 test "Submit Lambda" {
     if (builtin.single_threaded) {
@@ -511,4 +512,30 @@ test "Racy" {
     }
     ctx.wait_group.wait();
     try testing.expect(sharead_counter.load(.seq_cst) <= task_count);
+}
+
+test "threadpool - compute - init no alloc" {
+    var threads: [4]std.Thread = undefined;
+    _ = &threads;
+    var tp = ThreadPool.initNoAlloc(&threads);
+    defer tp.deinit();
+    try tp.start();
+    defer tp.stop();
+    const Ctx = struct {
+        counter: std.atomic.Value(usize) = .init(0),
+        wait_group: std.Thread.WaitGroup = .{},
+        pub fn run(ctx: *@This()) void {
+            _ = ctx.counter.fetchAdd(1, .seq_cst);
+            ctx.wait_group.finish();
+        }
+    };
+    var ctx: Ctx = .{};
+    var closures = [_]Closure.Impl(Ctx.run, false){undefined} ** threads.len;
+    ctx.wait_group.startMany(threads.len);
+    for (&closures) |*closure| {
+        closure.*.init(.{&ctx});
+        tp.executor().submitRunnable(&closure.runnable);
+    }
+    ctx.wait_group.wait();
+    try testing.expectEqual(threads.len, ctx.counter.load(.seq_cst));
 }
