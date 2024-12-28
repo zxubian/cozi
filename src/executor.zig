@@ -13,7 +13,7 @@ const Vtable = struct {
     submit: *const fn (ctx: *anyopaque, *Runnable) void,
 };
 
-pub inline fn submitRunnable(self: *Executor, runnable: *Runnable) void {
+pub inline fn submitRunnable(self: *const Executor, runnable: *Runnable) void {
     self.vtable.submit(self.ptr, runnable);
 }
 
