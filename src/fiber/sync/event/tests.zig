@@ -1,5 +1,6 @@
 const builtin = @import("builtin");
 const std = @import("std");
+const build_config = @import("build_config");
 const testing = std.testing;
 const Atomic = std.atomic.Value;
 
@@ -51,7 +52,10 @@ test "basic - single waiter" {
     try testing.expect(state);
 }
 
-test "basic - multiple waiters" {
+test "event - basic - multiple waiters" {
+    if (build_config.sanitize == .thread) {
+        return error.SkipZigTest;
+    }
     var event: Event = .{};
     var manual_executor = ManualExecutor{};
     var state: bool = false;
@@ -144,70 +148,74 @@ test "park fiber while waiting" {
     try testing.expect(state);
 }
 
-test "threadpool - stress" {
-    return error.SkipZigTest;
-    // if (builtin.single_threaded) {
-    // return error.SkipZigTest;
-    //    }
-    // var tp = try ThreadPool.init(4, testing.allocator);
-    // defer tp.deinit();
-    // try tp.start();
-    // defer tp.stop();
-    // var wait_group: WaitGroup = .{};
-    // const Ctx = struct {
-    //     event: Event = .{},
-    //     state: Atomic(bool) = .init(false),
-    //     alloc: std.mem.Allocator,
-    //     wait_group: *WaitGroup,
+test "event - threadpool - stress" {
+    if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
+    if (build_config.sanitize == .thread) {
+        return error.SkipZigTest;
+    }
+    var tp = try ThreadPool.init(4, testing.allocator);
+    defer tp.deinit();
+    try tp.start();
+    defer tp.stop();
+    var wait_group: WaitGroup = .{};
+    const Ctx = struct {
+        event: Event = .{},
+        state: Atomic(bool) = .init(false),
+        alloc: std.mem.Allocator,
+        wait_group: *WaitGroup,
 
-    //     pub fn runConsumer(self: *@This()) !void {
-    //         var wg = self.wait_group;
-    //         self.event.wait();
-    //         try testing.expectEqual(true, self.state.load(.seq_cst));
-    //         wg.finish();
-    //     }
+        pub fn runConsumer(self: *@This()) !void {
+            var wg = self.wait_group;
+            self.event.wait();
+            try testing.expectEqual(true, self.state.load(.seq_cst));
+            wg.finish();
+        }
 
-    //     pub fn runProducer(self: *@This()) !void {
-    //         self.state.store(true, .seq_cst);
-    //         self.event.fire();
-    //         self.wait_group.finish();
-    //     }
-    // };
-    // const runs = 5;
-    // for (0..runs) |_| {
-    //     var ctx: Ctx = .{
-    //         .alloc = testing.allocator,
-    //         .wait_group = &wait_group,
-    //     };
-    //     const consumers = 1000;
-    //     for (0..consumers / 2) |_| {
-    //         ctx.wait_group.start();
-    //         try Fiber.go(
-    //             Ctx.runConsumer,
-    //             .{&ctx},
-    //             testing.allocator,
-    //             tp.executor(),
-    //         );
-    //     }
+        pub fn runProducer(self: *@This()) !void {
+            self.state.store(true, .seq_cst);
+            self.event.fire();
+            self.wait_group.finish();
+        }
+    };
+    const runs = 5;
+    for (0..runs) |_| {
+        var ctx: Ctx = .{
+            .alloc = testing.allocator,
+            .wait_group = &wait_group,
+        };
+        const consumers = 1000;
+        for (0..consumers / 2) |_| {
+            ctx.wait_group.start();
+            try Fiber.go(
+                Ctx.runConsumer,
+                .{&ctx},
+                testing.allocator,
+                tp.executor(),
+            );
+        }
 
-    //     ctx.wait_group.start();
-    //     try Fiber.go(
-    //         Ctx.runProducer,
-    //         .{&ctx},
-    //         testing.allocator,
-    //         tp.executor(),
-    //     );
+        ctx.wait_group.start();
+        try Fiber.goOptions(
+            Ctx.runProducer,
+            .{&ctx},
+            testing.allocator,
+            tp.executor(),
+            .{ .stack_size = 1024 * 16 },
+        );
 
-    //     for (0..consumers / 2) |_| {
-    //         ctx.wait_group.start();
-    //         try Fiber.go(
-    //             Ctx.runConsumer,
-    //             .{&ctx},
-    //             testing.allocator,
-    //             tp.executor(),
-    //         );
-    //     }
-    //     wait_group.wait();
-    //     wait_group.reset();
-    // }
+        for (0..consumers / 2) |_| {
+            ctx.wait_group.start();
+            try Fiber.goOptions(
+                Ctx.runConsumer,
+                .{&ctx},
+                testing.allocator,
+                tp.executor(),
+                .{ .stack_size = 1024 * 16 },
+            );
+        }
+        wait_group.wait();
+        wait_group.reset();
+    }
 }

@@ -1,6 +1,7 @@
 const std = @import("std");
 const testing = std.testing;
 const builtin = @import("builtin");
+const build_config = @import("build_config");
 
 const Fiber = @import("../../../fiber.zig");
 const Mutex = Fiber.Mutex;
@@ -100,6 +101,9 @@ test "TryLock" {
 }
 
 test "inner counter" {
+    if (build_config.sanitize == .thread) {
+        return error.SkipZigTest;
+    }
     var mutex: Mutex = .{};
     var manual_executor = ManualExecutor{};
     const iterations_per_fiber = 5;

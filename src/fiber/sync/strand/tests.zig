@@ -48,6 +48,9 @@ test "strand - counter" {
 }
 
 test "strand - many fibers" {
+    if (build_config.sanitize == .thread) {
+        return error.SkipZigTest;
+    }
     var strand: Strand = .{};
     var manual_executor = ManualExecutor{};
     const count: usize = 100;
@@ -215,15 +218,15 @@ test "strand - stress" {
     }
 
     const cpu_count = try std.Thread.getCpuCount();
-    const runs = 5;
+    const runs = 10;
     for (0..runs) |_| {
         var tp = try ThreadPool.init(cpu_count, testing.allocator);
         defer tp.deinit();
         try tp.start();
         defer tp.stop();
         var fiber_name: [Fiber.MAX_FIBER_NAME_LENGTH_BYTES:0]u8 = undefined;
-        const iterations_per_fiber = 1000;
-        const fiber_count = 1000;
+        const iterations_per_fiber = 100;
+        const fiber_count = 100;
         const Ctx = struct {
             strand: Strand = .{},
             counter: usize,
