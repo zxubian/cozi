@@ -40,7 +40,7 @@ pub fn MpscStack(T: type) type {
             var current: ?*Node = head;
             while (current) |curr| {
                 const next = curr.next;
-                handler(@fieldParentPtr("intrusive_list_node", curr), ctx);
+                handler(curr.parentPtr(T), ctx);
                 current = next;
             }
         }
@@ -63,7 +63,7 @@ pub fn MpscStack(T: type) type {
                 }
             };
             if (result_node) |result| {
-                return @fieldParentPtr("intrusive_list_node", result);
+                return result.parentPtr(T);
             } else {
                 return null;
             }
