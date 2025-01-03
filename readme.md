@@ -1,7 +1,13 @@
 # zig-async
 
 ## Goals
-- to provide a set of independantly composable, orthogonal components for low-level parallel & concurrent computing
+- empower Zig users to solve concurrent & parallel engineering problems
+  - at a higher level of expressiveness than basic synchronization primitives (mutex/condvar)
+  - while maintaining the low-level control that is crucial for systems programming
+- to that end, provide a toolbox of software components with the following properties:
+  - orthogonal - components are meaningful and useful by themselves. Components have minimal coupling between themselves.
+  - composable - components can be combined to produce more powerful behaviours.
+  - extensible - we cannot anticipate every use-case. So, our APIs must be designed in a way that allows users of the library to integrate their custom solutions.
 
 ## Features & Roadmap
 ### Stackfull Coroutine - a function you can suspend & resume
@@ -34,15 +40,14 @@ Synchronization primitives
   - [x] Event
   - [x] Wait Group
   - [x] Barrier 
-  - [ ] Optimize memory orders
 - [ ] Channel (spinlock implementation)
 - [ ] Select
   - [ ] Lock-free channel/select
 ### Futures & Promises
-- [] eager (consider if this should be removed & only "lazy" should be kept)
-- [] lazy
+- [ ] eager (consider if this should be removed & only "lazy" should be kept)
+- [ ] lazy
 ### Structured Concurrency
-- [] TBC
+- [ ] TBC
 ### Testing
 - [ ] basic random fault injection for unit tests
 - [ ] study [Twist](https://gitlab.com/Lipovsky/twist) & consider which features to port
@@ -54,6 +59,10 @@ Synchronization primitives
 ### Misc
 - [ ] set up project to be consumed as a dependency in other Zig projects (main module)
 - [ ] clean-up internal module structure & imports
+### Performance
+- [ ] reconsider interface implementation: performance penalty of type-erased ptr approach
+- [ ] integrate with Tracy etc.
+- [ ] Optimize memory orders
 ### IO
 - [ ] Play around with self-hosted IO dispatch
 - [ ] Consider integration with [libxev](https://github.com/mitchellh/libxev)
