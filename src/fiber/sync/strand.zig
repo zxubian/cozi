@@ -166,10 +166,7 @@ const StrandAwaiter = struct {
     strand: *Strand,
     node: *TaskNode,
 
-    pub fn awaitReady(_: *anyopaque) bool {
-        return false;
-    }
-
+    // --- type-erased awaiter interface ---
     pub fn awaitSuspend(
         ctx: *anyopaque,
         _: *anyopaque,
@@ -179,18 +176,19 @@ const StrandAwaiter = struct {
         return Awaiter.AwaitSuspendResult{ .always_suspend = {} };
     }
 
-    pub fn awaitResume(_: *anyopaque) void {}
-
     pub fn awaiter(self: *StrandAwaiter) Awaiter {
         return Awaiter{
             .ptr = self,
-            .vtable = .{
-                .await_suspend = awaitSuspend,
-                .await_resume = awaitResume,
-                .await_ready = awaitReady,
-            },
+            .vtable = .{ .await_suspend = awaitSuspend },
         };
     }
+
+    /// --- comptime awaiter interface ---
+    pub fn awaitReady(_: *StrandAwaiter) bool {
+        return false;
+    }
+
+    pub fn awaitResume(_: *StrandAwaiter) void {}
 };
 
 test {

@@ -104,34 +104,7 @@ const LockAwaiter = struct {
     mutex: *Mutex,
     queue_node: Node = undefined,
 
-    pub fn awaiter(self: *LockAwaiter) Awaiter {
-        return Awaiter{
-            .ptr = self,
-            .vtable = .{
-                .await_suspend = awaitSuspend,
-                .await_resume = awaitResume,
-                .await_ready = awaitReady,
-            },
-        };
-    }
-
-    pub fn awaitResume(_: *anyopaque) void {}
-
-    pub fn awaitReady(ctx: *anyopaque) bool {
-        var self: *LockAwaiter = @alignCast(@ptrCast(ctx));
-        // Fast path: no contention
-        const acquired_lock = self.mutex.state.cmpxchgWeak(
-            .unlocked,
-            .locked_no_awaiters,
-            .seq_cst,
-            .seq_cst,
-        ) == null;
-        if (acquired_lock) {
-            log.debug("Acquired lock in awaitReady -> no need to suspend.", .{});
-        }
-        return acquired_lock;
-    }
-
+    // --- type-erased awaiter interface ---
     pub fn awaitSuspend(
         ctx: *anyopaque,
         handle: *anyopaque,
@@ -223,40 +196,35 @@ const LockAwaiter = struct {
         }
         return Awaiter.AwaitSuspendResult{ .always_suspend = {} };
     }
+
+    pub fn awaiter(self: *LockAwaiter) Awaiter {
+        return Awaiter{
+            .ptr = self,
+            .vtable = .{ .await_suspend = awaitSuspend },
+        };
+    }
+
+    /// --- comptime awaiter interface ---
+    pub fn awaitReady(self: *LockAwaiter) bool {
+        // Fast path: no contention
+        const acquired_lock = self.mutex.state.cmpxchgWeak(
+            .unlocked,
+            .locked_no_awaiters,
+            .seq_cst,
+            .seq_cst,
+        ) == null;
+        if (acquired_lock) {
+            log.debug("Acquired lock in awaitReady -> no need to suspend.", .{});
+        }
+        return acquired_lock;
+    }
+    pub fn awaitResume(_: *LockAwaiter) void {}
 };
 
 const UnlockAwaiter = struct {
     mutex: *Mutex,
 
-    pub fn awaiter(self: *UnlockAwaiter) Awaiter {
-        return Awaiter{
-            .ptr = self,
-            .vtable = .{
-                .await_suspend = awaitSuspend,
-                .await_resume = awaitResume,
-                .await_ready = awaitReady,
-            },
-        };
-    }
-
-    pub fn awaitResume(_: *anyopaque) void {}
-
-    pub fn awaitReady(ctx: *anyopaque) bool {
-        const self: *UnlockAwaiter = @alignCast(@ptrCast(ctx));
-        const mutex = self.mutex;
-        // fast path: nobody else is waiting
-        const released_lock = mutex.state.cmpxchgWeak(
-            .locked_no_awaiters,
-            .unlocked,
-            .seq_cst,
-            .seq_cst,
-        ) == null;
-        if (released_lock) {
-            log.debug("Released lock in awaitReady -> no need to suspend.", .{});
-        }
-        return released_lock;
-    }
-
+    // --- type-erased awaiter interface ---
     pub fn awaitSuspend(
         ctx: *anyopaque,
         handle: *anyopaque,
@@ -348,6 +316,30 @@ const UnlockAwaiter = struct {
             }
         }
     }
+    pub fn awaiter(self: *UnlockAwaiter) Awaiter {
+        return Awaiter{
+            .ptr = self,
+            .vtable = .{ .await_suspend = awaitSuspend },
+        };
+    }
+
+    /// --- comptime awaiter interface ---
+    pub fn awaitReady(self: *UnlockAwaiter) bool {
+        const mutex = self.mutex;
+        // fast path: nobody else is waiting
+        const released_lock = mutex.state.cmpxchgWeak(
+            .locked_no_awaiters,
+            .unlocked,
+            .seq_cst,
+            .seq_cst,
+        ) == null;
+        if (released_lock) {
+            log.debug("Released lock in awaitReady -> no need to suspend.", .{});
+        }
+        return released_lock;
+    }
+
+    pub fn awaitResume(_: *UnlockAwaiter) void {}
 };
 
 test {

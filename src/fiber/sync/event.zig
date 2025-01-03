@@ -53,24 +53,7 @@ const EventAwaiter = struct {
     event: *Event,
     queue_node: Node = undefined,
 
-    pub fn awaiter(self: *EventAwaiter) Awaiter {
-        return Awaiter{
-            .ptr = self,
-            .vtable = .{
-                .await_suspend = awaitSuspend,
-                .await_resume = awaitResume,
-                .await_ready = awaitReady,
-            },
-        };
-    }
-
-    pub fn awaitReady(ctx: *anyopaque) bool {
-        const self: *EventAwaiter = @ptrCast(@alignCast(ctx));
-        return self.event.state.load(.seq_cst) == .fired;
-    }
-
-    pub fn awaitResume(_: *anyopaque) void {}
-
+    // --- type-erased awaiter interface ---
     pub fn awaitSuspend(
         ctx: *anyopaque,
         handle: *anyopaque,
@@ -87,6 +70,20 @@ const EventAwaiter = struct {
         event.queue.pushBack(&self.queue_node);
         return Awaiter.AwaitSuspendResult{ .always_suspend = {} };
     }
+
+    pub fn awaiter(self: *EventAwaiter) Awaiter {
+        return Awaiter{
+            .ptr = self,
+            .vtable = .{ .await_suspend = awaitSuspend },
+        };
+    }
+
+    /// --- comptime awaiter interface ---
+    pub fn awaitReady(self: *EventAwaiter) bool {
+        return self.event.state.load(.seq_cst) == .fired;
+    }
+
+    pub fn awaitResume(_: *EventAwaiter) void {}
 };
 
 test {

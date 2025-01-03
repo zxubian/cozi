@@ -107,16 +107,7 @@ const WaitGroupAwaiter = struct {
     wait_group: *WaitGroup,
     queue_node: Node = undefined,
 
-    pub fn awaitReady(ctx: *anyopaque) bool {
-        const self: *WaitGroupAwaiter = @ptrCast(@alignCast(ctx));
-        const state: State = @bitCast(self.wait_group.state.load(.seq_cst));
-        if (state.num_waiters == 0) {
-            _ = self.wait_group.state.fetchSub(1 << 32, .seq_cst);
-            return true;
-        }
-        return false;
-    }
-
+    // --- type-erased awaiter interface ---
     pub fn awaitSuspend(
         ctx: *anyopaque,
         handle: *anyopaque,
@@ -135,18 +126,24 @@ const WaitGroupAwaiter = struct {
         return Awaiter.AwaitSuspendResult{ .always_suspend = {} };
     }
 
-    pub fn awaitResume(_: *anyopaque) void {}
-
     pub fn awaiter(self: *WaitGroupAwaiter) Awaiter {
         return Awaiter{
             .ptr = self,
-            .vtable = .{
-                .await_suspend = awaitSuspend,
-                .await_resume = awaitResume,
-                .await_ready = awaitReady,
-            },
+            .vtable = .{ .await_suspend = awaitSuspend },
         };
     }
+
+    /// --- comptime awaiter interface ---
+    pub fn awaitReady(self: *WaitGroupAwaiter) bool {
+        const state: State = @bitCast(self.wait_group.state.load(.seq_cst));
+        if (state.num_waiters == 0) {
+            _ = self.wait_group.state.fetchSub(1 << 32, .seq_cst);
+            return true;
+        }
+        return false;
+    }
+
+    pub fn awaitResume(_: *WaitGroupAwaiter) void {}
 };
 
 test {

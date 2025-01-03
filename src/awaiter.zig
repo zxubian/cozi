@@ -10,8 +10,6 @@ vtable: struct {
         ctx: *anyopaque,
         coroutine_handle: *anyopaque,
     ) AwaitSuspendResult,
-    await_resume: *const fn (ctx: *anyopaque) void,
-    await_ready: *const fn (ctx: *anyopaque) bool,
 },
 
 pub const AwaitSuspendResult = union(enum(usize)) {
@@ -28,12 +26,4 @@ pub inline fn awaitSuspend(
         self.ptr,
         coroutine_handle,
     );
-}
-
-pub inline fn awaitResume(self: *const Awaiter) void {
-    return self.vtable.await_resume(self.ptr);
-}
-
-pub inline fn awaitReady(self: *const Awaiter) bool {
-    return self.vtable.await_ready(self.ptr);
 }

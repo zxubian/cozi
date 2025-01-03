@@ -222,16 +222,7 @@ pub fn inSuspendIllegalScope(self: *Fiber) bool {
 }
 
 const YieldAwaiter = struct {
-    pub fn awaiter(self: *YieldAwaiter) Awaiter {
-        return Awaiter{ .ptr = self, .vtable = .{
-            .await_ready = awaitReady,
-            .await_suspend = awaitSuspend,
-            .await_resume = awaitResume,
-        } };
-    }
-    pub fn awaitReady(_: *anyopaque) bool {
-        return false;
-    }
+    // --- type-erased awaiter interface ---
     pub fn awaitSuspend(
         _: *anyopaque,
         handle: *anyopaque,
@@ -240,7 +231,20 @@ const YieldAwaiter = struct {
         fiber.scheduleSelf();
         return Awaiter.AwaitSuspendResult{ .always_suspend = {} };
     }
-    pub fn awaitResume(_: *anyopaque) void {}
+
+    pub fn awaiter(self: *YieldAwaiter) Awaiter {
+        return Awaiter{
+            .ptr = self,
+            .vtable = .{ .await_suspend = awaitSuspend },
+        };
+    }
+
+    /// --- comptime awaiter interface ---
+    pub fn awaitReady(_: *YieldAwaiter) bool {
+        return false;
+    }
+
+    pub fn awaitResume(_: *YieldAwaiter) void {}
 };
 
 test {
