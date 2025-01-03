@@ -11,7 +11,8 @@ test "basic" {
     var lock: Spinlock = .{};
     var a: u8 = 0;
     {
-        var guard = lock.lock();
+        var guard = lock.guard();
+        guard.lock();
         a += 1;
         defer guard.unlock();
     }
@@ -34,7 +35,8 @@ test "counter" {
         wait_group: *WaitGroup,
 
         pub fn run(self: *@This()) !void {
-            var guard = self.lock.lock();
+            var guard = self.lock.guard();
+            guard.lock();
             defer guard.unlock();
             self.counter += 1;
             self.wait_group.finish();

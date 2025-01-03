@@ -11,22 +11,27 @@ const Node = struct {
     next: Atomic(?*Node) = .init(null),
 };
 
+pub fn guard(self: *Spinlock) Guard {
+    return Guard{
+        .spinlock = self,
+    };
+}
+
 pub const Guard = struct {
     node: Node = .{},
     spinlock: *Spinlock,
+
+    pub inline fn lock(self: *Guard) void {
+        self.node = .{};
+        return self.spinlock.lock(&self.node);
+    }
 
     pub inline fn unlock(self: *Guard) void {
         self.spinlock.unlock(&self.node);
     }
 };
 
-pub inline fn lock(
-    self: *Spinlock,
-) *Guard {
-    var guard = Guard{
-        .spinlock = self,
-    };
-    const node = &guard.node;
+fn lock(self: *Spinlock, node: *Node) void {
     if (self.tail.swap(node, .seq_cst)) |prev_tail| {
         prev_tail.next.store(node, .seq_cst);
         while (!node.is_owner.load(.seq_cst)) {
@@ -37,10 +42,9 @@ pub inline fn lock(
         // Do not store node.is_owner = true,
         // because nobody will ever reference it.
     }
-    return &guard;
 }
 
-inline fn unlock(self: *Spinlock, node: *Node) void {
+fn unlock(self: *Spinlock, node: *Node) void {
     if (node.next.load(.seq_cst)) |next| {
         next.is_owner.store(true, .seq_cst);
     } else {
