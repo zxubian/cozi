@@ -20,7 +20,7 @@ pub inline fn submitRunnable(self: *const Executor, runnable: *Runnable) void {
 pub inline fn submit(
     self: *const Executor,
     comptime func: anytype,
-    args: anytype,
+    args: std.meta.ArgsTuple(@TypeOf(func)),
     allocator: Allocator,
 ) void {
     // No way to recover here. Just crash.

@@ -27,21 +27,24 @@ threadlocal var current_fiber: ?*Fiber = null;
 coroutine: *Coroutine,
 executor: Executor,
 tick_runnable: Runnable,
-owns_stack: bool = false,
 name: [:0]const u8,
 state: std.atomic.Value(u8) = .init(0),
 awaiter: ?Awaiter,
 suspend_illegal_scope_depth: Atomic(usize) = .init(0),
 
 pub const MAX_FIBER_NAME_LENGTH_BYTES = 100;
+pub const DEFAULT_NAME = "Fiber";
 
+/// Create new fiber and schedule it for execution on `executor`.
+/// Fiber will call `routine(args)` when executed.
+/// `allocator` will be used to allocate stack for Fiber execution.
 pub fn go(
     comptime routine: anytype,
-    args: anytype,
+    args: std.meta.ArgsTuple(@TypeOf(routine)),
     allocator: Allocator,
     executor: Executor,
 ) !void {
-    return goOptions(
+    try goOptions(
         routine,
         args,
         allocator,
@@ -51,64 +54,114 @@ pub fn go(
 }
 
 pub const Options = struct {
-    stack_size: usize = Coroutine.Stack.InitOptions.DEFAULT_STACK_SIZE_BYTES,
-    name: [:0]const u8 = "Fiber",
+    stack_size: usize = Stack.DEFAULT_SIZE_BYTES,
+    fiber: FiberOptions = .{},
+
+    pub const FiberOptions = struct {
+        name: [:0]const u8 = DEFAULT_NAME,
+    };
 };
 
+/// Create new fiber with custom options and schedule it for execution on `executor`.
+/// Fiber will call `routine(args)` when executed.
+/// `allocator` will be used to allocate stack for Fiber execution.
 pub fn goOptions(
     comptime routine: anytype,
-    args: anytype,
+    args: std.meta.ArgsTuple(@TypeOf(routine)),
     allocator: Allocator,
     executor: Executor,
     options: Options,
 ) !void {
-    const stack = try Stack.initOptions(
-        .{
-            .size = options.stack_size,
-        },
+    const fiber = try initOptions(
+        routine,
+        args,
         allocator,
+        executor,
+        options,
     );
-    return goWithStack(
+    fiber.scheduleSelf();
+}
+
+/// Create new fiber and schedule it for execution.
+/// Fiber will call routine(args) when executed.
+/// Any additional allocations necessary for fiber
+/// will be placed on the pre-provided stack.
+pub fn goWithStack(
+    comptime routine: anytype,
+    args: std.meta.ArgsTuple(@TypeOf(routine)),
+    stack: Stack,
+    executor: Executor,
+    options: Options.FiberOptions,
+) !void {
+    const fiber = try initWithStack(
         routine,
         args,
         stack,
         executor,
         options,
-        true,
     );
+    fiber.scheduleSelf();
 }
 
-pub fn goWithStack(
+pub fn initOptions(
     comptime routine: anytype,
-    args: anytype,
-    stack: Stack,
+    args: std.meta.ArgsTuple(@TypeOf(routine)),
+    allocator: Allocator,
     executor: Executor,
     options: Options,
-    comptime own_stack: bool,
-) !void {
-    var fixed_buffer_allocator = stack.bufferAllocator();
-    const gpa = fixed_buffer_allocator.allocator();
+) !*Fiber {
     // place fiber & coroutine on coroutine stack
     // in order to avoid additional dynamic allocations
-    var name = try gpa.alloc(u8, MAX_FIBER_NAME_LENGTH_BYTES);
-    std.mem.copyForwards(u8, name, options.name);
-    const fiber = try gpa.create(Fiber);
-    const coroutine = try gpa.create(Coroutine);
-    const routine_closure = try gpa.create(Closure.Impl(routine, false));
-    routine_closure.*.init(args);
-    // TODO: protect top of stack
-    const padding = try gpa.alignedAlloc(u8, Stack.STACK_ALIGNMENT_BYTES, 1);
-    _ = padding;
-    coroutine.initNoAlloc(&routine_closure.*.runnable, stack);
+    const stack = try Stack.Managed.initOptions(
+        allocator,
+        .{ .size = options.stack_size },
+    );
+    var fixed_buffer_allocator = stack.bufferAllocator();
+    const arena = fixed_buffer_allocator.allocator();
+    const store_allocator_ptr = try arena.create(Allocator);
+    store_allocator_ptr.* = allocator;
+    const coroutine = try Coroutine.initOnStack(routine, args, stack.raw, arena);
+    return try init(coroutine, executor, options.fiber, arena, true);
+}
+
+pub fn initWithStack(
+    comptime routine: anytype,
+    args: std.meta.ArgsTuple(@TypeOf(routine)),
+    stack: Stack,
+    executor: Executor,
+    options: Options.FiberOptions,
+) !*Fiber {
+    // place fiber & coroutine on coroutine stack
+    // in order to avoid additional dynamic allocations
+    var fixed_buffer_allocator = stack.bufferAllocator();
+    const arena = fixed_buffer_allocator.allocator();
+    const coroutine = try Coroutine.initOnStack(routine, args, stack, arena);
+    return try init(coroutine, executor, options, arena, false);
+}
+
+pub fn init(
+    coroutine: *Coroutine,
+    executor: Executor,
+    options: Options.FiberOptions,
+    stack_arena: Allocator,
+    comptime owns_stack: bool,
+) !*Fiber {
+    const name = try copyNameToStack(options.name, stack_arena);
+    const fiber = try stack_arena.create(Fiber);
     fiber.* = .{
         .coroutine = coroutine,
         .executor = executor,
-        .tick_runnable = fiber.runnable(),
+        .tick_runnable = fiber.runnable(owns_stack),
         .name = @ptrCast(name[0..options.name.len]),
         .awaiter = null,
-        .owns_stack = own_stack,
     };
-    fiber.scheduleSelf();
+    return fiber;
+}
+
+fn copyNameToStack(name: []const u8, stack_arena: Allocator) ![]const u8 {
+    const result = try stack_arena.alloc(u8, MAX_FIBER_NAME_LENGTH_BYTES);
+    std.mem.copyForwards(u8, result, name);
+    return result;
 }
 
 pub fn isInFiber() bool {
@@ -152,6 +205,78 @@ pub fn scheduleSelf(self: *Fiber) void {
     self.executor.submitRunnable(&self.tick_runnable);
 }
 
+pub inline fn runTickAndMaybeTransfer(self: *Fiber, comptime owns_stack: bool) ?*Fiber {
+    return RunFunctions(owns_stack).runTickAndMaybeTransfer(self);
+}
+
+fn RunFunctions(comptime owns_stack: bool) type {
+    return struct {
+        fn runTickAndMaybeTransfer(self: *Fiber) ?*Fiber {
+            log.debug("{s} about to resume", .{self.name});
+            self.runTick();
+            log.debug("{s} returned from coroutine", .{self.name});
+            if (self.coroutine.is_completed) {
+                if (owns_stack) {
+                    self.getManagedStack().deinit();
+                }
+                return null;
+            }
+            if (self.awaiter) |awaiter| {
+                self.awaiter = null;
+                const suspend_result = awaiter.awaitSuspend(self);
+                switch (suspend_result) {
+                    .always_suspend => return null,
+                    .never_suspend => return self,
+                    .symmetric_transfer_next => |next| {
+                        // TODO: consider if self.resume() or self.scheduleSelf() is better
+                        self.@"resume"();
+                        return @alignCast(@ptrCast(next));
+                    },
+                }
+                return null;
+            } else {
+                std.debug.panic("Fiber coroutine suspended without setting fiber awaiter", .{});
+            }
+        }
+
+        fn runChain(start: *Fiber) void {
+            var maybe_next: ?*Fiber = start;
+            while (maybe_next) |next| {
+                maybe_next = next.runTickAndMaybeTransfer(owns_stack);
+            }
+        }
+
+        fn run(ctx: *anyopaque) void {
+            const self: *Fiber = @alignCast(@ptrCast(ctx));
+            runChain(self);
+        }
+    };
+}
+
+fn runnable(fiber: *Fiber, comptime owns_stack: bool) Runnable {
+    return Runnable{
+        .runFn = RunFunctions(owns_stack).run,
+        .ptr = fiber,
+    };
+}
+
+fn getManagedStack(self: *Fiber) Stack.Managed {
+    const stack = self.coroutine.stack;
+    const stack_base = stack.base();
+    const offset = std.mem.alignPointerOffset(
+        stack_base,
+        @sizeOf(Allocator),
+    );
+    const allocator = std.mem.bytesToValue(
+        Allocator,
+        stack.ptr[offset.? .. offset.? + @sizeOf(Allocator)],
+    );
+    return Stack.Managed{
+        .raw = stack,
+        .allocator = allocator,
+    };
+}
+
 fn runTick(self: *Fiber) void {
     current_fiber = self;
     defer current_fiber = null;
@@ -159,54 +284,6 @@ fn runTick(self: *Fiber) void {
         std.debug.panic("{s} resuming twice!!", .{self.name});
     }
     self.coroutine.@"resume"();
-}
-
-fn runTickAndMaybeTransfer(self: *Fiber) ?*Fiber {
-    log.debug("{s} about to resume", .{self.name});
-    self.runTick();
-    log.debug("{s} returned from coroutine", .{self.name});
-    if (self.coroutine.is_completed) {
-        if (self.owns_stack) {
-            log.debug("{s} deallocating stack", .{self.name});
-            self.coroutine.deinit();
-        }
-        return null;
-    }
-    if (self.awaiter) |awaiter| {
-        self.awaiter = null;
-        const suspend_result = awaiter.awaitSuspend(self);
-        switch (suspend_result) {
-            .always_suspend => return null,
-            .never_suspend => return self,
-            .symmetric_transfer_next => |next| {
-                // TODO: consider if self.resume() or self.scheduleSelf() is better
-                self.@"resume"();
-                return @alignCast(@ptrCast(next));
-            },
-        }
-        return null;
-    } else {
-        std.debug.panic("Fiber coroutine suspended without setting fiber awaiter", .{});
-    }
-}
-
-fn runChain(start: *Fiber) void {
-    var maybe_next: ?*Fiber = start;
-    while (maybe_next) |next| {
-        maybe_next = next.runTickAndMaybeTransfer();
-    }
-}
-
-fn run(ctx: *anyopaque) void {
-    const self: *Fiber = @alignCast(@ptrCast(ctx));
-    runChain(self);
-}
-
-fn runnable(fiber: *Fiber) Runnable {
-    return Runnable{
-        .runFn = run,
-        .ptr = fiber,
-    };
 }
 
 pub fn beginSuspendIllegalScope(self: *Fiber) void {

@@ -50,13 +50,13 @@ const Aarch64Impl = struct {
     user_trampoline: Trampoline,
 
     pub fn init(self: *Aarch64Impl, stack: Stack, user_trampoline: Trampoline) void {
-        const stack_bottom = stack.bottom();
+        const stack_top = stack.top();
         self.rsp = machine_context_init(
-            @ptrCast(stack_bottom),
+            @ptrCast(stack_top),
             runTrampoline,
             self,
         );
-        const used_stack_space_bytes = @intFromPtr(stack_bottom) - @intFromPtr(self.rsp);
+        const used_stack_space_bytes = @intFromPtr(stack_top) - @intFromPtr(self.rsp);
         std.debug.assert(used_stack_space_bytes == 336);
         self.user_trampoline = user_trampoline;
     }

@@ -441,7 +441,9 @@ test "queue - stress" {
         .{&ctx},
         testing.allocator,
         tp.executor(),
-        .{ .name = "Consumer" },
+        .{
+            .fiber = .{ .name = "Consumer" },
+        },
     );
     for (0..producer_count) |i| {
         ctx.wait_group.start();
@@ -456,7 +458,7 @@ test "queue - stress" {
             testing.allocator,
             tp.executor(),
             .{
-                .name = name,
+                .fiber = .{ .name = name },
                 .stack_size = 1024 * 16,
             },
         );

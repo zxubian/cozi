@@ -13,7 +13,7 @@ const ThreadPool = @import("../executors.zig").ThreadPools.Compute;
 const Stack = @import("../stack.zig");
 
 test {
-    // _ = @import("./sync.zig");
+    _ = @import("./sync.zig");
 }
 
 test "Fiber basic" {
@@ -208,9 +208,17 @@ test "Fiber - Two Pools" {
 }
 
 test "Pre-supplied stack" {
-    var stack = try Stack.init(alloc);
-    defer stack.deinit();
-
+    const size = 1024 * 1024 * 16;
+    const ptr = try alloc.alignedAlloc(
+        u8,
+        Stack.ALIGNMENT_BYTES,
+        size,
+    );
+    defer (alloc.free(ptr));
+    const stack = Stack{
+        .ptr = ptr.ptr,
+        .len = size,
+    };
     var step: usize = 0;
     const Ctx = struct {
         pub fn run(step_: *usize) void {
@@ -224,7 +232,6 @@ test "Pre-supplied stack" {
         stack,
         manual_executor.executor(),
         .{},
-        false,
     );
     _ = manual_executor.drain();
     try testing.expectEqual(step, 1);

@@ -4,10 +4,10 @@ const testing = std.testing;
 const alloc = testing.allocator;
 const Allocator = std.mem.Allocator;
 const Coroutine = @import("../coroutine.zig");
+const Stack = @import("../stack.zig");
 
 test "Suspend" {
     var step: usize = 0;
-    var coro = Coroutine{};
     const Ctx = struct {
         pub fn run(ctx: *Coroutine, step_: *usize) void {
             step_.* += 1;
@@ -15,16 +15,17 @@ test "Suspend" {
             step_.* += 1;
         }
     };
-    try coro.init(Ctx.run, .{ &coro, &step }, alloc);
+    var coro: Coroutine.Managed = undefined;
+    try coro.initInPlace(Ctx.run, .{ &coro.coroutine, &step }, alloc);
     defer coro.deinit();
     try testing.expectEqual(0, step);
-    try testing.expect(!coro.is_completed);
+    try testing.expect(!coro.isCompleted());
     coro.@"resume"();
     try testing.expectEqual(1, step);
-    try testing.expect(!coro.is_completed);
+    try testing.expect(!coro.isCompleted());
     coro.@"resume"();
     try testing.expectEqual(2, step);
-    try testing.expect(coro.is_completed);
+    try testing.expect(coro.isCompleted());
 }
 
 test "Suspend for loop" {
@@ -38,18 +39,22 @@ test "Suspend for loop" {
         }
     };
 
-    var coro: Coroutine = .{};
-    try coro.init(Ctx.run, .{&coro}, alloc);
+    var coro: Coroutine.Managed = undefined;
+    try coro.initInPlace(Ctx.run, .{&coro.coroutine}, alloc);
     defer coro.deinit();
     for (0..iterations) |_| {
         coro.@"resume"();
     }
-    try testing.expect(!coro.is_completed);
+    try testing.expect(!coro.isCompleted());
     coro.@"resume"();
-    try testing.expect(coro.is_completed);
+    try testing.expect(coro.isCompleted());
 }
 
-fn expectEqual(value_name: []const u8, expected: anytype, actual: anytype) void {
+fn expectEqual(
+    value_name: []const u8,
+    expected: anytype,
+    actual: anytype,
+) void {
     if (expected != actual) {
         std.debug.panic("unexpected value for {s}. Expected = {}. Got: {}", .{ value_name, expected, actual });
     }
@@ -75,10 +80,10 @@ test "Interleaving" {
             step_.* = 4;
         }
     };
-    var a = Coroutine{};
-    var b = Coroutine{};
-    try a.init(aCtx.run, .{ &a, &step }, alloc);
-    try b.init(bCtx.run, .{ &b, &step }, alloc);
+    var a: Coroutine.Managed = undefined;
+    var b: Coroutine.Managed = undefined;
+    try a.initInPlace(aCtx.run, .{ &a.coroutine, &step }, alloc);
+    try b.initInPlace(bCtx.run, .{ &b.coroutine, &step }, alloc);
     defer a.deinit();
     defer b.deinit();
     a.@"resume"();
@@ -87,8 +92,8 @@ test "Interleaving" {
     a.@"resume"();
     b.@"resume"();
     try testing.expectEqual(4, step);
-    try testing.expect(a.is_completed);
-    try testing.expect(b.is_completed);
+    try testing.expect(a.isCompleted());
+    try testing.expect(b.isCompleted());
 }
 
 test "Threads" {
@@ -112,15 +117,15 @@ test "Threads" {
             coro.@"resume"();
         }
     };
-    var coro = Coroutine{};
-    try coro.init(Ctx.coroutine, .{ &coro, &steps }, alloc);
+    var coro: Coroutine.Managed = undefined;
     defer coro.deinit();
+    try coro.initInPlace(Ctx.coroutine, .{ &coro.coroutine, &steps }, alloc);
     for (1..4) |i| {
         var thread = try std.Thread.spawn(
             .{ .allocator = alloc },
             Ctx.threadEntry,
             .{
-                &coro,
+                &coro.coroutine,
             },
         );
         thread.join();
@@ -160,7 +165,7 @@ const TreeNode = struct {
 };
 
 const TreeIterator = struct {
-    walker: Coroutine = undefined,
+    walker: Coroutine.Managed = undefined,
     data: ?[]const u8 = null,
 
     pub fn init(
@@ -168,7 +173,7 @@ const TreeIterator = struct {
         root: *const TreeNode,
         allocator: Allocator,
     ) !void {
-        try self.walker.init(
+        try self.walker.initInPlace(
             treeWalk,
             .{
                 self,
@@ -180,7 +185,7 @@ const TreeIterator = struct {
 
     pub fn step(self: *TreeIterator) bool {
         self.walker.@"resume"();
-        return !self.walker.is_completed;
+        return !self.walker.isCompleted();
     }
 
     fn treeWalk(
@@ -247,22 +252,22 @@ test "Pipeline" {
     };
 
     const OuterCtx = struct {
-        pub fn run(ctx: *Coroutine, steps_: *usize) void {
-            var inner = Coroutine{};
-            inner.init(InnerCtx.run, .{ &inner, steps_ }, alloc) catch unreachable;
+        pub fn run(ctx: *Coroutine, steps_: *usize) !void {
+            var inner: Coroutine.Managed = undefined;
+            inner.initInPlace(InnerCtx.run, .{ &inner.coroutine, steps_ }, alloc) catch unreachable;
             defer inner.deinit();
-            while (!inner.is_completed) {
+            while (!inner.isCompleted()) {
                 inner.@"resume"();
                 ctx.@"suspend"();
             }
         }
     };
 
-    var outer = Coroutine{};
-    try outer.init(OuterCtx.run, .{ &outer, &steps }, alloc);
+    var outer: Coroutine.Managed = undefined;
+    try outer.initInPlace(OuterCtx.run, .{ &outer.coroutine, &steps }, alloc);
     defer outer.deinit();
 
-    while (!outer.is_completed) {
+    while (!outer.isCompleted()) {
         outer.@"resume"();
     }
 

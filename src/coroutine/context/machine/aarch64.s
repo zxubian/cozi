@@ -2,15 +2,16 @@
 .global _machine_context_switch_to
 
 _machine_context_init:
-    # X0 is stack bottom
+    # X0 is stack top
     # X1 is ptr to trampoline function
-    # X2 is ptr to trampoline impl (ptr to "self"/"this", to be passed to trampoline function when calling)
+    # X2 is ptr to trampoline impl
+    # (ptr to "self"/"this", to be passed to trampoline function when calling)
 
     # switch to provided stack
     mov x3, sp
     mov sp, x0
 
-    # leave some space at the bottom, just in case
+    # leave some space at the top, just in case
     sub sp, sp, #64
 
     # switch_to will try to load callee-saved registers from

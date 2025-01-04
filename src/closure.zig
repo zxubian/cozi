@@ -12,6 +12,7 @@ pub fn Impl(
     comptime managed: bool,
 ) type {
     const Args = std.meta.ArgsTuple(@TypeOf(routine));
+    // TODO: refactor
     if (managed) {
         return struct {
             arguments: Args,
@@ -47,13 +48,13 @@ pub fn Impl(
             }
 
             pub fn run(ctx: *anyopaque) void {
-                const closure: *@This() = @alignCast(@ptrCast(ctx));
+                const self: *@This() = @alignCast(@ptrCast(ctx));
                 if (comptime returnsErrorUnion(routine)) {
-                    @call(.auto, routine, closure.arguments) catch |e| {
+                    @call(.auto, routine, self.arguments) catch |e| {
                         std.debug.panic("Unhandled error in closure {}", .{e});
                     };
                 } else {
-                    @call(.auto, routine, closure.arguments);
+                    @call(.auto, routine, self.arguments);
                 }
             }
         };

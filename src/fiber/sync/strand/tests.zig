@@ -115,7 +115,7 @@ test "strand - run on single fiber" {
             testing.allocator,
             manual_executor.executor(),
             .{
-                .name = name,
+                .fiber = .{ .name = name },
             },
         );
     }
@@ -199,7 +199,10 @@ test "strand - thread pool" {
             .{&ctx},
             testing.allocator,
             tp.executor(),
-            .{ .name = name, .stack_size = 1024 * 16 * 16 },
+            .{
+                .fiber = .{ .name = name },
+                .stack_size = 1024 * 16 * 16,
+            },
         );
     }
     ctx.wait_group.wait();
@@ -261,7 +264,10 @@ test "strand - stress" {
                 .{&ctx},
                 testing.allocator,
                 tp.executor(),
-                .{ .name = name, .stack_size = 1024 * 16 * 16 },
+                .{
+                    .fiber = .{ .name = name },
+                    .stack_size = 1024 * 16 * 16,
+                },
             );
         }
         ctx.wait_group.wait();
