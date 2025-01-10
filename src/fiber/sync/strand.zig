@@ -4,7 +4,7 @@ const builtin = @import("builtin");
 const Atomic = std.atomic.Value;
 const Strand = @This();
 const Runnable = @import("../../runnable.zig");
-const Closure = @import("../../closure.zig");
+const Closure = @import("../../closure.zig").Closure;
 const Containers = @import("../../containers.zig");
 const Intrusive = Containers.Intrusive;
 const Queue = Intrusive.LockFree.MpscQueue;
@@ -69,7 +69,7 @@ pub fn combine(
 ) void {
     if (Fiber.current()) |current_fiber| {
         // allocate closure on fiber stack
-        var critical_section_closure: Closure.Impl(func, false) = undefined;
+        var critical_section_closure: Closure(func) = undefined;
         critical_section_closure.init(args);
         var task_node: TaskNode = .{
             .submitting_fiber = current_fiber,

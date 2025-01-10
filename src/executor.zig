@@ -2,7 +2,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
 const Runnable = @import("./runnable.zig");
-const Closure = @import("./closure.zig");
+const Closure = @import("./closure.zig").Closure;
 
 const Executor = @This();
 
@@ -25,17 +25,9 @@ pub inline fn submit(
 ) void {
     // No way to recover here. Just crash.
     // Don't want to propagate the error up.
-    const closure = Closure.init(func, args, allocator) catch |e| std.debug.panic(
+    const closure = Closure(func).Managed.init(args, allocator) catch |e| std.debug.panic(
         "Failed to allocate closure in {s}: {}",
         .{ @typeName(Executor), e },
     );
-    closure.* = .{
-        .arguments = args,
-        .runnable = .{
-            .runFn = @TypeOf(closure.*).run,
-            .ptr = closure,
-        },
-        .allocator = allocator,
-    };
-    self.vtable.submit(self.ptr, &closure.runnable);
+    self.vtable.submit(self.ptr, closure.runnable());
 }

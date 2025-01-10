@@ -5,60 +5,78 @@ const Allocator = std.mem.Allocator;
 const assert = std.debug.assert;
 
 const Runnable = @import("./runnable.zig");
-const Closure = @This();
 
-pub fn Impl(
+pub fn Closure(
     comptime routine: anytype,
-    comptime managed: bool,
 ) type {
     const Args = std.meta.ArgsTuple(@TypeOf(routine));
-    // TODO: refactor
-    if (managed) {
-        return struct {
-            arguments: Args,
+    return struct {
+        const Unmanaged = @This();
+        arguments: Args,
+        runnable: Runnable,
+
+        pub fn init(self: *@This(), args: Args) void {
+            const ClosureType = @This();
+            self.* = .{
+                .arguments = args,
+                .runnable = .{
+                    .runFn = ClosureType.run,
+                    .ptr = self,
+                },
+            };
+        }
+
+        pub fn run(ctx: *anyopaque) void {
+            const self: *@This() = @alignCast(@ptrCast(ctx));
+            if (comptime returnsErrorUnion(routine)) {
+                @call(.auto, routine, self.arguments) catch |e| {
+                    std.debug.panic("Unhandled error in closure {}", .{e});
+                };
+            } else {
+                @call(.auto, routine, self.arguments);
+            }
+        }
+
+        pub const Managed = struct {
+            raw: Unmanaged,
             allocator: Allocator,
-            runnable: Runnable,
+            const Self = @This();
+
+            pub fn init(
+                args: std.meta.ArgsTuple(@TypeOf(routine)),
+                allocator: Allocator,
+            ) !*Self {
+                const closure = try allocator.create(Self);
+                closure.* = .{
+                    .raw = .{
+                        .arguments = args,
+                        .runnable = .{
+                            .runFn = Self.run,
+                            .ptr = closure,
+                        },
+                    },
+                    .allocator = allocator,
+                };
+                return closure;
+            }
 
             pub fn run(ctx: *anyopaque) void {
-                const closure: *@This() = @alignCast(@ptrCast(ctx));
+                const closure: *Self = @alignCast(@ptrCast(ctx));
                 if (comptime returnsErrorUnion(routine)) {
-                    @call(.auto, routine, closure.arguments) catch |e| {
+                    @call(.auto, routine, closure.raw.arguments) catch |e| {
                         std.debug.panic("Unhandled error in closure: {}", .{e});
                     };
                 } else {
-                    @call(.auto, routine, closure.arguments);
+                    @call(.auto, routine, closure.raw.arguments);
                 }
                 closure.allocator.destroy(closure);
             }
-        };
-    } else {
-        return struct {
-            arguments: Args,
-            runnable: Runnable,
 
-            pub fn init(self: *@This(), args: Args) void {
-                const ClosureType = @This();
-                self.* = .{
-                    .arguments = args,
-                    .runnable = .{
-                        .runFn = ClosureType.run,
-                        .ptr = self,
-                    },
-                };
-            }
-
-            pub fn run(ctx: *anyopaque) void {
-                const self: *@This() = @alignCast(@ptrCast(ctx));
-                if (comptime returnsErrorUnion(routine)) {
-                    @call(.auto, routine, self.arguments) catch |e| {
-                        std.debug.panic("Unhandled error in closure {}", .{e});
-                    };
-                } else {
-                    @call(.auto, routine, self.arguments);
-                }
+            pub inline fn runnable(self: *Self) *Runnable {
+                return &self.raw.runnable;
             }
         };
-    }
+    };
 }
 
 fn returnsErrorUnion(comptime routine: anytype) bool {
@@ -75,22 +93,4 @@ fn returnsErrorUnion(comptime routine: anytype) bool {
             @compileError("Return type must be void or error.");
         },
     };
-}
-
-pub fn init(
-    comptime routine: anytype,
-    args: std.meta.ArgsTuple(@TypeOf(routine)),
-    allocator: Allocator,
-) !*Impl(routine, true) {
-    const ClosureType = Impl(routine, true);
-    const closure = try allocator.create(ClosureType);
-    closure.* = .{
-        .arguments = args,
-        .runnable = .{
-            .runFn = ClosureType.run,
-            .ptr = closure,
-        },
-        .allocator = allocator,
-    };
-    return closure;
 }

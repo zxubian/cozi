@@ -5,7 +5,7 @@ const testing = std.testing;
 const TimeLimit = @import("../../../testing/TimeLimit.zig");
 const Allocator = std.mem.Allocator;
 const WaitGroup = std.Thread.WaitGroup;
-const Closure = @import("../../../closure.zig");
+const Closure = @import("../../../closure.zig").Closure;
 
 test "Submit Lambda" {
     if (builtin.single_threaded) {
@@ -530,7 +530,7 @@ test "threadpool - compute - init no alloc" {
         }
     };
     var ctx: Ctx = .{};
-    var closures = [_]Closure.Impl(Ctx.run, false){undefined} ** threads.len;
+    var closures = [_]Closure(Ctx.run){undefined} ** threads.len;
     ctx.wait_group.startMany(threads.len);
     for (&closures) |*closure| {
         closure.*.init(.{&ctx});

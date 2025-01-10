@@ -5,7 +5,7 @@ const Allocator = std.mem.Allocator;
 const assert = std.debug.assert;
 
 const Runnable = @import("./runnable.zig");
-const Closure = @import("./closure.zig");
+const Closure = @import("./closure.zig").Closure;
 const ExecutionContext = @import("./coroutine/executionContext.zig");
 const Trampoline = ExecutionContext.Trampoline;
 
@@ -55,7 +55,7 @@ pub fn initOnStack(
     stack_arena: Allocator,
 ) !*Coroutine {
     const self = try stack_arena.create(Coroutine);
-    const routine_closure = try stack_arena.create(Closure.Impl(routine, false));
+    const routine_closure = try stack_arena.create(Closure(routine));
     routine_closure.init(args);
     self.initNoAlloc(
         &routine_closure.*.runnable,
@@ -71,13 +71,12 @@ pub fn initWithStack(
     stack: Stack,
     gpa: Allocator,
 ) !void {
-    const routine_closure = try Closure.init(
-        routine,
+    const routine_closure = try Closure(routine).Managed.init(
         args,
         gpa,
     );
     self.initNoAlloc(
-        &routine_closure.*.runnable,
+        routine_closure.runnable(),
         stack,
     );
 }

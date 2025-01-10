@@ -8,7 +8,7 @@ const atomic = std.atomic;
 const Dispatch = @This();
 const Executor = @import("../executor.zig");
 const Runnable = @import("../runnable.zig");
-const Closure = @import("../closure.zig");
+const Closure = @import("../closure.zig").Closure;
 
 pub const OnEntryCompleted = *const fn (
     dispatch: *Dispatch,
@@ -74,13 +74,12 @@ pub fn timer(
     on_complete: anytype,
     on_complete_user_data: std.meta.ArgsTuple(@TypeOf(on_complete)),
 ) !void {
-    const closure = try Closure.init(
-        on_complete,
+    const closure = try Closure(on_complete).Managed.init(
         on_complete_user_data,
         self.config.callback_entry_allocator,
     );
     errdefer self.config.callback_entry_allocator.destroy(closure);
-    try self.impl.timer(timeout_ns, &closure.runnable);
+    try self.impl.timer(timeout_ns, closure.runnable());
     if (self.state.fetchAdd(1, .acq_rel) ==
         @intFromEnum(State.idle))
     {
