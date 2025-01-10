@@ -26,7 +26,7 @@ Thread pool
   - [ ] "Fast" - similar to GoLang: per-thread local queues, work-stealing
   - Optimizations:
   - [ ] Option to "pin" thread pool worker threads to CPU core (core affinity)
-[ ] Fiber pool
+- [ ] Fiber pool
   - reference: [Parallelizing the Naughty Dog Engine Using Fibers](https://www.youtube.com/watch?v=HIVBhKj7gQU&t=628s)
   - [ ] Worker abstraction over fibers and threads
 Scheduler abstraction
