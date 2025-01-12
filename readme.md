@@ -10,6 +10,7 @@
   - extensible - we cannot anticipate every use-case. So, our APIs must be designed in a way that allows users of the library to integrate their custom solutions.
 
 ## Features & Roadmap
+
 ### Stackfull Coroutine - a function you can suspend & resume
 - [x] Basic support 
 - Back-ends for machine context switch:
@@ -19,6 +20,7 @@
     - [ ] System V AMD64 ABI
 - [ ] ASAN support
 - [x] TSAN support
+
 ### Executors & Schedulers
 Thread pool
   - [x] "Compute" - single global queue
@@ -29,9 +31,11 @@ Thread pool
 - [ ] Fiber pool
   - reference: [Parallelizing the Naughty Dog Engine Using Fibers](https://www.youtube.com/watch?v=HIVBhKj7gQU&t=628s)
   - [ ] Worker abstraction over fibers and threads
-Scheduler abstraction
+Other considerations:
 - [ ] Separate "scheduler" from "executor"
 - [ ] Scheduler "submit" hints (inline/lifo/queue-end etc)
+- [ ] Pass context to all tasks submitted to executor/scheduler
+
 ### Fibers - stackfull cooperatively-scheduled user-space threads
 - [x] Basic support
   - [x] Yield
@@ -42,30 +46,39 @@ Synchronization primitives
   - [x] Barrier 
 - [ ] Channel (spinlock implementation)
 - [ ] Select
-  - [ ] Lock-free channel/select
+- [ ] Lock-free channel/select 
+  - [Koval, N., Alistarh, D., & Elizarov, R. (2023, February). Fast and scalable channels in kotlin coroutines. In Proceedings of the 28th ACM SIGPLAN Annual Symposium on Principles and Practice of Parallel Programming (pp. 107-118).](https://arxiv.org/abs/2211.04986)
+
 ### Futures & Promises
 - [ ] eager (consider if this should be removed & only "lazy" should be kept)
 - [ ] lazy
+
 ### Structured Concurrency
-- [ ] TBC
+- [ ] cancellation token/source
+- [ ] nursery?
+
 ### Testing
 - [ ] basic random fault injection for unit tests
 - [ ] study [Twist](https://gitlab.com/Lipovsky/twist) & consider which features to port
+
 ### Core
 - [x] spin lock
 - [x] intrusive foward list/queue/stack (to be used with locks)
 - [ ] hazard pointers
-- [ ] atomic shared pointer (?)
+
 ### Misc
 - [ ] set up project to be consumed as a dependency in other Zig projects (main module)
 - [ ] clean-up internal module structure & imports
+
 ### Performance
 - [ ] reconsider interface implementation: performance penalty of type-erased ptr approach
 - [ ] integrate with Tracy etc.
 - [ ] Optimize memory orders
+
 ### IO
 - [ ] Play around with self-hosted IO dispatch
 - [ ] Consider integration with [libxev](https://github.com/mitchellh/libxev)
+
 ### Long-term initiatives
 - [ ] integration with Zig async/await
   - It is currently unclear what direction Zig will go with for language support of async/await. 
