@@ -124,6 +124,26 @@ pub fn @"suspend"(self: *Coroutine) void {
     self.execution_context.switchTo(&self.previous_context);
 }
 
+/// Returns true if current stack pointer belongs to
+/// the address range of this Coroutine's Stack.
+pub fn isInScope(self: *const Coroutine) bool {
+    var a: usize = undefined;
+    const addr = @intFromPtr(&a);
+    const base = @intFromPtr(self.stack.base());
+    const top = @intFromPtr(self.stack.top());
+    const result = base <= addr and addr < top;
+    log.debug(
+        "rsp: 0x{x:0>8}. Coroutine stack address range [0x{x:0>8}, 0x{x:0>8}]. Is in range: {}",
+        .{
+            addr,
+            base,
+            top,
+            result,
+        },
+    );
+    return result;
+}
+
 pub const Managed = struct {
     coroutine: Coroutine,
     stack: Stack.Managed,
@@ -140,6 +160,7 @@ pub const Managed = struct {
     }
 
     pub fn deinit(self: *@This()) void {
+        assert(!self.coroutine.isInScope());
         self.stack.deinit();
     }
 
@@ -153,6 +174,10 @@ pub const Managed = struct {
 
     pub inline fn isCompleted(self: *const Managed) bool {
         return self.coroutine.is_completed;
+    }
+
+    pub inline fn isInScope(self: *const Managed) bool {
+        return self.coroutine.isInScope();
     }
 };
 

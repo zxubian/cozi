@@ -273,3 +273,17 @@ test "Pipeline" {
 
     try testing.expectEqual(size, steps);
 }
+
+test "isInScope" {
+    var coro: Coroutine.Managed = undefined;
+    const Ctx = struct {
+        pub fn run(coroutine: *Coroutine.Managed) !void {
+            try testing.expect(coroutine.isInScope());
+        }
+    };
+    try coro.initInPlace(Ctx.run, .{&coro}, testing.allocator);
+    defer coro.deinit();
+    try testing.expect(!coro.isInScope());
+    coro.@"resume"();
+    try testing.expect(!coro.isInScope());
+}
