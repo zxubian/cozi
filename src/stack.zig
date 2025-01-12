@@ -25,6 +25,40 @@ pub fn bufferAllocator(self: *const Stack) FixedBufferAllocator {
     return std.heap.FixedBufferAllocator.init(self.slice);
 }
 
+/// for debugging only
+pub fn print(
+    stack: *const Stack,
+    offset: usize,
+    length: usize,
+    stack_pointer: ?*anyopaque,
+) void {
+    var i: usize = 0;
+    std.debug.print("-------\n", .{});
+    for (stack.slice[offset .. offset + length]) |r| {
+        if (i % 16 == 0) {
+            std.debug.print(
+                "0x{X:0>8}\t",
+                .{@intFromPtr(stack.top()) - i},
+            );
+        }
+        std.debug.print("0x{X:0>2}", .{r});
+        i += 1;
+        if (stack_pointer) |sp| {
+            if (@intFromPtr(stack.top()) - i == @intFromPtr(sp)) {
+                std.debug.print(" <- SP", .{});
+            }
+        }
+        if (i % 16 == 0) {
+            std.debug.print("\n", .{});
+        } else if (i % 8 == 0) {
+            std.debug.print("  ", .{});
+        } else {
+            std.debug.print(" ", .{});
+        }
+    }
+    std.debug.print("-------\n", .{});
+}
+
 pub const Managed = struct {
     raw: Stack,
     allocator: Allocator,
