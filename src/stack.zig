@@ -1,5 +1,5 @@
-//! A thin wrapper around raw bytes.
-//! Ensures correct alignment, according to target architecture requirements
+//! A thin wrapper around a raw byte buffer aligned
+//! according to target architecture requirements.
 const std = @import("std");
 const builtin = @import("builtin");
 const Stack = @This();
@@ -8,22 +8,21 @@ const FixedBufferAllocator = std.heap.FixedBufferAllocator;
 
 const PtrType = [*]align(ALIGNMENT_BYTES) u8;
 
-ptr: PtrType,
-len: usize,
+slice: []align(ALIGNMENT_BYTES) u8,
 
 pub const ALIGNMENT_BYTES = builtin.target.stackAlignment();
 pub const DEFAULT_SIZE_BYTES = 16 * 1024 * 1024;
 
 pub fn top(self: *const Stack) PtrType {
-    return @ptrFromInt(@intFromPtr(self.ptr) + self.len);
+    return @alignCast(self.slice.ptr + self.slice.len);
 }
 
 pub fn base(self: *const Stack) PtrType {
-    return self.ptr;
+    return @alignCast(self.slice.ptr);
 }
 
 pub fn bufferAllocator(self: *const Stack) FixedBufferAllocator {
-    return std.heap.FixedBufferAllocator.init(self.ptr[0..self.len]);
+    return std.heap.FixedBufferAllocator.init(self.slice);
 }
 
 pub const Managed = struct {
@@ -46,31 +45,38 @@ pub const Managed = struct {
         options: InitOptions,
     ) !Self {
         const size = options.size;
-        const ptr = try allocator.alignedAlloc(
+        const buffer = try allocator.alignedAlloc(
             u8,
             ALIGNMENT_BYTES,
             size,
         );
         return Self{
             .raw = .{
-                .ptr = ptr.ptr,
-                .len = size,
+                .slice = buffer,
             },
             .allocator = allocator,
         };
     }
 
     pub fn deinit(self: *const Self) void {
-        self.allocator.free(self.raw.ptr[0..self.raw.len]);
+        self.allocator.free(self.raw.slice);
     }
 
     pub inline fn top(self: *const Self) PtrType {
         return self.raw.top();
     }
 
+    pub inline fn base(self: *const Self) PtrType {
+        return self.raw.base();
+    }
+
     pub inline fn bufferAllocator(
         self: *const Self,
     ) FixedBufferAllocator {
         return self.raw.bufferAllocator();
+    }
+
+    pub inline fn slice(self: *const Self) []align(ALIGNMENT_BYTES) u8 {
+        return self.raw.slice;
     }
 };

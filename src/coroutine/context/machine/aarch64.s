@@ -4,8 +4,10 @@
 _machine_context_init:
     # X0 is stack top
     # X1 is ptr to trampoline function
-    # X2 is ptr to trampoline impl
-    # (ptr to "self"/"this", to be passed to trampoline function when calling)
+    # X2 is ptr to MachineContext trampoline mpl 
+    #    (aka ptr to "self"/"this",
+    #     to be passed to trampoline
+    #     function when calling)
 
     # switch to provided stack
     mov x3, sp
@@ -14,26 +16,30 @@ _machine_context_init:
     # leave some space at the top, just in case
     sub sp, sp, #64
 
-    # switch_to will try to load callee-saved registers from
-    # the stack. So, we push empty data.
-
-    # special registers
+    # switch_to will try to load callee-saved 
+    # registers from the stack. 
+    # So, we push empty data.
 
     # pass the ptr to trampoline as the 9th argument
-    str x2, [sp, #16]!
+    str x2, [sp, #-16]!
 
     # special registers
     # during switch, we want the following:
     # lp -> ptr to trampoline function (x1)
     # fp -> 0
-    str x1, [sp, #-16]!
+    mov x9, #0
+    stp x1, x9, [sp, #-16]!
 
     # general purpose registers
-    mov x9, #0
+    #   28  27
     stp x9, x9, [sp, #-16]!
+    #   26  25
     stp x9, x9, [sp, #-16]!
+    #   24  23
     stp x9, x9, [sp, #-16]!
+    #   22  21
     stp x9, x9, [sp, #-16]!
+    #   20  19
     stp x9, x9, [sp, #-16]!
 
     # floating point registers
@@ -100,18 +106,18 @@ _machine_context_switch_to:
     # 2. restore other state
 
     # floating point registers
-    stp d9, d8, [sp], #16
-    stp d11, d10, [sp], #16
-    stp d13, d12, [sp], #16
-    stp d15, d14, [sp], #16
-    stp d17, d16, [sp], #16
-    stp d19, d18, [sp], #16
-    stp d21, d20, [sp], #16
-    stp d23, d22, [sp], #16
-    stp d25, d24, [sp], #16
-    stp d27, d26, [sp], #16
-    stp d29, d28, [sp], #16
-    stp d31, d30, [sp], #16
+    ldp d9, d8, [sp], #16
+    ldp d11, d10, [sp], #16
+    ldp d13, d12, [sp], #16
+    ldp d15, d14, [sp], #16
+    ldp d17, d16, [sp], #16
+    ldp d19, d18, [sp], #16
+    ldp d21, d20, [sp], #16
+    ldp d23, d22, [sp], #16
+    ldp d25, d24, [sp], #16
+    ldp d27, d26, [sp], #16
+    ldp d29, d28, [sp], #16
+    ldp d31, d30, [sp], #16
 
     # general purpose registers
     ldp x20, x19, [sp], #16

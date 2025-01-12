@@ -209,16 +209,13 @@ test "Fiber - Two Pools" {
 
 test "Pre-supplied stack" {
     const size = 1024 * 1024 * 16;
-    const ptr = try alloc.alignedAlloc(
+    const slice = try alloc.alignedAlloc(
         u8,
         Stack.ALIGNMENT_BYTES,
         size,
     );
-    defer (alloc.free(ptr));
-    const stack = Stack{
-        .ptr = ptr.ptr,
-        .len = size,
-    };
+    defer (alloc.free(slice));
+    const stack = Stack{ .slice = slice };
     var step: usize = 0;
     const Ctx = struct {
         pub fn run(step_: *usize) void {

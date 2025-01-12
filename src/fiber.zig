@@ -266,10 +266,10 @@ fn getManagedStack(self: *Fiber) Stack.Managed {
     const offset = std.mem.alignPointerOffset(
         stack_base,
         @sizeOf(Allocator),
-    );
+    ).?;
     const allocator = std.mem.bytesToValue(
         Allocator,
-        stack.ptr[offset.? .. offset.? + @sizeOf(Allocator)],
+        stack.slice[offset .. offset + @sizeOf(Allocator)],
     );
     return Stack.Managed{
         .raw = stack,
