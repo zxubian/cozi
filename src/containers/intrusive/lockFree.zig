@@ -3,7 +3,11 @@ const Atomic = std.atomic.Value;
 const LockFreeQueue = @This();
 const Node = @import("../intrusive.zig").Node;
 
-///Multiple-producer single-consumer lock-free intrusive stack
+// TODO: add Michael-Scott Queue
+
+/// Multiple-producer single-consumer lock-free intrusive stack
+/// Treiber, R.K., 1986. Systems programming: Coping with parallelism.
+/// Note: using with multiple consumers will result in ABA problem.
 pub fn MpscStack(T: type) type {
     return struct {
         const Self = @This();
