@@ -1,4 +1,5 @@
 ///! MCS Spinlock
+/// https://dl.acm.org/doi/10.1016/0020-0190%2893%2990083-L
 const std = @import("std");
 const Spinlock = @This();
 const Atomic = std.atomic.Value;
