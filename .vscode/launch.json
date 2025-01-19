@@ -15,8 +15,8 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug app",
-            "program": "${workspaceFolder}/zig-out/bin/zig-async",
+            "name": "Debug example",
+            "program": "${workspaceFolder}/example/zig-out/bin/example",
             "args": [],
             "cwd": "${workspaceFolder}"
         }
