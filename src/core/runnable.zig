@@ -1,6 +1,6 @@
 const Runnable = @This();
 pub const RunProto = *const fn (ctx: *anyopaque) void;
-const Containers = @import("containers.zig");
+const Containers = @import("../containers/main.zig");
 
 runFn: RunProto,
 ptr: *anyopaque,

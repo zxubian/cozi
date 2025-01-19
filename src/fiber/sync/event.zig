@@ -5,12 +5,13 @@ const std = @import("std");
 const Event = @This();
 const Atomic = std.atomic.Value;
 
-const Containers = @import("../../containers.zig");
+const Containers = @import("../../containers/main.zig");
 const Queue = Containers.Intrusive.LockFree.MpscQueue;
 
-const Fiber = @import("../../fiber.zig");
-const Await = @import("../../await.zig").@"await";
-const Awaiter = @import("../../awaiter.zig");
+const Fiber = @import("../../fiber/main.zig");
+const GenericAwait = @import("../../await/main.zig");
+const Await = GenericAwait.@"await";
+const Awaiter = GenericAwait.Awaiter;
 
 const log = std.log.scoped(.fiber_event);
 

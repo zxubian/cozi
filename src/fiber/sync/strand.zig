@@ -3,15 +3,18 @@ const assert = std.debug.assert;
 const builtin = @import("builtin");
 const Atomic = std.atomic.Value;
 const Strand = @This();
-const Runnable = @import("../../runnable.zig");
-const Closure = @import("../../closure.zig").Closure;
-const Containers = @import("../../containers.zig");
+
+const Core = @import("../../core/main.zig");
+const Runnable = Core.Runnable;
+const Closure = Core.Closure;
+const Fiber = @import("../../fiber/main.zig");
+const GenericAwait = @import("../../await/main.zig");
+const Await = GenericAwait.@"await";
+const Awaiter = GenericAwait.Awaiter;
+const Containers = @import("../../containers/main.zig");
 const Intrusive = Containers.Intrusive;
 const Queue = Intrusive.LockFree.MpscQueue;
 const Stack = Intrusive.LockFree.MpscStack;
-const Await = @import("../../await.zig").@"await";
-const Awaiter = @import("../../awaiter.zig");
-const Fiber = @import("../../fiber.zig");
 
 const log = std.log.scoped(.fiber_strand);
 

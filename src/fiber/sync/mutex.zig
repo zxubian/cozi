@@ -9,11 +9,13 @@ const Atomic = std.atomic.Value;
 
 const Mutex = @This();
 
-const Fiber = @import("../../fiber.zig");
-const Awaiter = @import("../../awaiter.zig");
-const Containers = @import("../../containers.zig");
+const Fiber = @import("../../fiber/main.zig");
+const GenericAwait = @import("../../await/main.zig");
+const Await = GenericAwait.@"await";
+const Awaiter = GenericAwait.Awaiter;
+
+const Containers = @import("../../containers/main.zig");
 const Queue = Containers.Intrusive.LockFree.MpscQueue;
-const Await = @import("../../await.zig").@"await";
 
 const log = std.log.scoped(.fiber_mutex);
 

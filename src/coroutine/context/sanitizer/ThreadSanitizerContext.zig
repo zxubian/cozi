@@ -1,7 +1,9 @@
-const builtin = @import("builtin");
-const ThreadSanitizerContext = @This();
-const Stack = @import("../../../stack.zig");
 const std = @import("std");
+const builtin = @import("builtin");
+const Core = @import("../../../core/main.zig");
+const Stack = Core.Stack;
+
+const ThreadSanitizerContext = @This();
 
 const tsan = struct {
     extern "c" fn __tsan_create_fiber(flags: c_uint) *anyopaque;

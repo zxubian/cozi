@@ -3,8 +3,9 @@ const std = @import("std");
 const testing = std.testing;
 const alloc = testing.allocator;
 const Allocator = std.mem.Allocator;
-const Coroutine = @import("../coroutine.zig");
-const Stack = @import("../stack.zig");
+const Coroutine = @import("./main.zig");
+const Core = @import("../core/main.zig");
+const Stack = Core.Stack;
 
 test "Suspend" {
     var step: usize = 0;

@@ -3,10 +3,10 @@ const testing = std.testing;
 const builtin = @import("builtin");
 const build_config = @import("build_config");
 
-const Fiber = @import("../../../fiber.zig");
+const Fiber = @import("../../main.zig");
 const Mutex = Fiber.Mutex;
 
-const Executors = @import("../../../executors.zig");
+const Executors = @import("../../../executors/main.zig");
 const ManualExecutor = Executors.Manual;
 const ThreadPool = Executors.ThreadPools.Compute;
 const WaitGroup = std.Thread.WaitGroup;

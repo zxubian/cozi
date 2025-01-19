@@ -3,13 +3,16 @@ const log = std.log.scoped(.fiber_buffered_channel);
 const assert = std.debug.assert;
 const Atomic = std.atomic.Value;
 
-const Spinlock = @import("../sync.zig").Spinlock;
-const Awaiter = @import("../awaiter.zig");
-const Fiber = @import("../fiber.zig");
-const Containers = @import("../containers.zig");
+const GenericAwait = @import("../../../await/main.zig");
+const Awaiter = GenericAwait.Awaiter;
+const Await = GenericAwait.@"await";
+
+const Containers = @import("../../../containers/main.zig");
 const Queue = Containers.Intrusive.ForwardList;
 const Node = Containers.Intrusive.Node;
-const Await = @import("../await.zig").@"await";
+
+const Spinlock = @import("../../../sync/main.zig").Spinlock;
+const Fiber = @import("../../main.zig");
 
 pub fn BufferedChannel(T: type) type {
     return struct {
@@ -332,5 +335,5 @@ pub fn BufferedChannel(T: type) type {
 }
 
 test {
-    _ = @import("./buffered_channel/tests.zig");
+    _ = @import("./tests.zig");
 }

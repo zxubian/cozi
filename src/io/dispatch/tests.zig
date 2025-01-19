@@ -3,7 +3,7 @@ const time = std.time;
 const testing = std.testing;
 const gpa = testing.allocator;
 
-const ThreadPool = @import("../../executors.zig").ThreadPools.Compute;
+const ThreadPool = @import("../../executors/main.zig").ThreadPools.Compute;
 const WaitGroup = std.Thread.WaitGroup;
 const IoDispatch = @import("../dispatch.zig");
 const TimeLimit = @import("../../testing/TimeLimit.zig");

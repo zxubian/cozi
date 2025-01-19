@@ -6,9 +6,12 @@ const assert = std.debug.assert;
 const atomic = std.atomic;
 
 const Dispatch = @This();
-const Executor = @import("../executor.zig");
-const Runnable = @import("../runnable.zig");
-const Closure = @import("../closure.zig").Closure;
+
+const Core = @import("../core/main.zig");
+const Runnable = Core.Runnable;
+const Closure = Core.Closure;
+const Executors = @import("../executors/main.zig");
+const Executor = Executors.Executor;
 
 pub const OnEntryCompleted = *const fn (
     dispatch: *Dispatch,

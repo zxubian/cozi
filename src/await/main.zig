@@ -1,6 +1,7 @@
 const std = @import("std");
-const Awaiter = @import("./awaiter.zig");
-const Fiber = @import("./fiber.zig");
+pub const Awaiter = @import("./awaiter.zig");
+// TODO: eliminate dependency on fiber here
+const Fiber = @import("../fiber/main.zig");
 
 /// Generic await algorithm
 /// https://lewissbaker.github.io/2017/11/17/understanding-operator-co-await

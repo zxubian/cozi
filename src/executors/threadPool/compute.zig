@@ -8,8 +8,10 @@ const assert = std.debug.assert;
 const Atomic = std.atomic.Value;
 const Allocator = std.mem.Allocator;
 
-const Runnable = @import("../../runnable.zig");
-const Executor = @import("../../executor.zig");
+const Core = @import("../../core/main.zig");
+const Runnable = Core.Runnable;
+const Executor = @import("../../executors/main.zig").Executor;
+
 const Queue = @import("./compute/queue.zig").UnboundedBlockingQueue;
 
 const ThreadPool = @This();

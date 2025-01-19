@@ -4,7 +4,8 @@ const MachineContext = @import("./context/machineContext.zig");
 const SanitizerContext = @import("./context/sanitizerContext.zig");
 const build_config = @import("build_config");
 
-pub const Stack = @import("../stack.zig");
+const Core = @import("../core/main.zig");
+const Stack = Core.Stack;
 pub const Trampoline = @import("./context/trampoline.zig");
 
 const ExecutionContext = @This();

@@ -66,10 +66,6 @@ Synchronization primitives
 - [x] intrusive foward list/queue/stack (to be used with locks)
 - [ ] hazard pointers
 
-### Misc
-- [ ] set up project to be consumed as a dependency in other Zig projects (main module)
-- [ ] clean-up internal module structure & imports
-
 ### Performance
 - [ ] reconsider interface implementation: performance penalty of type-erased ptr approach
 - [ ] integrate with Tracy etc.

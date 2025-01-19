@@ -6,7 +6,7 @@ const Barrier = @This();
 
 const WaitGroup = @import("./wait_group.zig");
 
-const Fiber = @import("../../fiber.zig");
+const Fiber = @import("../main.zig");
 
 const log = std.log.scoped(.fiber_barrier);
 

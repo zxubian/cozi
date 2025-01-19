@@ -1,7 +1,5 @@
 const std = @import("std");
-const Fiber = @import("../fiber.zig");
 const Awaiter = @This();
-const Coroutine = @import("./coroutine.zig");
 
 ptr: *anyopaque,
 

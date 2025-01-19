@@ -3,7 +3,8 @@ const testing = std.testing;
 const builtin = @import("builtin");
 
 const WaitGroup = std.Thread.WaitGroup;
-const ThreadPool = @import("../../executors.zig").ThreadPools.Compute;
+const Executors = @import("../../executors/main.zig");
+const ThreadPool = Executors.ThreadPools.Compute;
 
 const Spinlock = @import("../spinlock.zig");
 

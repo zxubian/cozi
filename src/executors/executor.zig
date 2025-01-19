@@ -1,9 +1,12 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
-const Runnable = @import("./runnable.zig");
-const Closure = @import("./closure.zig").Closure;
 
+const Core = @import("../core/main.zig");
+const Runnable = Core.Runnable;
+const Closure = Core.Closure;
+
+//TODO(PERFORMANCE): reconsider if we really need type erasure for this interface
 const Executor = @This();
 
 ptr: *anyopaque,

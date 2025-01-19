@@ -4,15 +4,15 @@ const builtin = @import("builtin");
 const build_config = @import("build_config");
 const Atomic = std.atomic.Value;
 
-const Containers = @import("../../../containers.zig");
+const Containers = @import("../../main.zig");
 const LockFree = Containers.Intrusive.LockFree;
 const Stack = LockFree.MpscStack;
 const Queue = LockFree.MpscQueue;
-const Executors = @import("../../../executors.zig");
+const Executors = @import("../../../executors/main.zig");
 const ManualExecutor = Executors.Manual;
 const ThreadPool = Executors.ThreadPools.Compute;
 const WaitGroup = std.Thread.WaitGroup;
-const Fiber = @import("../../../fiber.zig");
+const Fiber = @import("../../../fiber/main.zig");
 
 test "stack - basic" {
     if (build_config.sanitize == .thread) {

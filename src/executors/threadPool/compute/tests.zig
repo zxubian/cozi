@@ -1,11 +1,13 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const ThreadPool = @import("../compute.zig");
 const testing = std.testing;
-const TimeLimit = @import("../../../testing/TimeLimit.zig");
-const Allocator = std.mem.Allocator;
 const WaitGroup = std.Thread.WaitGroup;
-const Closure = @import("../../../closure.zig").Closure;
+const Allocator = std.mem.Allocator;
+
+const Core = @import("../../../core/main.zig");
+const Closure = Core.Closure;
+const ThreadPool = @import("../compute.zig");
+const TimeLimit = @import("../../../testing/TimeLimit.zig");
 
 test "Submit Lambda" {
     if (builtin.single_threaded) {

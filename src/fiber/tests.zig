@@ -7,10 +7,11 @@ const alloc = testing.allocator;
 const Atomic = std.atomic.Value;
 const WaitGroup = std.Thread.WaitGroup;
 
-const Fiber = @import("../fiber.zig");
-const ManualExecutor = @import("../executors.zig").Manual;
-const ThreadPool = @import("../executors.zig").ThreadPools.Compute;
-const Stack = @import("../stack.zig");
+const Fiber = @import("./main.zig");
+const Executors = @import("../executors/main.zig");
+const ManualExecutor = Executors.Manual;
+const ThreadPool = Executors.ThreadPools.Compute;
+const Stack = @import("../core/main.zig").Stack;
 
 test {
     _ = @import("./sync.zig");

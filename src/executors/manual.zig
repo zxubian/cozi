@@ -1,7 +1,8 @@
 const std = @import("std");
-const Executor = @import("../executor.zig");
-const Runnable = @import("../runnable.zig");
-const Queue = @import("../containers/intrusive/forwardList.zig").IntrusiveForwardList(Runnable);
+const Core = @import("../core/main.zig");
+const Executor = @import("../executors/main.zig").Executor;
+const Runnable = Core.Runnable;
+const Queue = @import("../containers/main.zig").Intrusive.ForwardList(Runnable);
 const Allocator = std.mem.Allocator;
 
 /// Single-threaded manually-executed task queue

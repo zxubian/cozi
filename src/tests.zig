@@ -1,8 +1,9 @@
 test {
-    _ = @import("./containers.zig");
-    _ = @import("./coroutine.zig");
-    _ = @import("./executors.zig");
-    _ = @import("./fiber.zig");
+    _ = @import("./core/main.zig");
+    _ = @import("./containers/main.zig");
+    _ = @import("./coroutine/main.zig");
+    _ = @import("./executors/main.zig");
+    _ = @import("./fiber/main.zig");
     _ = @import("./io/tests.zig");
-    _ = @import("./sync.zig");
+    _ = @import("./sync/main.zig");
 }

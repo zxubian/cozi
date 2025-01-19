@@ -6,17 +6,20 @@ const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
 const Atomic = std.atomic.Value;
 
-const Coroutine = @import("./coroutine.zig");
-const Executor = @import("./executor.zig");
-const Stack = @import("./stack.zig");
-const Closure = @import("./closure.zig");
-const Runnable = @import("./runnable.zig");
-const Await = @import("./await.zig").@"await";
-const Awaiter = @import("./awaiter.zig");
+const Coroutine = @import("../coroutine/main.zig");
+const Executors = @import("../executors/main.zig");
+const Executor = Executors.Executor;
+const Core = @import("../core/main.zig");
+const Closure = Core.Closure;
+const Runnable = Core.Runnable;
+const Stack = Core.Stack;
+const GenericAwait = @import("../await/main.zig");
+const Await = GenericAwait.@"await";
+const Awaiter = GenericAwait.Awaiter;
 
-const Sync = @import("./fiber/sync.zig");
+const Sync = @import("./sync.zig");
 pub const Barrier = Sync.Barrier;
-pub const BufferedChannel = @import("./fiber/buffered_channel.zig").BufferedChannel;
+pub const Channel = @import("./channel/main.zig");
 pub const Event = Sync.Event;
 pub const Mutex = Sync.Mutex;
 pub const Strand = Sync.Strand;
@@ -326,7 +329,7 @@ const YieldAwaiter = struct {
 };
 
 test {
-    _ = @import("./fiber/tests.zig");
-    _ = @import("./fiber/sync.zig");
-    _ = BufferedChannel;
+    _ = @import("./tests.zig");
+    _ = Sync;
+    _ = Channel;
 }

@@ -1,7 +1,11 @@
 const std = @import("std");
 const SanitizerOption = @import("./src/sanitizerOption.zig").SanitizerOption;
 
-fn addAssemblyForMachineContext(b: *std.Build, c: *std.Build.Step.Compile, target: *const std.Build.ResolvedTarget) void {
+fn addAssemblyForMachineContext(
+    b: *std.Build,
+    dest: anytype,
+    target: *const std.Build.ResolvedTarget,
+) void {
     const path = switch (target.result.cpu.arch) {
         .aarch64 => b.path("./src/coroutine/context/machine/aarch64.s"),
         else => std.debug.panic(
@@ -12,43 +16,40 @@ fn addAssemblyForMachineContext(b: *std.Build, c: *std.Build.Step.Compile, targe
             },
         ),
     };
-    c.addAssemblyFile(path);
+    dest.addAssemblyFile(path);
 }
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const sanitize = b.option(SanitizerOption, "sanitize", "Whether to use ASan, TSan, or neither") orelse SanitizerOption.none;
+    const sanitize = b.option(
+        SanitizerOption,
+        "sanitize",
+        "Whether to use ASan, TSan, or neither",
+    ) orelse SanitizerOption.none;
 
-    const exe = b.addExecutable(.{
-        .name = "zig-async",
+    const sanitize_thread = sanitize == .thread;
+    const link_libcpp = sanitize != .none;
+
+    const root = b.addModule("root", .{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
-        .sanitize_thread = sanitize == .thread,
-        .use_llvm = true,
+        .sanitize_thread = sanitize_thread,
+        .link_libcpp = link_libcpp,
     });
 
-    addAssemblyForMachineContext(b, exe, &target);
+    addAssemblyForMachineContext(b, root, &target);
 
     const options = b.addOptions();
 
     options.addOption(SanitizerOption, "sanitize", sanitize);
-    exe.root_module.addOptions("build_config", options);
-
-    b.installArtifact(exe);
-
-    const run_cmd = b.addRunArtifact(exe);
-    run_cmd.step.dependOn(b.getInstallStep());
-
-    const run_step = b.step("run", "Run the app");
-    run_step.dependOn(&run_cmd.step);
+    root.addOptions("build_config", options);
 
     const test_filter_option = b.option([]const []const u8, "test-filter", "Test filter");
-
-    const exe_unit_tests = b.addTest(.{
-        .root_source_file = b.path("src/main.zig"),
+    const unit_tests = b.addTest(.{
+        .root_source_file = b.path("src/tests.zig"),
         .target = target,
         .optimize = optimize,
         .filters = if (test_filter_option) |o| o else &.{},
@@ -57,28 +58,26 @@ pub fn build(b: *std.Build) void {
 
     switch (sanitize) {
         .address => {
-            exe.linkLibCpp();
-            exe.pie = true;
-            exe_unit_tests.linkLibC();
-            exe_unit_tests.pie = true;
+            unit_tests.linkLibCpp();
+            unit_tests.pie = true;
         },
         .thread => {
-            exe.linkLibCpp();
-            exe.pie = true;
-            exe_unit_tests.linkLibC();
-            exe_unit_tests.pie = true;
+            unit_tests.linkLibCpp();
+            unit_tests.pie = true;
         },
         else => {},
     }
 
-    const install_test_step =
-        b.addInstallArtifact(exe_unit_tests, .{ .dest_dir = .{ .override = .{ .custom = "test" } } });
+    const install_test_step = b.addInstallArtifact(
+        unit_tests,
+        .{ .dest_dir = .{ .override = .{ .custom = "test" } } },
+    );
 
-    addAssemblyForMachineContext(b, exe_unit_tests, &target);
+    addAssemblyForMachineContext(b, unit_tests, &target);
 
-    exe_unit_tests.root_module.addOptions("build_config", options);
+    unit_tests.root_module.addOptions("build_config", options);
 
-    const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
+    const run_exe_unit_tests = b.addRunArtifact(unit_tests);
     const test_step = b.step("test", "Run unit tests");
 
     test_step.dependOn(&run_exe_unit_tests.step);

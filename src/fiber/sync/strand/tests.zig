@@ -5,11 +5,11 @@ const build_config = @import("build_config");
 
 const Atomic = std.atomic.Value;
 
-const Fiber = @import("../../../fiber.zig");
+const Fiber = @import("../../main.zig");
 const Strand = Fiber.Strand;
 const Event = Fiber.Event;
 
-const Executors = @import("../../../executors.zig");
+const Executors = @import("../../../executors/main.zig");
 const ManualExecutor = Executors.Manual;
 const ThreadPool = Executors.ThreadPools.Compute;
 const WaitGroup = std.Thread.WaitGroup;

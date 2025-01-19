@@ -4,12 +4,13 @@ const log = std.log.scoped(.coroutine);
 const Allocator = std.mem.Allocator;
 const assert = std.debug.assert;
 
-const Runnable = @import("./runnable.zig");
-const Closure = @import("./closure.zig").Closure;
-const ExecutionContext = @import("./coroutine/executionContext.zig");
+const Core = @import("../core/main.zig");
+const Runnable = Core.Runnable;
+const Closure = Core.Closure;
+const ExecutionContext = @import("./executionContext.zig");
 const Trampoline = ExecutionContext.Trampoline;
 
-pub const Stack = ExecutionContext.Stack;
+pub const Stack = Core.Stack;
 
 const Coroutine = @This();
 
@@ -182,5 +183,5 @@ pub const Managed = struct {
 };
 
 test {
-    _ = @import("./coroutine/tests.zig");
+    _ = @import("./tests.zig");
 }

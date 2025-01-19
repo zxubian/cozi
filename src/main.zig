@@ -1,7 +1,10 @@
 const std = @import("std");
 
-pub fn main() !void {}
-
-test {
-    _ = @import("./tests.zig");
-}
+pub const Await = @import("./await/main.zig");
+pub const Containers = @import("/containers/main.zig");
+pub const Core = @import("./core/main.zig");
+pub const Coroutine = @import("./coroutine/main.zig");
+pub const Executors = @import("./executors/main.zig");
+pub const Fiber = @import("./fiber/main.zig");
+pub const Io = @import("./io/");
+pub const Sync = @import("./sync/");

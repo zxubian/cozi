@@ -4,9 +4,9 @@ const testing = std.testing;
 
 const WaitGroup = std.Thread.WaitGroup;
 
-const Fiber = @import("../../fiber.zig");
-const BufferedChannel = Fiber.BufferedChannel;
-const Executors = @import("../../executors.zig");
+const Fiber = @import("../../main.zig");
+const BufferedChannel = Fiber.Channel.Buffered;
+const Executors = @import("../../../executors/main.zig");
 const ThreadPool = Executors.ThreadPools.Compute;
 const ManualExecutor = Executors.Manual;
 

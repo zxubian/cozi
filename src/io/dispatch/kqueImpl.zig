@@ -5,8 +5,9 @@ const Allocator = std.mem.Allocator;
 const assert = std.debug.assert;
 const atomic = std.atomic;
 
-const Executor = @import("../../executor.zig");
-const Runnable = @import("../../runnable.zig");
+const Core = @import("../../core/main.zig");
+const Runnable = Core.Runnable;
+const Executor = @import("../../executors/main.zig").Executor;
 
 const Dispatch = @import("../dispatch.zig");
 

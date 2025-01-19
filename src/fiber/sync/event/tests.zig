@@ -5,9 +5,9 @@ const testing = std.testing;
 const Atomic = std.atomic.Value;
 
 const Event = Fiber.Event;
-const Fiber = @import("../../../fiber.zig");
+const Fiber = @import("../../main.zig");
 
-const Executors = @import("../../../executors.zig");
+const Executors = @import("../../../executors/main.zig");
 const ManualExecutor = Executors.Manual;
 const ThreadPool = Executors.ThreadPools.Compute;
 const WaitGroup = std.Thread.WaitGroup;
