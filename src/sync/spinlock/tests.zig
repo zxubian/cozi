@@ -20,12 +20,12 @@ test "basic" {
     try testing.expectEqual(a, 1);
 }
 
-test "counter" {
+test "SpinLock - counter" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
     var lock: Spinlock = .{};
-    const thread_count = 4;
+    const thread_count = try std.Thread.getCpuCount();
     var tp: ThreadPool = try .init(thread_count, testing.allocator);
     defer tp.deinit();
     var wait_group: WaitGroup = .{};
