@@ -83,7 +83,7 @@ const EventAwaiter = struct {
         return self.event.state.load(.seq_cst) == .fired;
     }
 
-    pub fn awaitResume(_: *EventAwaiter) void {}
+    pub fn awaitResume(_: *EventAwaiter, _: bool) void {}
 };
 
 test {

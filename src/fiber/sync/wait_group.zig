@@ -143,7 +143,7 @@ const WaitGroupAwaiter = struct {
         return false;
     }
 
-    pub fn awaitResume(_: *WaitGroupAwaiter) void {}
+    pub fn awaitResume(_: *WaitGroupAwaiter, _: bool) void {}
 };
 
 test {

@@ -103,6 +103,7 @@ fn threadEntryPoint(
             .not_started => unreachable,
         }
     }
+    assert(current_.?.status.load(.seq_cst) == .stopped);
     log.debug("{s} exiting", .{name});
 }
 

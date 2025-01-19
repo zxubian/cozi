@@ -188,7 +188,7 @@ const StrandAwaiter = struct {
         return false;
     }
 
-    pub fn awaitResume(_: *StrandAwaiter) void {}
+    pub fn awaitResume(_: *StrandAwaiter, _: bool) void {}
 };
 
 test {

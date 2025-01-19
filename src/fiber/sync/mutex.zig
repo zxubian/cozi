@@ -218,7 +218,7 @@ const LockAwaiter = struct {
         }
         return acquired_lock;
     }
-    pub fn awaitResume(_: *LockAwaiter) void {}
+    pub fn awaitResume(_: *LockAwaiter, _: bool) void {}
 };
 
 const UnlockAwaiter = struct {
@@ -339,7 +339,7 @@ const UnlockAwaiter = struct {
         return released_lock;
     }
 
-    pub fn awaitResume(_: *UnlockAwaiter) void {}
+    pub fn awaitResume(_: *UnlockAwaiter, _: bool) void {}
 };
 
 test {

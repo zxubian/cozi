@@ -16,6 +16,7 @@ const Awaiter = @import("./awaiter.zig");
 
 const Sync = @import("./fiber/sync.zig");
 pub const Barrier = Sync.Barrier;
+pub const BufferedChannel = @import("./fiber/buffered_channel.zig").BufferedChannel;
 pub const Event = Sync.Event;
 pub const Mutex = Sync.Mutex;
 pub const Strand = Sync.Strand;
@@ -321,10 +322,11 @@ const YieldAwaiter = struct {
         return false;
     }
 
-    pub fn awaitResume(_: *YieldAwaiter) void {}
+    pub fn awaitResume(_: *YieldAwaiter, _: bool) void {}
 };
 
 test {
     _ = @import("./fiber/tests.zig");
     _ = @import("./fiber/sync.zig");
+    _ = BufferedChannel;
 }

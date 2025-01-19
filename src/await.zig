@@ -5,19 +5,21 @@ const Fiber = @import("./fiber.zig");
 /// Generic await algorithm
 /// https://lewissbaker.github.io/2017/11/17/understanding-operator-co-await
 pub fn @"await"(awaitable: anytype) awaitReturnType(@TypeOf(awaitable.*)) {
-    const awaiter: Awaiter = awaitable.awaiter();
     // for awaitables that always return false,
     // want to resolve optimize this branch out,
     // so rely on duck-typing here
     if (!awaitable.awaitReady()) {
-        const handle = getHandle();
         // need to handle to Fiber, so use type-erased
         // awaiter here:
+        const awaiter: Awaiter = awaitable.awaiter();
+        const handle = getHandle();
         handle.@"suspend"(awaiter);
+        // --- resume ---
+        return awaitable.awaitResume(true);
     }
     // need to resolve return type at comptime
     // so rely on duck-typing here
-    return awaitable.awaitResume();
+    return awaitable.awaitResume(false);
 }
 
 fn awaitReturnType(awaitable_type: type) type {
