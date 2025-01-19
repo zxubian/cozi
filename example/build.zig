@@ -13,7 +13,20 @@ pub fn build(b: *std.Build) void {
         },
     );
 
-    const zig_async = b.dependency("zig_async", .{});
+    const fault_inject_variant = b.option(
+        []const u8,
+        "fault_inject",
+        "Which fault injection build type to use",
+    );
+    const zig_async = blk: {
+        if (fault_inject_variant) |user_input| {
+            break :blk b.dependency("zig_async", .{
+                .fault_inject = user_input,
+            });
+        }
+        break :blk b.dependency("zig_async", .{});
+    };
+
     exe.root_module.addImport("zig-async", zig_async.module("root"));
 
     const install_cmd = b.addInstallArtifact(exe, .{});
