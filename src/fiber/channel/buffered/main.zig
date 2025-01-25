@@ -291,8 +291,9 @@ pub fn BufferedChannel(T: type) type {
                 const channel = self.channel;
                 const fiber: *Fiber = @alignCast(@ptrCast(handle));
                 self.fiber = fiber;
-                // const guard = self.guard;
+                const guard = self.guard;
                 if (channel.parked_receivers.popFront()) |receiver| {
+                    defer guard.unlock();
                     assert(channel.isEmpty());
                     receiver.result = null;
                     return Awaiter.AwaitSuspendResult{
@@ -301,7 +302,11 @@ pub fn BufferedChannel(T: type) type {
                 } else unreachable;
             }
 
-            pub fn awaitResume(_: *CloseAwaiter, _: bool) void {}
+            pub fn awaitResume(self: *CloseAwaiter, suspended: bool) void {
+                if (suspended) {
+                    self.guard.lock();
+                }
+            }
         };
 
         pub const Managed = struct {
