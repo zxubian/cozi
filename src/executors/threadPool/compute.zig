@@ -5,7 +5,9 @@ const log = std.log.scoped(.thread_pool);
 const Thread = std.Thread;
 const builtin = @import("builtin");
 const assert = std.debug.assert;
-const Atomic = std.atomic.Value;
+const fault = @import("../../fault/main.zig");
+const stdlike = fault.stdlike;
+const Atomic = stdlike.atomic.Value;
 const Allocator = std.mem.Allocator;
 
 const Core = @import("../../core/main.zig");

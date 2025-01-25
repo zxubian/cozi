@@ -3,7 +3,10 @@
 //! instead, the fiber is parked until the WaitGroup counter reaches 0.
 const std = @import("std");
 const WaitGroup = @This();
-const Atomic = std.atomic.Value;
+
+const fault = @import("../../fault/main.zig");
+const stdlike = fault.stdlike;
+const Atomic = stdlike.atomic.Value;
 
 const Containers = @import("../../containers/main.zig");
 const Queue = Containers.Intrusive.LockFree.MpscQueue;

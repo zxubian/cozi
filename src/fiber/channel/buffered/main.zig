@@ -1,7 +1,9 @@
 const std = @import("std");
 const log = std.log.scoped(.fiber_buffered_channel);
 const assert = std.debug.assert;
-const Atomic = std.atomic.Value;
+const fault = @import("../../../fault/main.zig");
+const stdlike = fault.stdlike;
+const Atomic = stdlike.atomic.Value;
 
 const GenericAwait = @import("../../../await/main.zig");
 const Awaiter = GenericAwait.Awaiter;

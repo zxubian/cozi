@@ -2,7 +2,9 @@ const builtin = @import("builtin");
 const std = @import("std");
 const build_config = @import("build_config");
 const testing = std.testing;
-const Atomic = std.atomic.Value;
+const fault = @import("../../../fault/main.zig");
+const stdlike = fault.stdlike;
+const Atomic = stdlike.atomic.Value;
 
 const Event = Fiber.Event;
 const Fiber = @import("../../main.zig");

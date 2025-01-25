@@ -1,5 +1,7 @@
 const std = @import("std");
-const Atomic = std.atomic.Value;
+const fault = @import("../../fault/main.zig");
+const stdlike = fault.stdlike;
+const Atomic = stdlike.atomic.Value;
 const LockFreeQueue = @This();
 const Node = @import("../intrusive.zig").Node;
 

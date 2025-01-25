@@ -3,7 +3,9 @@ const builtin = @import("builtin");
 const testing = std.testing;
 const build_config = @import("build_config");
 
-const Atomic = std.atomic.Value;
+const fault = @import("../../../fault/main.zig");
+const stdlike = fault.stdlike;
+const Atomic = stdlike.atomic.Value;
 
 const Fiber = @import("../../main.zig");
 const Strand = Fiber.Strand;

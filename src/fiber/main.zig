@@ -4,7 +4,10 @@ const Fiber = @This();
 const std = @import("std");
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
-const Atomic = std.atomic.Value;
+
+const fault = @import("../fault/main.zig");
+const stdlike = fault.stdlike;
+const Atomic = stdlike.atomic.Value;
 
 const Coroutine = @import("../coroutine/main.zig");
 const Executors = @import("../executors/main.zig");
@@ -32,7 +35,7 @@ coroutine: *Coroutine,
 executor: Executor,
 tick_runnable: Runnable,
 name: [:0]const u8,
-state: std.atomic.Value(u8) = .init(0),
+state: stdlike.atomic.Value(u8) = .init(0),
 awaiter: ?Awaiter,
 suspend_illegal_scope_depth: Atomic(usize) = .init(0),
 

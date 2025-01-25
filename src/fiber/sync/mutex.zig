@@ -5,7 +5,10 @@
 //! until the mutex is unlocked.
 const std = @import("std");
 const assert = std.debug.assert;
-const Atomic = std.atomic.Value;
+
+const fault = @import("../../fault/main.zig");
+const stdlike = fault.stdlike;
+const Atomic = stdlike.atomic.Value;
 
 const Mutex = @This();
 

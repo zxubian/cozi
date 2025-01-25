@@ -1,7 +1,10 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const builtin = @import("builtin");
-const Atomic = std.atomic.Value;
+
+const fault = @import("../../fault/main.zig");
+const stdlike = fault.stdlike;
+const Atomic = stdlike.atomic.Value;
 const Strand = @This();
 
 const Core = @import("../../core/main.zig");

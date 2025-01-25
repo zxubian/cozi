@@ -2,7 +2,9 @@
 /// https://dl.acm.org/doi/10.1016/0020-0190%2893%2990083-L
 const std = @import("std");
 const Spinlock = @This();
-const Atomic = std.atomic.Value;
+const fault = @import("../fault/main.zig");
+const stdlike = fault.stdlike;
+const Atomic = stdlike.atomic.Value;
 const assert = std.debug.assert;
 
 tail: Atomic(?*Node) = .init(null),

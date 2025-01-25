@@ -3,7 +3,10 @@
 //! instead, the fiber is parked until the event is fired.
 const std = @import("std");
 const Event = @This();
-const Atomic = std.atomic.Value;
+
+const fault = @import("../../fault/main.zig");
+const stdlike = fault.stdlike;
+const Atomic = stdlike.atomic.Value;
 
 const Containers = @import("../../containers/main.zig");
 const Queue = Containers.Intrusive.LockFree.MpscQueue;

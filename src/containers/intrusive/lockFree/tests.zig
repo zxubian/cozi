@@ -2,7 +2,9 @@ const std = @import("std");
 const testing = std.testing;
 const builtin = @import("builtin");
 const build_config = @import("build_config");
-const Atomic = std.atomic.Value;
+const fault = @import("../../../fault/main.zig");
+const stdlike = fault.stdlike;
+const Atomic = stdlike.atomic.Value;
 
 const Containers = @import("../../main.zig");
 const LockFree = Containers.Intrusive.LockFree;

@@ -1,6 +1,8 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const testing = std.testing;
+const fault = @import("../../../fault/main.zig");
+const stdlike = fault.stdlike;
 
 const WaitGroup = std.Thread.WaitGroup;
 
@@ -443,7 +445,7 @@ test "BufferedChannel - Fiber - Buffered Channel - Stress SPMC" {
     const Ctx = struct {
         wait_group: WaitGroup = .{},
         channel: BufferedChannel(usize).Managed,
-        producer_counter: std.atomic.Value(usize) = .init(0),
+        producer_counter: stdlike.atomic.Value(usize) = .init(0),
 
         pub fn producer(ctx: *@This(), producer_idx: usize) void {
             for (0..messages_per_producer) |i| {
@@ -540,7 +542,7 @@ test "BufferedChannel - Fiber - Buffered Channel - Stress MPSC" {
     const Ctx = struct {
         wait_group: WaitGroup = .{},
         channel: BufferedChannel(usize).Managed,
-        producer_counter: std.atomic.Value(usize) = .init(0),
+        producer_counter: stdlike.atomic.Value(usize) = .init(0),
 
         pub fn producer(ctx: *@This(), producer_idx: usize) void {
             for (0..messages_per_producer) |i| {
@@ -637,7 +639,7 @@ test "BufferedChannel - Fiber - Buffered Channel - Stress MPMC" {
     const Ctx = struct {
         wait_group: WaitGroup = .{},
         channel: BufferedChannel(usize).Managed,
-        producer_counter: std.atomic.Value(usize) = .init(0),
+        producer_counter: stdlike.atomic.Value(usize) = .init(0),
 
         pub fn producer(ctx: *@This(), producer_idx: usize) void {
             for (0..messages_per_producer) |i| {

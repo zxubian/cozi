@@ -4,7 +4,9 @@ const build_config = @import("build_config");
 
 const testing = std.testing;
 const alloc = testing.allocator;
-const Atomic = std.atomic.Value;
+const fault = @import("../fault/main.zig");
+const stdlike = fault.stdlike;
+const Atomic = stdlike.atomic.Value;
 const WaitGroup = std.Thread.WaitGroup;
 
 const Fiber = @import("./main.zig");

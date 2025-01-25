@@ -9,6 +9,10 @@ const Closure = Core.Closure;
 const ThreadPool = @import("../compute.zig");
 const TimeLimit = @import("../../../testing/TimeLimit.zig");
 
+const fault = @import("../../../fault/main.zig");
+const stdlike = fault.stdlike;
+const Atomic = stdlike.atomic.Value;
+
 test "Submit Lambda" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
@@ -151,14 +155,14 @@ test "Many Tasks" {
 
     const task_count: usize = 17;
     const Context = struct {
-        tasks: std.atomic.Value(usize),
+        tasks: Atomic(usize),
         wait_group: WaitGroup = .{},
         pub fn run(self: *@This()) void {
             _ = self.tasks.fetchAdd(1, .seq_cst);
             self.wait_group.finish();
         }
     };
-    var ctx = Context{ .tasks = std.atomic.Value(usize).init(0) };
+    var ctx = Context{ .tasks = Atomic(usize).init(0) };
     const executor = tp.executor();
     ctx.wait_group.startMany(task_count);
     for (0..task_count) |_| {
@@ -185,7 +189,7 @@ test "Parallel" {
     defer tp.stop();
 
     const Context = struct {
-        tasks: std.atomic.Value(usize) = .init(0),
+        tasks: Atomic(usize) = .init(0),
         wait_group: WaitGroup = .{},
         pub fn Run(
             self: *@This(),
@@ -230,7 +234,7 @@ test "Two Pools" {
     defer tp2.stop();
 
     const Context = struct {
-        tasks: std.atomic.Value(usize) = .init(0),
+        tasks: Atomic(usize) = .init(0),
         wait_group: WaitGroup = .{},
 
         const sleep_nanoseconds: u64 = std.time.ns_per_s;
@@ -410,7 +414,7 @@ test "Use Threads" {
         const task_count: usize = 4;
 
         const Context = struct {
-            tasks: std.atomic.Value(usize),
+            tasks: Atomic(usize),
             wait_group: WaitGroup = .{},
 
             pub fn run(self: *@This()) void {
@@ -420,7 +424,7 @@ test "Use Threads" {
             }
         };
 
-        var ctx = Context{ .tasks = std.atomic.Value(usize).init(0) };
+        var ctx = Context{ .tasks = Atomic(usize).init(0) };
         const executor = tp.executor();
         for (0..task_count) |_| {
             ctx.wait_group.start();
@@ -453,7 +457,7 @@ test "Too Many Threads" {
         const task_count: usize = 4;
 
         const Context = struct {
-            tasks: std.atomic.Value(usize),
+            tasks: Atomic(usize),
             wait_group: WaitGroup = .{},
 
             pub fn run(self: *@This()) void {
@@ -463,7 +467,7 @@ test "Too Many Threads" {
             }
         };
 
-        var ctx = Context{ .tasks = std.atomic.Value(usize).init(0) };
+        var ctx = Context{ .tasks = Atomic(usize).init(0) };
         const executor = tp.executor();
         for (0..task_count) |_| {
             ctx.wait_group.start();
@@ -492,10 +496,10 @@ test "Racy" {
     defer tp.stop();
 
     const task_count: usize = 100500;
-    var sharead_counter = std.atomic.Value(usize).init(0);
+    var sharead_counter = Atomic(usize).init(0);
 
     const Context = struct {
-        shared_counter: *std.atomic.Value(usize),
+        shared_counter: *Atomic(usize),
         wait_group: WaitGroup = .{},
         pub fn run(self: *@This()) void {
             const old = self.shared_counter.load(.seq_cst);
@@ -524,7 +528,7 @@ test "threadpool - compute - init no alloc" {
     try tp.start();
     defer tp.stop();
     const Ctx = struct {
-        counter: std.atomic.Value(usize) = .init(0),
+        counter: Atomic(usize) = .init(0),
         wait_group: std.Thread.WaitGroup = .{},
         pub fn run(ctx: *@This()) void {
             _ = ctx.counter.fetchAdd(1, .seq_cst);
