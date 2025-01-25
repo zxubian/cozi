@@ -63,7 +63,8 @@ Synchronization primitives
 
 ### Core
 - [x] spin lock
-- [x] intrusive foward list/queue/stack (to be used with locks)
+- [x] intrusive foward list/queue/stack (not thread-safe)
+- [ ] [Michael & Scott lock-free queue](https://dl.acm.org/doi/pdf/10.1145/248052.248106)
 - [ ] hazard pointers
 
 ### Performance
