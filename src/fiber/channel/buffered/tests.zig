@@ -7,7 +7,7 @@ const stdlike = fault.stdlike;
 const WaitGroup = std.Thread.WaitGroup;
 
 const Fiber = @import("../../main.zig");
-const BufferedChannel = Fiber.Channel.Buffered;
+const Channel = Fiber.Channel;
 const Executors = @import("../../../executors/main.zig");
 const ThreadPool = Executors.ThreadPools.Compute;
 const ManualExecutor = Executors.Manual;
@@ -20,7 +20,7 @@ test "BufferedChannel - Ping Pong" {
     const loop_count = 2;
 
     const Ctx = struct {
-        channel: BufferedChannel(usize).Managed,
+        channel: Channel(usize).Buffered.Managed,
         send_counter: usize = 0,
         recv_counter: usize = 0,
         sender_done: bool = false,
@@ -48,7 +48,7 @@ test "BufferedChannel - Ping Pong" {
         }
     };
 
-    var channel = try BufferedChannel(usize).Managed.init(buffer_size, testing.allocator);
+    var channel = try Channel(usize).Buffered.Managed.init(buffer_size, testing.allocator);
     defer channel.deinit();
 
     var ctx: Ctx = .{ .channel = channel };
@@ -82,7 +82,7 @@ test "BufferedChannel - Sequential" {
     const loop_count = 100;
 
     const Ctx = struct {
-        channel: BufferedChannel(usize).Managed,
+        channel: Channel(usize).Buffered.Managed,
         send_counter: usize = 0,
         recv_counter: usize = 0,
         sender_done: bool = false,
@@ -110,7 +110,7 @@ test "BufferedChannel - Sequential" {
         }
     };
 
-    var channel = try BufferedChannel(usize).Managed.init(buffer_size, testing.allocator);
+    var channel = try Channel(usize).Buffered.Managed.init(buffer_size, testing.allocator);
     defer channel.deinit();
 
     var ctx: Ctx = .{ .channel = channel };
@@ -143,7 +143,7 @@ test "BufferedChannel - Close - return null" {
     const message_count = 3;
 
     const Ctx = struct {
-        channel: BufferedChannel(usize).Managed,
+        channel: Channel(usize).Buffered.Managed,
         send_counter: usize = 0,
         recv_counter: usize = 0,
         sender_done: bool = false,
@@ -170,7 +170,7 @@ test "BufferedChannel - Close - return null" {
         }
     };
 
-    var channel = try BufferedChannel(usize).Managed.init(buffer_size, testing.allocator);
+    var channel = try Channel(usize).Buffered.Managed.init(buffer_size, testing.allocator);
     defer channel.deinit();
 
     var ctx: Ctx = .{ .channel = channel };
@@ -198,7 +198,7 @@ test "BufferedChannel - park sender when buffer is full" {
     const message_count = 5;
 
     const Ctx = struct {
-        channel: BufferedChannel(usize).Managed,
+        channel: Channel(usize).Buffered.Managed,
         send_counter: usize = 0,
         recv_counter: usize = 0,
         sender_done: bool = false,
@@ -224,7 +224,7 @@ test "BufferedChannel - park sender when buffer is full" {
         }
     };
 
-    var channel = try BufferedChannel(usize).Managed.init(
+    var channel = try Channel(usize).Buffered.Managed.init(
         buffer_size,
         testing.allocator,
     );
@@ -265,7 +265,7 @@ test "BufferedChannel - park receiver when buffer is empty" {
     const message_count = 4;
 
     const Ctx = struct {
-        channel: BufferedChannel(usize).Managed,
+        channel: Channel(usize).Buffered.Managed,
         send_counter: usize = 0,
         recv_counter: usize = 0,
         sender_done: bool = false,
@@ -293,7 +293,7 @@ test "BufferedChannel - park receiver when buffer is empty" {
         }
     };
 
-    var channel = try BufferedChannel(usize).Managed.init(
+    var channel = try Channel(usize).Buffered.Managed.init(
         buffer_size,
         testing.allocator,
     );
@@ -335,7 +335,7 @@ test "BufferedChannel - close wakes up suspended receiver" {
     const buffer_size = 1;
 
     const Ctx = struct {
-        channel: BufferedChannel(usize).Managed,
+        channel: Channel(usize).Buffered.Managed,
         sender_done: bool = false,
         receiver_done: bool = false,
 
@@ -352,7 +352,7 @@ test "BufferedChannel - close wakes up suspended receiver" {
         }
     };
 
-    var channel = try BufferedChannel(usize).Managed.init(
+    var channel = try Channel(usize).Buffered.Managed.init(
         buffer_size,
         testing.allocator,
     );
@@ -390,7 +390,7 @@ test "BufferedChannel - Fiber - Buffered Channel - Basic - Thread Pool" {
 
     const Ctx = struct {
         wait_group: WaitGroup = .{},
-        channel: BufferedChannel(usize).Managed,
+        channel: Channel(usize).Buffered.Managed,
 
         pub fn sender(ctx: *@This()) void {
             for (0..message_count) |i| {
@@ -409,7 +409,7 @@ test "BufferedChannel - Fiber - Buffered Channel - Basic - Thread Pool" {
         }
     };
 
-    var channel = try BufferedChannel(usize).Managed.init(buffer_size, testing.allocator);
+    var channel = try Channel(usize).Buffered.Managed.init(buffer_size, testing.allocator);
     defer channel.deinit();
 
     var ctx: Ctx = .{
@@ -444,7 +444,7 @@ test "BufferedChannel - Fiber - Buffered Channel - Stress SPMC" {
 
     const Ctx = struct {
         wait_group: WaitGroup = .{},
-        channel: BufferedChannel(usize).Managed,
+        channel: Channel(usize).Buffered.Managed,
         producer_counter: stdlike.atomic.Value(usize) = .init(0),
 
         pub fn producer(ctx: *@This(), producer_idx: usize) void {
@@ -471,7 +471,7 @@ test "BufferedChannel - Fiber - Buffered Channel - Stress SPMC" {
         }
     };
 
-    var channel = try BufferedChannel(usize).Managed.init(
+    var channel = try Channel(usize).Buffered.Managed.init(
         buffer_size,
         testing.allocator,
     );
@@ -541,7 +541,7 @@ test "BufferedChannel - Fiber - Buffered Channel - Stress MPSC" {
 
     const Ctx = struct {
         wait_group: WaitGroup = .{},
-        channel: BufferedChannel(usize).Managed,
+        channel: Channel(usize).Buffered.Managed,
         producer_counter: stdlike.atomic.Value(usize) = .init(0),
 
         pub fn producer(ctx: *@This(), producer_idx: usize) void {
@@ -568,7 +568,7 @@ test "BufferedChannel - Fiber - Buffered Channel - Stress MPSC" {
         }
     };
 
-    var channel = try BufferedChannel(usize).Managed.init(
+    var channel = try Channel(usize).Buffered.Managed.init(
         buffer_size,
         testing.allocator,
     );
@@ -638,7 +638,7 @@ test "BufferedChannel - Fiber - Buffered Channel - Stress MPMC" {
 
     const Ctx = struct {
         wait_group: WaitGroup = .{},
-        channel: BufferedChannel(usize).Managed,
+        channel: Channel(usize).Buffered.Managed,
         producer_counter: stdlike.atomic.Value(usize) = .init(0),
 
         pub fn producer(ctx: *@This(), producer_idx: usize) void {
@@ -665,7 +665,7 @@ test "BufferedChannel - Fiber - Buffered Channel - Stress MPMC" {
         }
     };
 
-    var channel = try BufferedChannel(usize).Managed.init(
+    var channel = try Channel(usize).Buffered.Managed.init(
         buffer_size,
         testing.allocator,
     );

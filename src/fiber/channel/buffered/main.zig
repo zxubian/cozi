@@ -183,7 +183,10 @@ pub fn BufferedChannel(T: type) type {
                 } else unreachable;
             }
 
-            pub fn awaitResume(self: *SendAwaiter, suspended: bool) void {
+            pub fn awaitResume(
+                self: *SendAwaiter,
+                suspended: bool,
+            ) void {
                 if (suspended) {
                     self.guard.lock();
                 }
