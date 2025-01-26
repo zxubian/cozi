@@ -25,89 +25,28 @@ const select_ = @import("./select/main.zig");
 pub const select = select_.select;
 const SelectAwaiter = select_.SelectAwaiter;
 
-pub fn Channellike(T: type) type {
-    return struct {
-        const Self = @This();
-        ptr: *anyopaque,
-        vtable: struct {
-            send: *const fn (ctx: *anyopaque, value: T) void,
-            receive: *const fn (ctx: *anyopaque) ?T,
-        },
-
-        pub inline fn send(self: *Self, value: T) void {
-            return self.vtable.send(self.ptr, value);
-        }
-
-        pub inline fn receive(self: *Self) ?T {
-            return self.vtable.receive(self.ptr);
-        }
-    };
-}
-
 pub fn QueueElement(T: type) type {
     return struct {
         const Self = @This();
         pub const Operation = union(enum) {
-            send: SendAwaiter(T),
-            receive: ReceiveAwaiter(T),
+            send: struct {
+                pub fn awaiter(self: *@This()) *SendAwaiter(T) {
+                    const operation: *Operation = @alignCast(@fieldParentPtr("send", self));
+                    const queue_element: *Self = @alignCast(@fieldParentPtr("operation", operation));
+                    return @alignCast(@fieldParentPtr("queue_element", queue_element));
+                }
+            },
+            receive: struct {
+                pub fn awaiter(self: *@This()) *ReceiveAwaiter(T) {
+                    const operation: *Operation = @alignCast(@fieldParentPtr("receive", self));
+                    const queue_element: *Self = @alignCast(@fieldParentPtr("operation", operation));
+                    return @alignCast(@fieldParentPtr("queue_element", queue_element));
+                }
+            },
             select_receive: *SelectAwaiter(T),
-
-            pub inline fn awaiter(self: *Operation) Awaiter {
-                return switch (self.*) {
-                    .send => |*sender| sender.awaiter(),
-                    .receive => |*receiver| receiver.awaiter(),
-                    .select_receive => |selector| return selector.awaiter(),
-                };
-            }
-
-            pub inline fn awaitReady(self: *Operation) bool {
-                return switch (self.*) {
-                    .send => |*sender| sender.awaitReady(),
-                    .receive => |*receiver| receiver.awaitReady(),
-                    .select_receive => |selector| return selector.awaitReady(),
-                };
-            }
-
-            pub inline fn awaitResume(self: *Operation, suspended: bool) void {
-                return switch (self.*) {
-                    .send => |*sender| sender.awaitResume(suspended),
-                    .receive => |*receiver| receiver.awaitResume(suspended),
-                    .select_receive => |selector| return selector.awaitResume(suspended),
-                };
-            }
         };
-
         intrusive_list_node: Node = .{},
         operation: Operation,
-
-        pub inline fn awaiter(self: *Self) Awaiter {
-            return self.operation.awaiter();
-        }
-
-        pub inline fn awaitReady(self: *Self) bool {
-            return self.operation.awaitReady();
-        }
-
-        pub inline fn awaitResume(
-            self: *Self,
-            suspended: bool,
-        ) void {
-            return self.operation.awaitResume(suspended);
-        }
-
-        fn fromAwaiter(ptr: anytype) *Self {
-            const type_info: std.builtin.Type.Pointer = @typeInfo(@TypeOf(ptr)).pointer;
-            const name = switch (type_info.child) {
-                SendAwaiter(T) => "send",
-                ReceiveAwaiter(T) => "receive",
-                else => @compileError(std.fmt.comptimePrint(
-                    "Invalid ptr type: {s}",
-                    @typeName(type_info.child),
-                )),
-            };
-            const operation: *Operation = @fieldParentPtr(name, ptr);
-            return @fieldParentPtr("operation", operation);
-        }
     };
 }
 
@@ -118,6 +57,7 @@ fn SendAwaiter(T: type) type {
         guard: *Spinlock.Guard,
         value: *const T,
         fiber: *Fiber = undefined,
+        queue_element: QueueElement(T),
 
         pub fn awaiter(self: *Self) Awaiter {
             return Awaiter{
@@ -140,22 +80,30 @@ fn SendAwaiter(T: type) type {
             if (channel.peekHead()) |head| {
                 switch (head.operation) {
                     .send => {},
-                    .receive => |*receiver| {
+                    .receive => |*receive| {
                         defer _ = channel.parked_fibers.popFront();
+                        const receiver = receive.awaiter();
                         receiver.result = self.value.*;
                         return Awaiter.AwaitSuspendResult{
                             .symmetric_transfer_next = receiver.fiber,
                         };
                     },
                     .select_receive => |receiver| {
-                        receiver.*.result = self.value.*;
-                        return Awaiter.AwaitSuspendResult{
-                            .symmetric_transfer_next = receiver.fiber,
-                        };
+                        if (receiver.result_set.cmpxchgStrong(
+                            false,
+                            true,
+                            .seq_cst,
+                            .seq_cst,
+                        ) == null) {
+                            receiver.*.result = self.value.*;
+                            return Awaiter.AwaitSuspendResult{
+                                .symmetric_transfer_next = receiver.fiber,
+                            };
+                        }
                     },
                 }
             }
-            channel.parked_fibers.pushBack(QueueElement(T).fromAwaiter(self));
+            channel.parked_fibers.pushBack(&self.queue_element);
             return Awaiter.AwaitSuspendResult{ .always_suspend = {} };
         }
 
@@ -181,6 +129,7 @@ fn ReceiveAwaiter(T: type) type {
         guard: *Spinlock.Guard,
         result: ?T = undefined,
         fiber: *Fiber = undefined,
+        queue_element: QueueElement(T),
 
         pub fn awaiter(self: *Self) Awaiter {
             return Awaiter{
@@ -202,8 +151,9 @@ fn ReceiveAwaiter(T: type) type {
             defer self.guard.unlock();
             if (channel.peekHead()) |head| {
                 switch (head.operation) {
-                    .send => |sender| {
+                    .send => |*send| {
                         defer _ = channel.parked_fibers.popFront();
+                        const sender = send.awaiter();
                         self.result = sender.value.*;
                         return Awaiter.AwaitSuspendResult{
                             .symmetric_transfer_next = sender.fiber,
@@ -213,7 +163,7 @@ fn ReceiveAwaiter(T: type) type {
                     .select_receive => @panic("todo - select receive in receive awaiter"),
                 }
             }
-            channel.parked_fibers.pushBack(QueueElement(T).fromAwaiter(self));
+            channel.parked_fibers.pushBack(&self.queue_element);
             return Awaiter.AwaitSuspendResult{ .always_suspend = {} };
         }
 
@@ -255,16 +205,15 @@ pub fn Channel(T: type) type {
             if (self.closed) {
                 std.debug.panic("send on closed channel", .{});
             }
-            var queue_element: QueueElement(T) = .{
-                .operation = .{
-                    .send = .{
-                        .value = &value,
-                        .channel = self,
-                        .guard = &guard,
-                    },
+            var awaiter: SendAwaiter(T) = .{
+                .value = &value,
+                .channel = self,
+                .guard = &guard,
+                .queue_element = .{
+                    .operation = .send,
                 },
             };
-            Await(&queue_element);
+            Await(&awaiter);
         }
 
         /// Parks fiber until rendezvous is finished and
@@ -273,16 +222,15 @@ pub fn Channel(T: type) type {
             var guard = self.lock.guard();
             guard.lock();
             defer guard.unlock();
-            var queue_element: QueueElement(T) = .{
-                .operation = .{
-                    .receive = .{
-                        .channel = self,
-                        .guard = &guard,
-                    },
+            var awaiter: ReceiveAwaiter(T) = .{
+                .channel = self,
+                .guard = &guard,
+                .queue_element = .{
+                    .operation = .receive,
                 },
             };
-            Await(&queue_element);
-            return queue_element.operation.receiver.result;
+            Await(&awaiter);
+            return awaiter.result;
         }
 
         pub fn close(self: *Impl) void {
@@ -298,28 +246,6 @@ pub fn Channel(T: type) type {
                 .guard = &guard,
             };
             Await(&awaiter);
-        }
-
-        pub fn asChannellike(self: *Impl) Channellike(T) {
-            const InterfaceImpl = struct {
-                pub fn send(ctx: *anyopaque, value: T) void {
-                    const self_: *Impl = @alignCast(@ptrCast(ctx));
-                    return self_.send(value);
-                }
-
-                pub fn receive(ctx: *anyopaque) ?T {
-                    const self_: *Impl = @alignCast(@ptrCast(ctx));
-                    return self_.receive();
-                }
-            };
-
-            return Channellike(T){
-                .ptr = self,
-                .vtable = .{
-                    .send = InterfaceImpl.send,
-                    .receive = InterfaceImpl.receive,
-                },
-            };
         }
 
         pub fn peekHead(self: *Impl) ?*QueueElement(T) {
@@ -363,7 +289,7 @@ pub fn Channel(T: type) type {
                 const guard = self.guard;
                 defer guard.unlock();
                 while (channel.parked_fibers.popFront()) |head| {
-                    const receiver = &head.operation.receiver;
+                    const receiver = head.operation.receive.awaiter();
                     receiver.result = null;
                     receiver.fiber.scheduleSelf();
                 }
