@@ -2,7 +2,8 @@ const std = @import("std");
 
 pub const BuildVariant = enum {
     none,
-    thread,
+    thread_sleep,
+    thread_yield,
     fiber,
 };
 

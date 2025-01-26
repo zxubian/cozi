@@ -4,7 +4,7 @@ const fault_injection_builtin = @import("zig_async_fault_injection");
 const Fiber = @import("../fiber/main.zig");
 
 const inject_frequency = 16;
-const sleep_time_ns = 100;
+const sleep_time_ns = 10;
 
 const uninited_state = std.math.maxInt(usize);
 state: std.atomic.Value(usize) = .init(uninited_state),
@@ -25,12 +25,16 @@ inline fn maybeInit(self: *Injector) void {
 }
 
 pub fn injectFault() void {
-    Impl.yield();
+    switch (fault_injection_builtin.build_variant) {
+        .none => {},
+        .thread_yield, .fiber => Impl.yield(),
+        .thread_sleep => Impl.sleep(sleep_time_ns),
+    }
 }
 
 const Impl = switch (fault_injection_builtin.build_variant) {
     .none => {},
-    .thread => ThreadImpl,
+    .thread_yield, .thread_sleep => ThreadImpl,
     .fiber => FiberImpl,
 };
 
