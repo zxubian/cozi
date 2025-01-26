@@ -141,7 +141,61 @@ test "Select - send multiple then select receive" {
     try testing.expect(ctx.receiver_done);
 }
 
-// test "Select - Basic" {
+test "Select - select receive then send" {
+    if (fault_injection_builtin.build_variant == .fiber) {
+        return error.SkipZigTest;
+    }
+    var manual: ManualExecutor = .{};
+    const Ctx = struct {
+        channel_a: Fiber.Channel(usize) = .{},
+        channel_b: Fiber.Channel(usize) = .{},
+        sender_done: bool = false,
+        receiver_done: bool = false,
+
+        pub fn sender(ctx: *@This(), value: usize) !void {
+            ctx.channel_a.send(value);
+            ctx.sender_done = true;
+        }
+
+        pub fn receiver(
+            ctx: *@This(),
+            expected: usize,
+        ) !void {
+            const result = select(usize)(
+                &ctx.channel_a,
+                &ctx.channel_b,
+            );
+            try testing.expectEqual(expected, result);
+            ctx.receiver_done = true;
+        }
+    };
+
+    var ctx: Ctx = .{};
+
+    try Fiber.go(
+        Ctx.receiver,
+        .{ &ctx, 1 },
+        testing.allocator,
+        manual.executor(),
+    );
+    _ = manual.drain();
+
+    try testing.expect(!ctx.sender_done);
+    try testing.expect(!ctx.receiver_done);
+
+    try Fiber.go(
+        Ctx.sender,
+        .{ &ctx, 1 },
+        testing.allocator,
+        manual.executor(),
+    );
+    _ = manual.drain();
+
+    try testing.expect(ctx.sender_done);
+    try testing.expect(ctx.receiver_done);
+}
+
+// test "Select - " {
 //     var manual: ManualExecutor = .{};
 //     const Ctx = struct {
 //         channel_a: Fiber.Channel(usize) = .{},

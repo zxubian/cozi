@@ -10,6 +10,7 @@ const Fiber = @import("../../main.zig");
 const channel_ = @import("../main.zig");
 const Channel = channel_.Channel;
 const ChannelLike = channel_.Channellike;
+const QueueElement = channel_.QueueElement;
 
 // fn AnyChannel(T: type) type {
 //     return union(enum) {
@@ -62,26 +63,27 @@ pub fn select(T: type) *const fn (a: *Channel(T), b: *Channel(T)) ?T {
             first_lock.lock();
             second_lock.lock();
             //
-            const A = @TypeOf(a.*);
-            const B = @TypeOf(b.*);
             const Result = T;
-            var awaiter: SelectAwaiter(A, B) = .{
+            var queue_elements: [2]QueueElement(T) = [_]QueueElement(T){undefined} ** 2;
+            var awaiter: SelectAwaiter(T) = .{
                 .locks = &[_]*SpinLock.Guard{ &first_lock, &second_lock },
                 .channels = &[_]*Channel(Result){ a, b },
+                .queue_elements = &queue_elements,
             };
-            return Await(&awaiter);
+            Await(&awaiter);
+            return awaiter.result;
         }
     }.select;
 }
 
-fn SelectAwaiter(A: type, B: type) type {
-    const Result = SelectResult(A, B);
+pub fn SelectAwaiter(Result: type) type {
     return struct {
         const Self = @This();
         result: Result = undefined,
         fiber: *Fiber = undefined,
         locks: []const *SpinLock.Guard,
         channels: []const *Channel(Result),
+        queue_elements: []QueueElement(Result),
 
         pub fn awaitReady(_: *Self) bool {
             // for rendezvous channels:
@@ -108,7 +110,7 @@ fn SelectAwaiter(A: type, B: type) type {
                 if (channel.peekHead()) |head| {
                     switch (head.operation) {
                         .send => |sender| {
-                            defer _ = channel.operation_queue.popFront();
+                            defer _ = channel.parked_fibers.popFront();
                             self.result = sender.value.*;
                             return Awaiter.AwaitSuspendResult{
                                 .symmetric_transfer_next = sender.fiber,
@@ -118,12 +120,21 @@ fn SelectAwaiter(A: type, B: type) type {
                     }
                 }
             }
-            return Awaiter.AwaitSuspendResult{ .never_suspend = {} };
+
+            // enqueue self on all channels
+            for (self.channels, self.queue_elements) |channel, *queue_element| {
+                queue_element.* = QueueElement(Result){
+                    .intrusive_list_node = .{},
+                    .operation = .{
+                        .select_receive = self,
+                    },
+                };
+                channel.parked_fibers.pushBack(queue_element);
+            }
+            return Awaiter.AwaitSuspendResult{ .always_suspend = {} };
         }
 
-        pub fn awaitResume(self: *Self, _: bool) Result {
-            return self.result;
-        }
+        pub fn awaitResume(_: *Self, _: bool) void {}
 
         pub fn awaiter(self: *Self) Awaiter {
             return Awaiter{

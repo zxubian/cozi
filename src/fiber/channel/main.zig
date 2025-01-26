@@ -23,10 +23,7 @@ const BufferedChannel = @import("./buffered/main.zig").BufferedChannel;
 
 const select_ = @import("./select/main.zig");
 pub const select = select_.select;
-
-pub const SelectError = error{
-    not_ready,
-};
+const SelectAwaiter = select_.SelectAwaiter;
 
 pub fn Channellike(T: type) type {
     return struct {
@@ -35,7 +32,6 @@ pub fn Channellike(T: type) type {
         vtable: struct {
             send: *const fn (ctx: *anyopaque, value: T) void,
             receive: *const fn (ctx: *anyopaque) ?T,
-            selectReceive: *const fn (ctx: *anyopaque) SelectError!?T,
         },
 
         pub inline fn send(self: *Self, value: T) void {
@@ -44,10 +40,6 @@ pub fn Channellike(T: type) type {
 
         pub inline fn receive(self: *Self) ?T {
             return self.vtable.receive(self.ptr);
-        }
-
-        pub inline fn selectReceive(self: *Self) !?T {
-            return self.vtable.selectReceive(self.ptr);
         }
     };
 }
@@ -58,11 +50,13 @@ pub fn QueueElement(T: type) type {
         pub const Operation = union(enum) {
             send: SendAwaiter(T),
             receive: ReceiveAwaiter(T),
+            select_receive: *SelectAwaiter(T),
 
             pub inline fn awaiter(self: *Operation) Awaiter {
                 return switch (self.*) {
                     .send => |*sender| sender.awaiter(),
                     .receive => |*receiver| receiver.awaiter(),
+                    .select_receive => |selector| return selector.awaiter(),
                 };
             }
 
@@ -70,6 +64,7 @@ pub fn QueueElement(T: type) type {
                 return switch (self.*) {
                     .send => |*sender| sender.awaitReady(),
                     .receive => |*receiver| receiver.awaitReady(),
+                    .select_receive => |selector| return selector.awaitReady(),
                 };
             }
 
@@ -77,6 +72,7 @@ pub fn QueueElement(T: type) type {
                 return switch (self.*) {
                     .send => |*sender| sender.awaitResume(suspended),
                     .receive => |*receiver| receiver.awaitResume(suspended),
+                    .select_receive => |selector| return selector.awaitResume(suspended),
                 };
             }
         };
@@ -145,15 +141,21 @@ fn SendAwaiter(T: type) type {
                 switch (head.operation) {
                     .send => {},
                     .receive => |*receiver| {
-                        defer _ = channel.operation_queue.popFront();
+                        defer _ = channel.parked_fibers.popFront();
                         receiver.result = self.value.*;
+                        return Awaiter.AwaitSuspendResult{
+                            .symmetric_transfer_next = receiver.fiber,
+                        };
+                    },
+                    .select_receive => |receiver| {
+                        receiver.*.result = self.value.*;
                         return Awaiter.AwaitSuspendResult{
                             .symmetric_transfer_next = receiver.fiber,
                         };
                     },
                 }
             }
-            channel.operation_queue.pushBack(QueueElement(T).fromAwaiter(self));
+            channel.parked_fibers.pushBack(QueueElement(T).fromAwaiter(self));
             return Awaiter.AwaitSuspendResult{ .always_suspend = {} };
         }
 
@@ -201,16 +203,17 @@ fn ReceiveAwaiter(T: type) type {
             if (channel.peekHead()) |head| {
                 switch (head.operation) {
                     .send => |sender| {
-                        defer _ = channel.operation_queue.popFront();
+                        defer _ = channel.parked_fibers.popFront();
                         self.result = sender.value.*;
                         return Awaiter.AwaitSuspendResult{
                             .symmetric_transfer_next = sender.fiber,
                         };
                     },
                     .receive => {},
+                    .select_receive => @panic("todo - select receive in receive awaiter"),
                 }
             }
-            channel.operation_queue.pushBack(QueueElement(T).fromAwaiter(self));
+            channel.parked_fibers.pushBack(QueueElement(T).fromAwaiter(self));
             return Awaiter.AwaitSuspendResult{ .always_suspend = {} };
         }
 
@@ -241,7 +244,7 @@ pub fn Channel(T: type) type {
 
         lock: Spinlock = .{},
         closed: bool = false,
-        operation_queue: Queue(QueueElement(T)) = .{},
+        parked_fibers: Queue(QueueElement(T)) = .{},
 
         /// Parks fiber until rendezvous is finished and
         /// value is passed to another fiber which called `receive`.
@@ -297,10 +300,6 @@ pub fn Channel(T: type) type {
             Await(&awaiter);
         }
 
-        pub fn selectReceive(_: *Impl) SelectError!?T {
-            return null;
-        }
-
         pub fn asChannellike(self: *Impl) Channellike(T) {
             const InterfaceImpl = struct {
                 pub fn send(ctx: *anyopaque, value: T) void {
@@ -312,24 +311,19 @@ pub fn Channel(T: type) type {
                     const self_: *Impl = @alignCast(@ptrCast(ctx));
                     return self_.receive();
                 }
-
-                pub fn selectReceive(ctx: *anyopaque) SelectError!?T {
-                    const self_: *Impl = @alignCast(@ptrCast(ctx));
-                    return self_.selectReceive();
-                }
             };
+
             return Channellike(T){
                 .ptr = self,
                 .vtable = .{
                     .send = InterfaceImpl.send,
                     .receive = InterfaceImpl.receive,
-                    .selectReceive = InterfaceImpl.selectReceive,
                 },
             };
         }
 
         pub fn peekHead(self: *Impl) ?*QueueElement(T) {
-            if (self.operation_queue.head) |head| {
+            if (self.parked_fibers.head) |head| {
                 return head.parentPtr(QueueElement(T));
             }
             return null;
@@ -349,7 +343,10 @@ pub fn Channel(T: type) type {
 
             pub fn awaitReady(self: *CloseAwaiter) bool {
                 if (self.channel.peekHead()) |head| {
-                    const must_suspend = head.operation == .receiver;
+                    const must_suspend = switch (head.operation) {
+                        .receive, .select_receive => true,
+                        else => false,
+                    };
                     return !must_suspend;
                 }
                 return true;
@@ -365,7 +362,7 @@ pub fn Channel(T: type) type {
                 self.fiber = fiber;
                 const guard = self.guard;
                 defer guard.unlock();
-                while (channel.operation_queue.popFront()) |head| {
+                while (channel.parked_fibers.popFront()) |head| {
                     const receiver = &head.operation.receiver;
                     receiver.result = null;
                     receiver.fiber.scheduleSelf();
