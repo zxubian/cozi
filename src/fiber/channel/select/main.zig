@@ -103,10 +103,12 @@ fn SelectAwaiter(A: type, B: type) type {
                     guard.*.unlock();
                 }
             }
+            // TODO: randomize polling order
             for (self.channels) |channel| {
                 if (channel.peekHead()) |head| {
                     switch (head.operation) {
                         .send => |sender| {
+                            defer _ = channel.operation_queue.popFront();
                             self.result = sender.value.*;
                             return Awaiter.AwaitSuspendResult{
                                 .symmetric_transfer_next = sender.fiber,

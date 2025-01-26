@@ -63,6 +63,84 @@ test "Select - send then select receive" {
     try testing.expect(ctx.receiver_done);
 }
 
+test "Select - send multiple then select receive" {
+    if (fault_injection_builtin.build_variant == .fiber) {
+        return error.SkipZigTest;
+    }
+    var manual: ManualExecutor = .{};
+    const Ctx = struct {
+        channel_a: Fiber.Channel(usize) = .{},
+        channel_b: Fiber.Channel(usize) = .{},
+        sender_a_done: bool = false,
+        sender_b_done: bool = false,
+        receiver_done: bool = false,
+
+        pub fn senderA(ctx: *@This(), value: usize) !void {
+            ctx.channel_a.send(value);
+            ctx.sender_a_done = true;
+        }
+
+        pub fn senderB(ctx: *@This(), value: usize) !void {
+            ctx.channel_b.send(value);
+            ctx.sender_b_done = true;
+        }
+
+        pub fn receiver(
+            ctx: *@This(),
+        ) !void {
+            _ = select(usize)(
+                &ctx.channel_a,
+                &ctx.channel_b,
+            );
+            ctx.receiver_done = true;
+        }
+    };
+
+    var ctx: Ctx = .{};
+
+    try Fiber.go(
+        Ctx.senderA,
+        .{ &ctx, 1 },
+        testing.allocator,
+        manual.executor(),
+    );
+    try Fiber.go(
+        Ctx.senderB,
+        .{ &ctx, 2 },
+        testing.allocator,
+        manual.executor(),
+    );
+    _ = manual.drain();
+
+    try testing.expect(!ctx.sender_a_done);
+    try testing.expect(!ctx.sender_b_done);
+    try testing.expect(!ctx.receiver_done);
+
+    try Fiber.go(
+        Ctx.receiver,
+        .{&ctx},
+        testing.allocator,
+        manual.executor(),
+    );
+    _ = manual.drain();
+
+    try testing.expect(!ctx.sender_a_done or !ctx.sender_b_done);
+    try testing.expect(ctx.receiver_done);
+    ctx.receiver_done = false;
+
+    try Fiber.go(
+        Ctx.receiver,
+        .{&ctx},
+        testing.allocator,
+        manual.executor(),
+    );
+    _ = manual.drain();
+
+    try testing.expect(ctx.sender_a_done);
+    try testing.expect(ctx.sender_b_done);
+    try testing.expect(ctx.receiver_done);
+}
+
 // test "Select - Basic" {
 //     var manual: ManualExecutor = .{};
 //     const Ctx = struct {
