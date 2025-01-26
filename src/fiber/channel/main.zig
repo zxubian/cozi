@@ -289,9 +289,21 @@ pub fn Channel(T: type) type {
                 const guard = self.guard;
                 defer guard.unlock();
                 while (channel.parked_fibers.popFront()) |head| {
-                    const receiver = head.operation.receive.awaiter();
-                    receiver.result = null;
-                    receiver.fiber.scheduleSelf();
+                    switch (head.operation) {
+                        .receive => |*receive_op| {
+                            const receiver = receive_op.awaiter();
+                            receiver.result = null;
+                            receiver.fiber.scheduleSelf();
+                        },
+                        .select_receive => |selector| {
+                            if (selector.result_set.cmpxchgStrong(false, true, .seq_cst, .seq_cst)) |_| {
+                                continue;
+                            }
+                            selector.result = null;
+                            selector.fiber.scheduleSelf();
+                        },
+                        else => unreachable,
+                    }
                 }
                 return Awaiter.AwaitSuspendResult{ .never_suspend = {} };
             }

@@ -435,3 +435,174 @@ test "Select - select in loop - send first" {
     try testing.expect(ctx.sender_b_done);
     try testing.expect(ctx.receiver_done);
 }
+
+test "Select - do not block on closed channel" {
+    var manual: ManualExecutor = .{};
+    const Ctx = struct {
+        channel_a: Fiber.Channel(usize) = .{},
+        channel_b: Fiber.Channel(usize) = .{},
+        sender_a_done: bool = false,
+        sender_b_done: bool = false,
+        receiver_done: bool = false,
+        selector_done: bool = false,
+
+        pub fn senderA(ctx: *@This()) !void {
+            ctx.channel_a.close();
+            ctx.sender_a_done = true;
+        }
+
+        pub fn senderB(ctx: *@This()) !void {
+            ctx.channel_b.send(2);
+            ctx.channel_b.close();
+            ctx.sender_b_done = true;
+        }
+
+        pub fn selector(
+            ctx: *@This(),
+            expected: []const ?usize,
+        ) !void {
+            for (expected) |e| {
+                const result = select(usize)(
+                    &ctx.channel_a,
+                    &ctx.channel_b,
+                );
+                try testing.expectEqual(e, result);
+            }
+            ctx.selector_done = true;
+        }
+
+        pub fn receiver(
+            ctx: *@This(),
+            channel: *Fiber.Channel(usize),
+            expected: []const ?usize,
+        ) !void {
+            for (expected) |e| {
+                const result = channel.receive();
+                try testing.expectEqual(e, result);
+            }
+            ctx.receiver_done = true;
+        }
+    };
+
+    var ctx: Ctx = .{};
+
+    try Fiber.go(
+        Ctx.senderA,
+        .{&ctx},
+        testing.allocator,
+        manual.executor(),
+    );
+    _ = manual.drain();
+    try testing.expect(ctx.sender_a_done);
+    try testing.expect(!ctx.sender_b_done);
+    try testing.expect(!ctx.receiver_done);
+    try testing.expect(!ctx.selector_done);
+
+    try Fiber.go(
+        Ctx.selector,
+        .{ &ctx, &[_]?usize{null} },
+        testing.allocator,
+        manual.executor(),
+    );
+    _ = manual.drain();
+    try testing.expect(ctx.sender_a_done);
+    try testing.expect(!ctx.sender_b_done);
+    try testing.expect(!ctx.receiver_done);
+    try testing.expect(ctx.selector_done);
+
+    try Fiber.go(
+        Ctx.senderB,
+        .{&ctx},
+        testing.allocator,
+        manual.executor(),
+    );
+    _ = manual.drain();
+    try testing.expect(ctx.sender_a_done);
+    try testing.expect(!ctx.sender_b_done);
+    try testing.expect(!ctx.receiver_done);
+    try testing.expect(ctx.selector_done);
+
+    try Fiber.go(
+        Ctx.receiver,
+        .{ &ctx, &ctx.channel_b, &[_]?usize{ 2, null } },
+        testing.allocator,
+        manual.executor(),
+    );
+    _ = manual.drain();
+    try testing.expect(ctx.sender_a_done);
+    try testing.expect(ctx.sender_b_done);
+    try testing.expect(ctx.receiver_done);
+    try testing.expect(ctx.selector_done);
+}
+
+test "Select - channel close must resume fiber which was parked on select" {
+    var manual: ManualExecutor = .{};
+    const Ctx = struct {
+        channel_a: Fiber.Channel(usize) = .{},
+        channel_b: Fiber.Channel(usize) = .{},
+        sender_done: []bool,
+        selector_done: bool = false,
+
+        pub fn sender(
+            ctx: *@This(),
+            idx: usize,
+            channel: *Fiber.Channel(usize),
+            values: []const usize,
+        ) !void {
+            for (values) |value| {
+                channel.send(value);
+            }
+            channel.close();
+            ctx.sender_done[idx] = true;
+        }
+
+        pub fn selector(
+            ctx: *@This(),
+            expected: []const ?usize,
+        ) !void {
+            for (expected) |e| {
+                const result = select(usize)(
+                    &ctx.channel_a,
+                    &ctx.channel_b,
+                );
+                try testing.expectEqual(e, result);
+            }
+            ctx.selector_done = true;
+        }
+
+        pub fn allSendersDone(self: *@This()) bool {
+            for (self.sender_done) |done| {
+                if (!done) return false;
+            }
+            return true;
+        }
+    };
+
+    var sender_done: [1]bool = undefined;
+    for (&sender_done) |*done| {
+        done.* = false;
+    }
+    var ctx: Ctx = .{
+        .sender_done = &sender_done,
+    };
+
+    try Fiber.go(
+        Ctx.selector,
+        .{ &ctx, &[_]?usize{null} },
+        testing.allocator,
+        manual.executor(),
+    );
+    _ = manual.drain();
+    try testing.expect(!ctx.allSendersDone());
+    try testing.expect(!ctx.selector_done);
+
+    try Fiber.go(
+        Ctx.sender,
+        .{ &ctx, 0, &ctx.channel_a, &[_]usize{} },
+        testing.allocator,
+        manual.executor(),
+    );
+    _ = manual.drain();
+    try testing.expect(ctx.allSendersDone());
+    try testing.expect(ctx.selector_done);
+}

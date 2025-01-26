@@ -59,7 +59,7 @@ pub fn SelectAwaiter(Result: type) type {
         // However, we use Atomic here in preparation for lock-free select in the
         // future.
         result_set: Atomic(bool) = .init(false),
-        result: Result = undefined,
+        result: ?Result = undefined,
         fiber: *Fiber = undefined,
         locks: []const *SpinLock.Guard,
         channels: []const *Channel(Result),
@@ -87,6 +87,13 @@ pub fn SelectAwaiter(Result: type) type {
             }
             // TODO: randomize polling order
             for (self.channels) |channel| {
+                if (channel.closed) {
+                    if (self.result_set.cmpxchgStrong(false, true, .seq_cst, .seq_cst)) |_| {
+                        @panic("todo");
+                    }
+                    self.result = null;
+                    return Awaiter.AwaitSuspendResult{ .never_suspend = {} };
+                }
                 if (channel.peekHead()) |head| {
                     switch (head.operation) {
                         .send => |*send| {
@@ -97,14 +104,14 @@ pub fn SelectAwaiter(Result: type) type {
                                 true,
                                 .seq_cst,
                                 .seq_cst,
-                            ) == null) {
-                                const sender = send.awaiter();
-                                self.result = sender.value.*;
-                                return Awaiter.AwaitSuspendResult{
-                                    .symmetric_transfer_next = sender.fiber,
-                                };
+                            )) |_| {
+                                @panic("TODO");
                             }
-                            return Awaiter.AwaitSuspendResult{ .never_suspend = {} };
+                            const sender = send.awaiter();
+                            self.result = sender.value.*;
+                            return Awaiter.AwaitSuspendResult{
+                                .symmetric_transfer_next = sender.fiber,
+                            };
                         },
                         else => @panic("todo"),
                     }
