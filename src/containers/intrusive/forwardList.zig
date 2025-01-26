@@ -101,6 +101,29 @@ pub fn IntrusiveForwardList(T: type) type {
             self.count = 0;
         }
 
+        const FindPreviousError = error{
+            node_not_found,
+        };
+
+        pub fn findPrevious(self: *List, target: *T) FindPreviousError!?*T {
+            if (self.tail) |tail| {
+                if (tail.parentPtr(T) == target) {
+                    // head == tail == target
+                    return null;
+                }
+                var next: ?*Node = tail;
+                while (next) |current| : (next = current.next) {
+                    if (current.next) |n| {
+                        if (n.parentPtr(T) == target) {
+                            return current.parentPtr(T);
+                        }
+                    }
+                }
+                return FindPreviousError.node_not_found;
+            }
+            return FindPreviousError.node_not_found;
+        }
+
         pub fn print(self: *List) void {
             std.debug.print(
                 "printing intrusive list {*}\n",

@@ -11,35 +11,9 @@ const channel_ = @import("../main.zig");
 const Channel = channel_.Channel;
 const ChannelLike = channel_.Channellike;
 const QueueElement = channel_.QueueElement;
-
-// fn AnyChannel(T: type) type {
-//     return union(enum) {
-//         const Self = @This();
-//         buffered: *Channel(T).Buffered,
-//         rendezvous: *Channel(T),
-
-//         pub fn fromRaw(channel_ptr: anytype) Self {
-//             return switch (@TypeOf(channel_ptr.*)) {
-//                 Channel(T).Buffered => Self{
-//                     .buffered = channel_ptr,
-//                 },
-//                 Channel(T) => Self{
-//                     .rendezvous = channel_ptr,
-//                 },
-//                 else => |UnknownChannel| @compileError(std.fmt.comptimePrint(
-//                     "Unsupported channel type {s}}",
-//                     .{@typeName(UnknownChannel)},
-//                 )),
-//             };
-//         }
-//     };
-// }
-
-// pub fn SelectOperation(Result: type) type {
-//     return struct {
-//         channel: AnyChannel(Result),
-//     };
-// }
+const fault = @import("../../../fault/main.zig");
+const stdlike = fault.stdlike;
+const Atomic = stdlike.atomic.Value;
 
 //TODO: support more than 2 channels
 //TODO: support sending to channels in select also
@@ -79,6 +53,12 @@ pub fn select(T: type) *const fn (a: *Channel(T), b: *Channel(T)) ?T {
 pub fn SelectAwaiter(Result: type) type {
     return struct {
         const Self = @This();
+        // Used for consensus.
+        // Note that this actually does not need to be atomic, because
+        // any fiber which references this value will have the necessary locks.
+        // However, we use Atomic here in preparation for lock-free select in the
+        // future.
+        result_set: Atomic(bool) = .init(false),
         result: Result = undefined,
         fiber: *Fiber = undefined,
         locks: []const *SpinLock.Guard,
@@ -109,18 +89,27 @@ pub fn SelectAwaiter(Result: type) type {
             for (self.channels) |channel| {
                 if (channel.peekHead()) |head| {
                     switch (head.operation) {
-                        .send => |sender| {
+                        .send => |*send| {
                             defer _ = channel.parked_fibers.popFront();
-                            self.result = sender.value.*;
-                            return Awaiter.AwaitSuspendResult{
-                                .symmetric_transfer_next = sender.fiber,
-                            };
+                            // TODO
+                            if (self.result_set.cmpxchgStrong(
+                                false,
+                                true,
+                                .seq_cst,
+                                .seq_cst,
+                            ) == null) {
+                                const sender = send.awaiter();
+                                self.result = sender.value.*;
+                                return Awaiter.AwaitSuspendResult{
+                                    .symmetric_transfer_next = sender.fiber,
+                                };
+                            }
+                            return Awaiter.AwaitSuspendResult{ .never_suspend = {} };
                         },
                         else => @panic("todo"),
                     }
                 }
             }
-
             // enqueue self on all channels
             for (self.channels, self.queue_elements) |channel, *queue_element| {
                 queue_element.* = QueueElement(Result){
@@ -134,7 +123,35 @@ pub fn SelectAwaiter(Result: type) type {
             return Awaiter.AwaitSuspendResult{ .always_suspend = {} };
         }
 
-        pub fn awaitResume(_: *Self, _: bool) void {}
+        pub fn awaitResume(self: *Self, suspended: bool) void {
+            if (!suspended) return;
+            for (self.locks) |*guard| {
+                guard.*.lock();
+            }
+            defer {
+                for (self.locks) |guard| {
+                    guard.unlock();
+                }
+            }
+            // dequeue self from unsuccessful channels
+            for (
+                self.channels,
+                self.queue_elements,
+            ) |
+                channel,
+                *queue_element,
+            | {
+                const parked_fibers = &channel.parked_fibers;
+                const next_element = queue_element.intrusive_list_node.next;
+                const previous_element = parked_fibers.findPrevious(queue_element) catch continue;
+                if (previous_element) |previous| {
+                    previous.intrusive_list_node.next = next_element;
+                } else {
+                    assert(parked_fibers.head == &queue_element.intrusive_list_node);
+                    _ = parked_fibers.popFront();
+                }
+            }
+        }
 
         pub fn awaiter(self: *Self) Awaiter {
             return Awaiter{
