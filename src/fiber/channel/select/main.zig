@@ -1,5 +1,6 @@
 const std = @import("std");
-const log = std.log.scoped(.fiber_channel);
+const builtin = @import("builtin");
+const log = std.log.scoped(.fiber_channel_select);
 const assert = std.debug.assert;
 const sync = @import("../../../sync/main.zig");
 const SpinLock = sync.Spinlock;
@@ -14,6 +15,9 @@ const QueueElement = channel_.QueueElement;
 const fault = @import("../../../fault/main.zig");
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
+
+/// TODO: reconsider where this should live
+threadlocal var random: ?std.Random.DefaultPrng = null;
 
 //TODO: support more than 2 channels
 //TODO: support sending to channels in select also
@@ -85,11 +89,20 @@ pub fn SelectAwaiter(Result: type) type {
                     guard.*.unlock();
                 }
             }
-            // TODO: randomize polling order
-            for (self.channels) |channel| {
+            var random_order = [_]u16{ 0, 1 };
+            randomize(&random_order);
+            for (&random_order) |i| {
+                const channel = self.channels[i];
                 if (channel.closed) {
-                    if (self.result_set.cmpxchgStrong(false, true, .seq_cst, .seq_cst)) |_| {
-                        @panic("todo");
+                    if (self.result_set.cmpxchgStrong(
+                        false,
+                        true,
+                        .seq_cst,
+                        .seq_cst,
+                    )) |_| {
+                        // cannot happen, because we're not enqueued yet,
+                        // so the node is not accessible to other fibers.
+                        unreachable;
                     }
                     self.result = null;
                     return Awaiter.AwaitSuspendResult{ .never_suspend = {} };
@@ -98,14 +111,15 @@ pub fn SelectAwaiter(Result: type) type {
                     switch (head.operation) {
                         .send => |*send| {
                             defer _ = channel.parked_fibers.popFront();
-                            // TODO
                             if (self.result_set.cmpxchgStrong(
                                 false,
                                 true,
                                 .seq_cst,
                                 .seq_cst,
                             )) |_| {
-                                @panic("TODO");
+                                // cannot happen, because we're not enqueued yet,
+                                // so the node is not accessible to other fibers.
+                                unreachable;
                             }
                             const sender = send.awaiter();
                             self.result = sender.value.*;
@@ -171,6 +185,25 @@ pub fn SelectAwaiter(Result: type) type {
     };
 }
 
+const MAX_SELECT_BRANCHES = std.math.maxInt(u16);
+
+fn randomize(slice: anytype) void {
+    if (random == null) {
+        const seed: u64 = blk: {
+            if (builtin.is_test) {
+                break :blk std.testing.random_seed;
+            }
+            var bytes: u64 = undefined;
+            std.posix.getrandom(std.mem.asBytes(&bytes)) catch unreachable;
+            break :blk bytes;
+        };
+        random = std.Random.DefaultPrng.init(seed);
+    }
+    if (random) |*r| {
+        r.random().shuffleWithIndex(u16, slice, u16);
+    }
+}
+
 fn SelectResult(A: anytype, B: anytype) type {
     for (&.{ A, B }) |T| {
         if (!isChannelLike(T)) {
@@ -181,7 +214,7 @@ fn SelectResult(A: anytype, B: anytype) type {
         }
     }
     const ValueTypeA = A.ValueType;
-    const ValueTypeB = A.ValueType;
+    const ValueTypeB = B.ValueType;
     if (ValueTypeA != ValueTypeB) {
         @compileError("TODO");
     }
