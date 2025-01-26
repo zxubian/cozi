@@ -22,7 +22,9 @@ const Awaiter = GenericAwait.Awaiter;
 
 const Sync = @import("./sync.zig");
 pub const Barrier = Sync.Barrier;
-pub const Channel = @import("./channel/main.zig").Channel;
+const Channel_ = @import("./channel/main.zig");
+pub const Channel = Channel_.Channel;
+pub const select = Channel_.select;
 pub const Event = Sync.Event;
 pub const Mutex = Sync.Mutex;
 pub const Strand = Sync.Strand;
