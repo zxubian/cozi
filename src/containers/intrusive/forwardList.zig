@@ -101,6 +101,25 @@ pub fn IntrusiveForwardList(T: type) type {
             self.count = 0;
         }
 
+        const RemoveError = error{
+            node_not_found,
+        };
+
+        pub fn remove(self: *List, target: *T) !void {
+            const node: *Node = &target.intrusive_list_node;
+            const previous = self.findPrevious(target) catch return RemoveError.node_not_found;
+            defer self.count -= 1;
+            if (previous) |p| {
+                p.intrusive_list_node.next = node.next;
+            } else {
+                assert(self.tail == node);
+                self.tail = node.next;
+            }
+            if (self.head == node) {
+                self.head = if (previous) |p| &p.intrusive_list_node else null;
+            }
+        }
+
         const FindPreviousError = error{
             node_not_found,
         };

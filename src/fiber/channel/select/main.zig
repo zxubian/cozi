@@ -89,6 +89,7 @@ pub fn SelectAwaiter(Result: type) type {
                     guard.*.unlock();
                 }
             }
+            // TODO: support >2 select branches
             var random_order = [_]u16{ 0, 1 };
             randomize(&random_order);
             for (&random_order) |i| {
@@ -110,7 +111,9 @@ pub fn SelectAwaiter(Result: type) type {
                 if (channel.peekHead()) |head| {
                     switch (head.operation) {
                         .send => |*send| {
-                            defer _ = channel.parked_fibers.popFront();
+                            defer {
+                                _ = channel.parked_fibers.popFront();
+                            }
                             if (self.result_set.cmpxchgStrong(
                                 false,
                                 true,
@@ -127,7 +130,7 @@ pub fn SelectAwaiter(Result: type) type {
                                 .symmetric_transfer_next = sender.fiber,
                             };
                         },
-                        else => @panic("todo"),
+                        else => continue,
                     }
                 }
             }

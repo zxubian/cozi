@@ -89,6 +89,18 @@ fn SendAwaiter(T: type) type {
                         };
                     },
                     .select_receive => |receiver| {
+                        defer {
+                            for (
+                                receiver.channels,
+                                receiver.queue_elements,
+                            ) |peer_channel, *queue_element| {
+                                if (peer_channel == channel) {
+                                    _ = channel.parked_fibers.popFront();
+                                } else {
+                                    peer_channel.parked_fibers.remove(queue_element) catch unreachable;
+                                }
+                            }
+                        }
                         if (receiver.result_set.cmpxchgStrong(
                             false,
                             true,
@@ -159,8 +171,7 @@ fn ReceiveAwaiter(T: type) type {
                             .symmetric_transfer_next = sender.fiber,
                         };
                     },
-                    .receive => {},
-                    .select_receive => @panic("todo - select receive in receive awaiter"),
+                    .receive, .select_receive => {},
                 }
             }
             channel.parked_fibers.pushBack(&self.queue_element);
@@ -296,7 +307,12 @@ pub fn Channel(T: type) type {
                             receiver.fiber.scheduleSelf();
                         },
                         .select_receive => |selector| {
-                            if (selector.result_set.cmpxchgStrong(false, true, .seq_cst, .seq_cst)) |_| {
+                            if (selector.result_set.cmpxchgStrong(
+                                false,
+                                true,
+                                .seq_cst,
+                                .seq_cst,
+                            )) |_| {
                                 continue;
                             }
                             selector.result = null;
