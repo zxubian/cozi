@@ -78,6 +78,10 @@ fn SendAwaiter(T: type) type {
             defer self.guard.unlock();
             const channel = self.channel;
             if (channel.peekHead()) |head| {
+                log.debug(
+                    "{*}: saw {s} as head of operation queue",
+                    .{ self, @tagName(std.meta.activeTag(head.operation)) },
+                );
                 switch (head.operation) {
                     .send => {},
                     .receive => |*receive| {
@@ -89,25 +93,17 @@ fn SendAwaiter(T: type) type {
                         };
                     },
                     .select_receive => |receiver| {
-                        defer {
-                            for (
-                                receiver.channels,
-                                receiver.queue_elements,
-                            ) |peer_channel, *queue_element| {
-                                if (peer_channel == channel) {
-                                    _ = channel.parked_fibers.popFront();
-                                } else {
-                                    peer_channel.parked_fibers.remove(queue_element) catch unreachable;
-                                }
-                            }
-                        }
                         if (receiver.result_set.cmpxchgStrong(
                             false,
                             true,
                             .seq_cst,
                             .seq_cst,
                         ) == null) {
-                            receiver.*.result = self.value.*;
+                            defer _ = channel.parked_fibers.popFront();
+                            receiver.*.result = .{
+                                .channel_index = receiver.findChannelIndex(channel).?,
+                                .value = self.value.*,
+                            };
                             return Awaiter.AwaitSuspendResult{
                                 .symmetric_transfer_next = receiver.fiber,
                             };
@@ -115,6 +111,7 @@ fn SendAwaiter(T: type) type {
                     },
                 }
             }
+            log.debug("{*}: will suspend", .{self});
             channel.parked_fibers.pushBack(&self.queue_element);
             return Awaiter.AwaitSuspendResult{ .always_suspend = {} };
         }
@@ -179,7 +176,7 @@ fn ReceiveAwaiter(T: type) type {
         }
 
         pub fn awaitReady(self: *Self) bool {
-            if (self.channel.closed) {
+            if (self.channel.closed.load(.seq_cst)) {
                 self.result = null;
                 return true;
             }
@@ -204,7 +201,7 @@ pub fn Channel(T: type) type {
         const Impl = @This();
 
         lock: Spinlock = .{},
-        closed: bool = false,
+        closed: Atomic(bool) = .init(false),
         parked_fibers: Queue(QueueElement(T)) = .{},
 
         /// Parks fiber until rendezvous is finished and
@@ -213,7 +210,7 @@ pub fn Channel(T: type) type {
             var guard = self.lock.guard();
             guard.lock();
             defer guard.unlock();
-            if (self.closed) {
+            if (self.closed.load(.seq_cst)) {
                 std.debug.panic("send on closed channel", .{});
             }
             var awaiter: SendAwaiter(T) = .{
@@ -244,19 +241,27 @@ pub fn Channel(T: type) type {
             return awaiter.result;
         }
 
-        pub fn close(self: *Impl) void {
+        pub const TryCloseError = error{
+            already_closed,
+        };
+
+        pub fn tryClose(self: *Impl) TryCloseError!void {
             var guard = self.lock.guard();
             guard.lock();
             defer guard.unlock();
-            if (self.closed) {
-                std.debug.panic("closing an already closed channel", .{});
+            if (self.closed.cmpxchgStrong(false, true, .seq_cst, .seq_cst)) |_| {
+                return TryCloseError.already_closed;
             }
-            self.closed = true;
             var awaiter: CloseAwaiter = .{
                 .channel = self,
                 .guard = &guard,
             };
             Await(&awaiter);
+        }
+
+        pub fn close(self: *Impl) void {
+            self.tryClose() catch
+                std.debug.panic("closing an already closed channel", .{});
         }
 
         pub fn peekHead(self: *Impl) ?*QueueElement(T) {
@@ -315,7 +320,10 @@ pub fn Channel(T: type) type {
                             )) |_| {
                                 continue;
                             }
-                            selector.result = null;
+                            selector.result = .{
+                                .channel_index = selector.findChannelIndex(channel).?,
+                                .value = null,
+                            };
                             selector.fiber.scheduleSelf();
                         },
                         else => unreachable,

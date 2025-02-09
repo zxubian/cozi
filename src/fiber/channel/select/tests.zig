@@ -1,6 +1,5 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const log = std.log.scoped(.fiber_channel);
 const testing = std.testing;
 const fault_injection_builtin = @import("zig_async_fault_injection");
 
@@ -826,82 +825,94 @@ test "Select - select receive then receive" {
     try testing.expect(ctx.selector_done);
 }
 
-// test "Select - stress" {
-//     if (builtin.single_threaded) {
-//         return error.SkipZigTest;
-//     }
-//     const cpu_count = try std.Thread.getCpuCount();
-//     var tp: ThreadPool = try .init(cpu_count, testing.allocator);
-//     defer tp.deinit();
-//     try tp.start();
-//     defer tp.stop();
+test "Select - stress" {
+    if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
+    const cpu_count = try std.Thread.getCpuCount();
+    var tp: ThreadPool = try .init(cpu_count, testing.allocator);
+    defer tp.deinit();
+    try tp.start();
+    defer tp.stop();
 
-//     const Ctx = struct {
-//         channel: Channel(usize),
-//         senders_done: Atomic(usize) = .init(0),
-//         receivers_done: Atomic(usize) = .init(0),
-//         total_message_count: Atomic(usize) = .init(0),
-//         wait_group: std.Thread.WaitGroup,
+    const messages_per_sender = 125;
+    const selector_count = 125;
+    const sender_count = 125;
+    const total_message_count = messages_per_sender * sender_count;
+    const messages_per_channel = total_message_count / 2;
 
-//         target_count: usize,
+    const allocator = testing.allocator;
 
-//         pub fn sender(ctx: *@This(), id: usize, messages_per_sender: usize) !void {
-//             for (0..messages_per_sender) |i| {
-//                 ctx.channel.send(id * messages_per_sender + i);
-//             }
-//             if (ctx.total_message_count.fetchAdd(
-//                 messages_per_sender,
-//                 .seq_cst,
-//             ) + messages_per_sender == ctx.target_count) {
-//                 ctx.channel.close();
-//             }
-//             _ = ctx.senders_done.fetchAdd(1, .seq_cst);
-//             ctx.wait_group.finish();
-//         }
+    const Ctx = struct {
+        channels: [2]Channel(usize) = [_]Channel(usize){.{}} ** 2,
+        wait_group: std.Thread.WaitGroup = .{},
+        sent_message_count: [2]Atomic.Value(usize) = [_]Atomic.Value(usize){.init(0)} ** 2,
+        received_message_count: Atomic.Value(usize) = .init(0),
+        senders_done: Atomic.Value(usize) = .init(0),
+        selectors_done: Atomic.Value(usize) = .init(0),
 
-//         pub fn receiver(ctx: *@This()) !void {
-//             while (ctx.channel.receive()) |_| {}
-//             _ = ctx.receivers_done.fetchAdd(1, .seq_cst);
-//             ctx.wait_group.finish();
-//         }
-//     };
+        pub fn sender(ctx: *@This(), id: usize) !void {
+            const channel: *Channel(usize) = &ctx.channels[id % 2];
+            for (0..messages_per_sender) |i| {
+                channel.send(id * messages_per_sender + i);
+            }
+            if (ctx.sent_message_count[id % 2].fetchAdd(
+                messages_per_sender,
+                .seq_cst,
+            ) + messages_per_sender == messages_per_channel) {
+                channel.tryClose() catch {};
+            }
+            _ = ctx.senders_done.fetchAdd(1, .seq_cst);
+            ctx.wait_group.finish();
+        }
 
-//     const receiver_count = 100;
-//     const sender_count = 100;
-//     const messages_per_sender = 10000;
+        pub fn selector(ctx: *@This(), id: usize) !void {
+            while (ctx.received_message_count.load(.seq_cst) < total_message_count) {
+                if (Select(usize)(&ctx.channels[id % 2], &ctx.channels[(id + 1) % 2]) == null) {
+                    Fiber.yield();
+                    if (ctx.channels[0].closed.load(.seq_cst) and ctx.channels[1].closed.load(.seq_cst)) {
+                        break;
+                    }
+                } else {
+                    _ = ctx.received_message_count.fetchAdd(1, .seq_cst);
+                }
+            }
+            _ = ctx.selectors_done.fetchAdd(1, .seq_cst);
+            ctx.wait_group.finish();
+        }
+    };
 
-//     var ctx: Ctx = .{
-//         .channel = .{},
-//         .target_count = sender_count * messages_per_sender,
-//         .wait_group = .{},
-//     };
+    var ctx: Ctx = .{};
 
-//     ctx.wait_group.startMany(sender_count + receiver_count);
+    ctx.wait_group.startMany(sender_count + selector_count);
 
-//     for (0..receiver_count) |_| {
-//         try Fiber.go(
-//             Ctx.receiver,
-//             .{&ctx},
-//             testing.allocator,
-//             tp.executor(),
-//         );
-//     }
+    for (0..selector_count) |i| {
+        try Fiber.goWithNameFmt(
+            Ctx.selector,
+            .{ &ctx, i },
+            allocator,
+            tp.executor(),
+            "Selector#{}",
+            .{i},
+        );
+    }
 
-//     for (0..sender_count) |i| {
-//         try Fiber.go(
-//             Ctx.sender,
-//             .{
-//                 &ctx,
-//                 i,
-//                 messages_per_sender,
-//             },
-//             testing.allocator,
-//             tp.executor(),
-//         );
-//     }
+    for (0..sender_count) |i| {
+        try Fiber.goWithNameFmt(
+            Ctx.sender,
+            .{
+                &ctx,
+                i,
+            },
+            allocator,
+            tp.executor(),
+            "Sender#{}",
+            .{i},
+        );
+    }
 
-//     ctx.wait_group.wait();
+    ctx.wait_group.wait();
 
-//     try testing.expectEqual(sender_count, ctx.senders_done.load(.seq_cst));
-//     try testing.expectEqual(receiver_count, ctx.receivers_done.load(.seq_cst));
-// }
+    try testing.expectEqual(sender_count, ctx.senders_done.load(.seq_cst));
+    try testing.expectEqual(selector_count, ctx.selectors_done.load(.seq_cst));
+}

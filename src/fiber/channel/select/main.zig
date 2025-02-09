@@ -33,14 +33,18 @@ pub fn select(T: type) *const fn (a: *Channel(T), b: *Channel(T)) ?T {
             // by sorting on their pointer addresses.
             // Then, acquire spinlocks in that order.
 
-            // get locks for all channels in order
+            log.debug("About to select from: {*}, {*}", .{ a, b });
+            // --- get locks for all channels in order ---
             const a_int = @intFromPtr(a);
             const b_int = @intFromPtr(b);
-            var first_lock: SpinLock.Guard = if (a_int < b_int) a.lock.guard() else b.lock.guard();
-            var second_lock: SpinLock.Guard = if (a_int < b_int) b.lock.guard() else a.lock.guard();
+            const a_first = a_int < b_int;
+            var first_lock: SpinLock.Guard = if (a_first) a.lock.guard() else b.lock.guard();
+            var second_lock: SpinLock.Guard = if (a_first) b.lock.guard() else a.lock.guard();
+            log.debug("Acquiring locks in order: {*} -> {*}", .{ if (a_first) a else b, if (a_first) b else a });
             first_lock.lock();
             second_lock.lock();
-            //
+            log.debug("all locks acquired", .{});
+            // ---
             const Result = T;
             var queue_elements: [2]QueueElement(T) = [_]QueueElement(T){undefined} ** 2;
             var awaiter: SelectAwaiter(T) = .{
@@ -48,10 +52,19 @@ pub fn select(T: type) *const fn (a: *Channel(T), b: *Channel(T)) ?T {
                 .channels = &[_]*Channel(Result){ a, b },
                 .queue_elements = &queue_elements,
             };
+            log.debug("about to await on {*}", .{&awaiter});
             Await(&awaiter);
-            return awaiter.result;
+            log.debug("returned from await. Result = {}", .{awaiter.result});
+            return awaiter.result.value;
         }
     }.select;
+}
+
+pub fn ResultType(T: type) type {
+    return struct {
+        channel_index: usize,
+        value: ?T,
+    };
 }
 
 pub fn SelectAwaiter(Result: type) type {
@@ -63,7 +76,7 @@ pub fn SelectAwaiter(Result: type) type {
         // However, we use Atomic here in preparation for lock-free select in the
         // future.
         result_set: Atomic(bool) = .init(false),
-        result: ?Result = undefined,
+        result: ResultType(Result) = undefined,
         fiber: *Fiber = undefined,
         locks: []const *SpinLock.Guard,
         channels: []const *Channel(Result),
@@ -83,18 +96,31 @@ pub fn SelectAwaiter(Result: type) type {
         ) Awaiter.AwaitSuspendResult {
             const self: *Self = @alignCast(@ptrCast(ctx));
             self.fiber = @alignCast(@ptrCast(handle));
-            // pass 1: poll all channels to see if somebody is ready
             defer {
+                log.debug("{*}: releasing all locks", .{self});
                 for (self.locks) |*guard| {
                     guard.*.unlock();
                 }
             }
             // TODO: support >2 select branches
+            // pass 1: poll all channels to see if somebody is ready
             var random_order = [_]u16{ 0, 1 };
             randomize(&random_order);
+            log.debug(
+                "{*}: will poll channels in randomized order: {any}",
+                .{ self, random_order },
+            );
             for (&random_order) |i| {
                 const channel = self.channels[i];
-                if (channel.closed) {
+                log.debug(
+                    "{*}: polling channel#{} {*}",
+                    .{ self, i, channel },
+                );
+                if (channel.closed.load(.seq_cst)) {
+                    log.debug(
+                        "{*}: {*} is closed",
+                        .{ self, channel },
+                    );
                     if (self.result_set.cmpxchgStrong(
                         false,
                         true,
@@ -105,12 +131,19 @@ pub fn SelectAwaiter(Result: type) type {
                         // so the node is not accessible to other fibers.
                         unreachable;
                     }
-                    self.result = null;
+                    self.result = .{
+                        .channel_index = i,
+                        .value = null,
+                    };
                     return Awaiter.AwaitSuspendResult{ .never_suspend = {} };
                 }
                 if (channel.peekHead()) |head| {
                     switch (head.operation) {
                         .send => |*send| {
+                            log.debug(
+                                "{*}: head of queue of {*} was a sender",
+                                .{ self, channel },
+                            );
                             defer {
                                 _ = channel.parked_fibers.popFront();
                             }
@@ -125,7 +158,14 @@ pub fn SelectAwaiter(Result: type) type {
                                 unreachable;
                             }
                             const sender = send.awaiter();
-                            self.result = sender.value.*;
+                            self.result = .{
+                                .channel_index = i,
+                                .value = sender.value.*,
+                            };
+                            log.debug(
+                                "{*}: will return: {}",
+                                .{ self, self.result },
+                            );
                             return Awaiter.AwaitSuspendResult{
                                 .symmetric_transfer_next = sender.fiber,
                             };
@@ -134,6 +174,10 @@ pub fn SelectAwaiter(Result: type) type {
                     }
                 }
             }
+            log.debug(
+                "{*}: all channels were empty. Will park self in all channels & wait for sender on any channel",
+                .{self},
+            );
             // enqueue self on all channels
             for (self.channels, self.queue_elements) |channel, *queue_element| {
                 queue_element.* = QueueElement(Result){
@@ -149,15 +193,18 @@ pub fn SelectAwaiter(Result: type) type {
 
         pub fn awaitResume(self: *Self, suspended: bool) void {
             if (!suspended) return;
+            log.debug("{*}: resume from suspend. Reacquire all locks", .{self});
             for (self.locks) |*guard| {
                 guard.*.lock();
             }
             defer {
+                log.debug("{*}: release all locks", .{self});
                 for (self.locks) |guard| {
                     guard.unlock();
                 }
             }
             // dequeue self from unsuccessful channels
+            log.debug("{*}: dequeue self from all channel waiting queues.", .{self});
             for (
                 self.channels,
                 self.queue_elements,
@@ -166,14 +213,7 @@ pub fn SelectAwaiter(Result: type) type {
                 *queue_element,
             | {
                 const parked_fibers = &channel.parked_fibers;
-                const next_element = queue_element.intrusive_list_node.next;
-                const previous_element = parked_fibers.findPrevious(queue_element) catch continue;
-                if (previous_element) |previous| {
-                    previous.intrusive_list_node.next = next_element;
-                } else {
-                    assert(parked_fibers.head == &queue_element.intrusive_list_node);
-                    _ = parked_fibers.popFront();
-                }
+                parked_fibers.remove(queue_element) catch continue;
             }
         }
 
@@ -184,6 +224,10 @@ pub fn SelectAwaiter(Result: type) type {
                     .await_suspend = awaitSuspend,
                 },
             };
+        }
+
+        pub fn findChannelIndex(self: *Self, channel: *Channel(Result)) ?usize {
+            return std.mem.indexOfScalar(*Channel(Result), self.channels, channel);
         }
     };
 }

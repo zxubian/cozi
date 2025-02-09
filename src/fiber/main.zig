@@ -62,6 +62,44 @@ pub fn go(
     );
 }
 
+pub fn goWithName(
+    comptime routine: anytype,
+    args: std.meta.ArgsTuple(@TypeOf(routine)),
+    allocator: Allocator,
+    executor: Executor,
+    name: [:0]const u8,
+) !void {
+    return goOptions(
+        routine,
+        args,
+        allocator,
+        executor,
+        .{
+            .fiber = .{
+                .name = name,
+            },
+        },
+    );
+}
+
+pub fn goWithNameFmt(
+    comptime routine: anytype,
+    args: std.meta.ArgsTuple(@TypeOf(routine)),
+    allocator: Allocator,
+    executor: Executor,
+    comptime name_fmt: [:0]const u8,
+    name_fmt_args: anytype,
+) !void {
+    var name_buf: [MAX_FIBER_NAME_LENGTH_BYTES]u8 = undefined;
+    return goWithName(
+        routine,
+        args,
+        allocator,
+        executor,
+        try std.fmt.bufPrintZ(&name_buf, name_fmt, name_fmt_args),
+    );
+}
+
 pub const Options = struct {
     stack_size: usize = Stack.DEFAULT_SIZE_BYTES,
     fiber: FiberOptions = .{},
@@ -189,9 +227,11 @@ pub fn yield() void {
     }
 }
 
-fn yield_(_: *Fiber) void {
+fn yield_(self: *Fiber) void {
+    log.debug("{s} about to yield", .{self.name});
     var yield_awaiter: YieldAwaiter = .{};
     Await(&yield_awaiter);
+    log.debug("{s}: resume from yield", .{self.name});
 }
 
 pub fn @"suspend"(self: *Fiber, awaiter: Awaiter) void {
