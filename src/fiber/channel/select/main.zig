@@ -42,8 +42,7 @@ fn Select(Cases: type) type {
             const Self = @This();
 
             // --- init parameters ---
-            locks: []Spinlock.Guard,
-            mutex: Spinlock,
+            locks: []*Spinlock,
             cases: Cases,
 
             // --- state ---
@@ -64,11 +63,10 @@ fn Select(Cases: type) type {
             ) Awaiter.AwaitSuspendResult {
                 const self: *Self = @alignCast(@ptrCast(ctx));
                 self.fiber = @alignCast(@ptrCast(handle));
-                var guard = self.mutex.guard();
-                guard.lock();
+                var guards: [case_count]Spinlock.Guard = undefined;
+                lockAll(self.locks, &guards);
                 defer {
-                    unlockAll(self.locks);
-                    guard.unlock();
+                    unlockAll(&guards);
                 }
                 // set up all opertations & pointers
                 inline for (0..case_count) |case_idx| {
@@ -168,16 +166,14 @@ fn Select(Cases: type) type {
 
             pub fn awaitResume(self: *Self, suspended: bool) void {
                 if (!suspended) unreachable;
-                var guard = self.mutex.guard();
-                guard.lock();
-                defer guard.unlock();
                 log.debug(
                     "{s} {s}: resume from suspend",
                     .{ self.fiber.name, log_name },
                 );
-                lockAll(self.locks);
+                var guards: [case_count]Spinlock.Guard = undefined;
+                lockAll(self.locks, &guards);
                 defer {
-                    unlockAll(self.locks);
+                    unlockAll(&guards);
                 }
                 // dequeue self from unsuccessful channels
                 log.debug(
@@ -237,22 +233,12 @@ fn Select(Cases: type) type {
             // by sorting on their pointer addresses.
             // Then, acquire spinlocks in that order.
             // --- get locks for all channels in order ---
-            var locks: [case_count]Spinlock.Guard = undefined;
+            var locks: [case_count]*Spinlock = undefined;
             sortLocks(cases, &locks);
-            log.debug(
-                "{s}: about to acquire all locks for {s}",
-                .{ fiber.name, log_name },
-            );
-            lockAll(&locks);
-            log.debug(
-                "{s}:  acquired all locks for {s}",
-                .{ fiber.name, log_name },
-            );
             var awaiter: SelectAwaiter = .{
                 .locks = &locks,
                 .cases = cases,
                 .operations = &operations,
-                .mutex = .{},
             };
             log.debug(
                 "{s} {s} about to await on {*}",
@@ -272,7 +258,7 @@ fn Select(Cases: type) type {
     };
 }
 
-fn sortLocks(cases: anytype, locks: []Spinlock.Guard) void {
+fn sortLocks(cases: anytype, locks: []*Spinlock) void {
     if (locks.len != 2) {
         @panic("TODO");
     }
@@ -281,15 +267,17 @@ fn sortLocks(cases: anytype, locks: []Spinlock.Guard) void {
     const a_int = @intFromPtr(a);
     const b_int = @intFromPtr(b);
     const a_first = a_int < b_int;
-    locks[0] = if (a_first) a.lock.guard() else b.lock.guard();
-    locks[1] = if (a_first) b.lock.guard() else a.lock.guard();
+    locks[0] = if (a_first) &a.lock else &b.lock;
+    locks[1] = if (a_first) &b.lock else &a.lock;
 }
 
 fn lockAll(
-    locks: []Spinlock.Guard,
+    locks: []*Spinlock,
+    guards: []Spinlock.Guard,
 ) void {
-    for (locks) |*lock| {
-        lock.*.lock();
+    for (locks, guards) |lock, *guard| {
+        guard.* = lock.guard();
+        guard.*.lock();
     }
 }
 
