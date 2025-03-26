@@ -34,8 +34,7 @@ pub fn select(cases: anytype) SelectResultType(@TypeOf(cases)) {
 
 fn Select(Cases: type) type {
     const case_count = meta.caseCount(Cases);
-    // const log_name = meta.selectName(Cases);
-    const log_name = "";
+    const log_name = meta.selectName(Cases);
     return struct {
         const Result = SelectResultType(Cases);
 
@@ -68,20 +67,8 @@ fn Select(Cases: type) type {
                 var guard = self.mutex.guard();
                 guard.lock();
                 defer {
-                    log.debug("{s} {s}: releasing all locks", .{ self.fiber.name, log_name });
-                    // var thread_name_buf: [std.Thread.max_name_len:0]u8 = undefined;
-                    // const thread_name = ThreadExt.nameOrHandle(
-                    //     ThreadExt.getCurrentThread().?,
-                    //     &thread_name_buf,
-                    // ) catch unreachable;
-                    const thread_name = "";
-                    unlockAll(
-                        self.locks,
-                        self.fiber.name,
-                        thread_name,
-                    );
+                    unlockAll(self.locks);
                     guard.unlock();
-                    log.debug("{s} {s}: finished releasing all locks", .{ self.fiber.name, log_name });
                 }
                 // set up all opertations & pointers
                 inline for (0..case_count) |case_idx| {
@@ -133,7 +120,7 @@ fn Select(Cases: type) type {
                             );
                             if (channel.closed.load(.seq_cst)) {
                                 log.debug(
-                                    "{s}{s}: {*} is closed",
+                                    "{s} {s}: {*} is closed",
                                     .{ self.fiber.name, log_name, channel },
                                 );
                                 assert(this_receiver.trySet(T, null));
@@ -154,10 +141,6 @@ fn Select(Cases: type) type {
                                         }
                                         const value: *const T = @alignCast(@ptrCast(send.value));
                                         assert(this_receiver.trySet(T, value.*));
-                                        // log.debug(
-                                        //     "{s} {s}: will return: {}",
-                                        //     .{ self.fiber.name, log_name, self.result },
-                                        // );
                                         assert(send.value_taken.cmpxchgStrong(false, true, .seq_cst, .seq_cst) == null);
                                         send.fiber.scheduleSelf();
                                         return .never_suspend;
@@ -184,35 +167,17 @@ fn Select(Cases: type) type {
             }
 
             pub fn awaitResume(self: *Self, suspended: bool) void {
-                const thread_name = "";
-                // // var thread_name_buf: [std.Thread.max_name_len:0]u8 = undefined;
-                // const thread_name = ThreadExt.nameOrHandle(
-                //     ThreadExt.getCurrentThread().?,
-                //     &thread_name_buf,
-                // ) catch unreachable;
+                if (!suspended) unreachable;
                 var guard = self.mutex.guard();
                 guard.lock();
                 defer guard.unlock();
-                if (!suspended) {
-                    log.debug(
-                        "{s} {s}: resume without suspend.",
-                        .{ self.fiber.name, log_name },
-                    );
-                    return;
-                }
                 log.debug(
-                    "{s} {s}: resume from suspend on {s}",
-                    .{ self.fiber.name, log_name, thread_name },
+                    "{s} {s}: resume from suspend",
+                    .{ self.fiber.name, log_name },
                 );
-                lockAll(self.locks, self.fiber.name, thread_name);
+                lockAll(self.locks);
                 defer {
-                    log.debug("{s} {s}: release all locks on resume", .{ self.fiber.name, log_name });
-                    unlockAll(
-                        self.locks,
-                        self.fiber.name,
-                        thread_name,
-                    );
-                    log.debug("{s} {s}: finished releasing all locks on resume", .{ self.fiber.name, log_name });
+                    unlockAll(self.locks);
                 }
                 // dequeue self from unsuccessful channels
                 log.debug(
@@ -234,9 +199,7 @@ fn Select(Cases: type) type {
                         });
                         switch (operation.operation) {
                             .select_receive => |select_receive| {
-                                // TODO: spurrious error here
                                 assert(select_receive.result_set.load(.seq_cst));
-                                // log.debug("{}", .{operation});
                                 const result: *?T = @alignCast(@ptrCast(select_receive.result_ptr));
                                 self.result = @unionInit(
                                     Result,
@@ -276,30 +239,14 @@ fn Select(Cases: type) type {
             // --- get locks for all channels in order ---
             var locks: [case_count]Spinlock.Guard = undefined;
             sortLocks(cases, &locks);
-            // var thread_name_buf: [std.Thread.max_name_len:0]u8 = undefined;
-            // const thread_name = ThreadExt.nameOrHandle(
-            //     ThreadExt.getCurrentThread().?,
-            //     &thread_name_buf,
-            // ) catch unreachable;
-            const thread_name = "";
             log.debug(
-                "{s} (running on {s})  about to acquire all locks for select",
-                .{
-                    fiber.name,
-                    thread_name,
-                },
+                "{s}: about to acquire all locks for {s}",
+                .{ fiber.name, log_name },
             );
-            lockAll(
-                &locks,
-                Fiber.current().?.name,
-                thread_name,
-            );
+            lockAll(&locks);
             log.debug(
-                "{s} (running on {s})  acquired all locks for select",
-                .{
-                    fiber.name,
-                    thread_name,
-                },
+                "{s}:  acquired all locks for {s}",
+                .{ fiber.name, log_name },
             );
             var awaiter: SelectAwaiter = .{
                 .locks = &locks,
@@ -340,38 +287,18 @@ fn sortLocks(cases: anytype, locks: []Spinlock.Guard) void {
 
 fn lockAll(
     locks: []Spinlock.Guard,
-    fiber_name: []const u8,
-    thread_name: []const u8,
 ) void {
     for (locks) |*lock| {
-        log.debug(
-            "{s} ({s}) about to grab lock {*}",
-            .{
-                fiber_name,
-                thread_name,
-                @as(*anyopaque, @ptrCast(lock.spinlock)),
-            },
-        );
         lock.*.lock();
     }
 }
 
 fn unlockAll(
     locks: []Spinlock.Guard,
-    fiber_name: []const u8,
-    thread_name: []const u8,
 ) void {
     var i: usize = locks.len - 1;
     while (i < locks.len) : (i -%= 1) {
         const lock = &locks[i];
-        log.debug(
-            "{s} ({s}) about to release lock {*}",
-            .{
-                fiber_name,
-                thread_name,
-                @as(*anyopaque, @ptrCast(lock.spinlock)),
-            },
-        );
         lock.*.unlock();
     }
 }

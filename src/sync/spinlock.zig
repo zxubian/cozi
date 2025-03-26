@@ -41,41 +41,20 @@ pub const Guard = struct {
 fn lock(self: *Spinlock, node: *Node) void {
     if (self.tail.swap(node, .seq_cst)) |prev_tail| {
         assert(prev_tail != node);
-        // log.debug("{s}: {*} waiting on {*}", .{
-        //     if (Fiber.current()) |f| f.name else "(no fiber)",
-        //     node,
-        //     prev_tail,
-        // });
         prev_tail.next.store(node, .seq_cst);
         while (!node.is_owner.load(.seq_cst)) {
             assert(self.tail.load(.seq_cst) != null);
             std.atomic.spinLoopHint();
         }
-        // log.debug("{s}: unlocked! {*}", .{ Fiber.current().?.name, node });
     } else {
         // We grabbed the lock with no contention.
         // Do not store node.is_owner = true,
         // because nobody will ever reference it.
-        // log.debug(
-        //     "{s}: lock: -> {*} with no contention",
-        //     .{
-        //         if (Fiber.current()) |f| f.name else "(no fiber)",
-        //         node,
-        //     },
-        // );
     }
 }
 
 fn unlock(self: *Spinlock, node: *Node) void {
     if (node.next.load(.seq_cst)) |next| {
-        // log.debug(
-        //     "{s} unlock: {*} -> {*}",
-        //     .{
-        //         if (Fiber.current()) |f| f.name else "(no fiber)",
-        //         node,
-        //         next,
-        //     },
-        // );
         next.is_owner.store(true, .seq_cst);
     } else {
         @branchHint(.likely);
@@ -98,10 +77,9 @@ fn unlock(self: *Spinlock, node: *Node) void {
                 assert(self.tail.load(.seq_cst) != null);
                 std.atomic.spinLoopHint();
             }
-            // log.debug("unlock: {*} -> {*}", .{ node, next.? });
             next.?.is_owner.store(true, .seq_cst);
         } else {
-            // log.debug("unlock: {*} -> null without contention", .{node});
+            // Unlocked without contention.
         }
     }
 }
