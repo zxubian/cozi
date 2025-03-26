@@ -2,6 +2,7 @@ const std = @import("std");
 pub const Awaiter = @import("./awaiter.zig");
 // TODO: eliminate dependency on fiber here
 const Fiber = @import("../fiber/main.zig");
+const log = std.log.scoped(.@"await");
 
 /// Generic await algorithm
 /// https://lewissbaker.github.io/2017/11/17/understanding-operator-co-await
@@ -14,6 +15,7 @@ pub fn @"await"(awaitable: anytype) awaitReturnType(@TypeOf(awaitable.*)) {
         // awaiter here:
         const awaiter: Awaiter = awaitable.awaiter();
         const handle = getHandle();
+        log.debug("{s} about to suspend due to {s}", .{ handle.name, @typeName(@TypeOf(awaitable)) });
         handle.@"suspend"(awaiter);
         // --- resume ---
         return awaitable.awaitResume(true);

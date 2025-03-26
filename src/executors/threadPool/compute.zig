@@ -9,6 +9,7 @@ const fault = @import("../../fault/main.zig");
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
 const Allocator = std.mem.Allocator;
+const ThreadExt = @import("../../sync/main.zig").Thread;
 
 const Core = @import("../../core/main.zig");
 const Runnable = Core.Runnable;
@@ -80,6 +81,7 @@ fn threadEntryPoint(
     thread_pool.thread_start_barrier.finish();
     thread_pool.finish_init_barrier.wait();
     current_ = thread_pool;
+    ThreadExt.setCurrentThread(self);
     assert(current_.?.status.load(.seq_cst) != .not_started);
     var thread_pool_name_buf: [512]u8 = undefined;
     const name = std.fmt.bufPrint(

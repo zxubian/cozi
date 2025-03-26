@@ -2,13 +2,14 @@ const std = @import("std");
 const testing = std.testing;
 const builtin = @import("builtin");
 
-const WaitGroup = std.Thread.WaitGroup;
+const Thread = std.Thread;
+const WaitGroup = Thread.WaitGroup;
 const Executors = @import("../../executors/main.zig");
 const ThreadPool = Executors.ThreadPools.Compute;
 
 const Spinlock = @import("../spinlock.zig");
 
-test "basic" {
+test "Spinlock - basic" {
     var lock: Spinlock = .{};
     var a: u8 = 0;
     {
@@ -58,4 +59,65 @@ test "SpinLock - counter" {
 
     wait_group.wait();
     try testing.expect(ctx.counter == count);
+}
+
+test "Spinlock - deadlock" {
+    return error.SkipZigTest;
+    // const thread_count = 3;
+    // var tp: ThreadPool = try .init(thread_count, testing.allocator);
+    // defer tp.deinit();
+
+    // // A -> B -> C -> A
+
+    // const Ctx = struct {
+    //     lock_a: Spinlock = .{},
+    //     lock_b: Spinlock = .{},
+    //     lock_c: Spinlock = .{},
+
+    //     barrier: std.atomic.Value(usize) = .init(3),
+
+    //     pub fn A(ctx: *@This()) !void {
+    //         var a = ctx.lock_a.guard();
+    //         a.lock();
+    //         _ = ctx.barrier.fetchSub(1, .seq_cst);
+    //         while (ctx.barrier.load(.seq_cst) > 0) {
+    //             std.atomic.spinLoopHint();
+    //         }
+    //         var b = ctx.lock_c.guard();
+    //         b.lock();
+    //         while (true) {}
+    //     }
+
+    //     pub fn B(ctx: *@This()) !void {
+    //         var b = ctx.lock_b.guard();
+    //         b.lock();
+    //         _ = ctx.barrier.fetchSub(1, .seq_cst);
+    //         while (ctx.barrier.load(.seq_cst) > 0) {
+    //             std.atomic.spinLoopHint();
+    //         }
+    //         var c = ctx.lock_c.guard();
+    //         c.lock();
+    //         while (true) {}
+    //     }
+
+    //     pub fn C(ctx: *@This()) !void {
+    //         var c = ctx.lock_c.guard();
+    //         c.lock();
+    //         _ = ctx.barrier.fetchSub(1, .seq_cst);
+    //         while (ctx.barrier.load(.seq_cst) > 0) {
+    //             std.atomic.spinLoopHint();
+    //         }
+    //         var a = ctx.lock_a.guard();
+    //         a.lock();
+    //         while (true) {}
+    //     }
+    // };
+    // var ctx: Ctx = .{};
+    // const executor = tp.executor();
+    // executor.submit(Ctx.A, .{&ctx}, testing.allocator);
+    // executor.submit(Ctx.B, .{&ctx}, testing.allocator);
+    // executor.submit(Ctx.C, .{&ctx}, testing.allocator);
+    // try tp.start();
+    // defer tp.stop();
+    // while (true) {}
 }

@@ -3,8 +3,8 @@ const Injector = @This();
 const fault_injection_builtin = @import("zig_async_fault_injection");
 const Fiber = @import("../fiber/main.zig");
 
-const inject_frequency = 16;
-const sleep_time_ns = 10;
+const inject_frequency = 9;
+const sleep_time_ns = 1000;
 
 const uninited_state = std.math.maxInt(usize);
 state: std.atomic.Value(usize) = .init(uninited_state),

@@ -3,6 +3,7 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const Node = @import("../intrusive.zig").Node;
+const builtin = @import("builtin");
 
 pub fn IntrusiveForwardList(T: type) type {
     return struct {
@@ -25,6 +26,18 @@ pub fn IntrusiveForwardList(T: type) type {
 
         pub fn pushBack(self: *List, data: *T) void {
             const node: *Node = &data.intrusive_list_node;
+            if (builtin.mode == .Debug) {
+                var current: ?*Node = self.tail;
+                while (current) |c| : (current = c.next) {
+                    if (data == c.parentPtr(T)) {
+                        std.debug.panic("Attempting to add {*} to list {*} twice!", .{ data, self });
+                    }
+                }
+            }
+            defer {
+                assert(!self.isEmpty());
+                assert(self.tail.?.next != self.tail);
+            }
             defer self.count += 1;
             if (self.isEmpty()) {
                 // null <- node = head = tail
@@ -38,6 +51,9 @@ pub fn IntrusiveForwardList(T: type) type {
 
         pub fn pushFront(self: *List, data: *T) void {
             const node: *Node = &data.intrusive_list_node;
+            defer {
+                assert(!self.isEmpty());
+            }
             defer self.count += 1;
             node.next = null;
             if (self.isEmpty()) {
@@ -54,7 +70,11 @@ pub fn IntrusiveForwardList(T: type) type {
 
         pub fn popFront(self: *List) ?*T {
             switch (self.count) {
-                0 => return null,
+                0 => {
+                    assert(self.head == null);
+                    assert(self.tail == null);
+                    return null;
+                },
                 1 => {
                     defer self.count -= 1;
                     assert(self.head == self.tail);
@@ -76,13 +96,17 @@ pub fn IntrusiveForwardList(T: type) type {
                 },
                 else => {
                     defer self.count -= 1;
+                    assert(self.head != null);
                     assert(self.head != self.tail);
                     assert(self.tail.?.next != null);
                     const next_head: *Node = blk: {
                         var current: *Node = self.tail.?;
-                        break :blk while (current.next) |next| : (current = next) {
+                        while (current.next) |next| : (current = next) {
+                            assert(self.head != null);
+                            assert(self.head != self.tail);
+                            assert(self.tail.?.next != null);
                             if (next == self.head) {
-                                break current;
+                                break :blk current;
                             }
                         } else unreachable;
                     };
@@ -101,6 +125,48 @@ pub fn IntrusiveForwardList(T: type) type {
             self.count = 0;
         }
 
+        const RemoveError = error{
+            node_not_found,
+        };
+
+        pub fn remove(self: *List, target: *T) !void {
+            const node: *Node = &target.intrusive_list_node;
+            const previous = self.findPrevious(target) catch return RemoveError.node_not_found;
+            defer self.count -= 1;
+            if (previous) |p| {
+                p.intrusive_list_node.next = node.next;
+            } else {
+                assert(self.tail == node);
+                self.tail = node.next;
+            }
+            if (self.head == node) {
+                self.head = if (previous) |p| &p.intrusive_list_node else null;
+            }
+        }
+
+        const FindPreviousError = error{
+            node_not_found,
+        };
+
+        pub fn findPrevious(self: *List, target: *T) FindPreviousError!?*T {
+            if (self.tail) |tail| {
+                if (tail.parentPtr(T) == target) {
+                    // head == tail == target
+                    return null;
+                }
+                var next: ?*Node = tail;
+                while (next) |current| : (next = current.next) {
+                    if (current.next) |n| {
+                        if (n.parentPtr(T) == target) {
+                            return current.parentPtr(T);
+                        }
+                    }
+                }
+                return FindPreviousError.node_not_found;
+            }
+            return FindPreviousError.node_not_found;
+        }
+
         pub fn print(self: *List) void {
             std.debug.print(
                 "printing intrusive list {*}\n",
@@ -108,12 +174,14 @@ pub fn IntrusiveForwardList(T: type) type {
             );
             if (self.head) |head| {
                 var next = head.next;
+                std.debug.print("{?} -> ", .{head});
                 while (next != null) : (next = next.?.next) {
                     std.debug.print("{?} -> ", .{next});
                 }
             } else {
                 std.debug.print("{*}: empty\n", .{self});
             }
+            std.debug.print("\n", .{});
         }
     };
 }

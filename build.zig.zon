@@ -1,6 +1,7 @@
 .{
-    .name = "zig-async",
+    .name = .zig_async,
     .version = "0.0.0",
+    .fingerprint = 0x56d45aa7a03e1c13,
     .minimum_zig_version = "0.14.0-dev.909+f9f894200",
     .dependencies = .{},
     .paths = .{

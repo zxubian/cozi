@@ -22,7 +22,9 @@ const Awaiter = GenericAwait.Awaiter;
 
 const Sync = @import("./sync.zig");
 pub const Barrier = Sync.Barrier;
-pub const Channel = @import("./channel/main.zig").Channel;
+const Channel_ = @import("./channel/main.zig");
+pub const Channel = Channel_.Channel;
+pub const select = Channel_.select;
 pub const Event = Sync.Event;
 pub const Mutex = Sync.Mutex;
 pub const Strand = Sync.Strand;
@@ -57,6 +59,44 @@ pub fn go(
         allocator,
         executor,
         .{},
+    );
+}
+
+pub fn goWithName(
+    comptime routine: anytype,
+    args: std.meta.ArgsTuple(@TypeOf(routine)),
+    allocator: Allocator,
+    executor: Executor,
+    name: [:0]const u8,
+) !void {
+    return goOptions(
+        routine,
+        args,
+        allocator,
+        executor,
+        .{
+            .fiber = .{
+                .name = name,
+            },
+        },
+    );
+}
+
+pub fn goWithNameFmt(
+    comptime routine: anytype,
+    args: std.meta.ArgsTuple(@TypeOf(routine)),
+    allocator: Allocator,
+    executor: Executor,
+    comptime name_fmt: [:0]const u8,
+    name_fmt_args: anytype,
+) !void {
+    var name_buf: [MAX_FIBER_NAME_LENGTH_BYTES]u8 = undefined;
+    return goWithName(
+        routine,
+        args,
+        allocator,
+        executor,
+        try std.fmt.bufPrintZ(&name_buf, name_fmt, name_fmt_args),
     );
 }
 
@@ -187,9 +227,11 @@ pub fn yield() void {
     }
 }
 
-fn yield_(_: *Fiber) void {
+fn yield_(self: *Fiber) void {
+    log.debug("{s} about to yield", .{self.name});
     var yield_awaiter: YieldAwaiter = .{};
     Await(&yield_awaiter);
+    log.debug("{s}: resume from yield", .{self.name});
 }
 
 pub fn @"suspend"(self: *Fiber, awaiter: Awaiter) void {
@@ -209,6 +251,7 @@ pub fn @"resume"(self: *Fiber) void {
 }
 
 pub fn scheduleSelf(self: *Fiber) void {
+    log.debug("{s} getting scheduled", .{self.name});
     self.executor.submitRunnable(&self.tick_runnable);
 }
 
@@ -235,9 +278,13 @@ fn RunFunctions(comptime owns_stack: bool) type {
                     .always_suspend => return null,
                     .never_suspend => return self,
                     .symmetric_transfer_next => |next| {
+                        const next_fiber: *Fiber = @alignCast(@ptrCast(next));
                         // TODO: consider if self.resume() or self.scheduleSelf() is better
+                        log.debug("Got request for symmetric transfer: {s} -> {s}", .{ self.name, next_fiber.name });
+                        log.debug("{s} Resuming self first.", .{self.name});
                         self.@"resume"();
-                        return @alignCast(@ptrCast(next));
+                        log.debug("Symmetric transfer: -> {s}", .{next_fiber.name});
+                        return next_fiber;
                     },
                 }
                 return null;

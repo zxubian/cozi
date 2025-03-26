@@ -8,4 +8,4 @@ pub const executors = @import("./executors/main.zig");
 pub const fault = @import("./fault/main.zig");
 pub const Fiber = @import("./fiber/main.zig");
 pub const io = @import("./io/");
-pub const sync = @import("./sync/");
+pub const sync = @import("./sync/main.zig");
