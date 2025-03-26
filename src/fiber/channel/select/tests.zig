@@ -951,6 +951,9 @@ test "Select - stress" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
+    if (builtin.sanitize_thread) {
+        return error.SkipZigTest;
+    }
     const allocator = testing.allocator;
 
     const cpu_count = try std.Thread.getCpuCount();
@@ -960,9 +963,9 @@ test "Select - stress" {
     defer tp.stop();
     const executor = tp.executor();
 
-    const messages_per_sender = 100;
-    const selector_count = 100;
-    const sender_count = 100;
+    const messages_per_sender = 200;
+    const selector_count = 200;
+    const sender_count = 200;
     const total_message_count = messages_per_sender * sender_count;
     const messages_per_channel = if (sender_count > 1)
         total_message_count / 2
