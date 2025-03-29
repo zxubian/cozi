@@ -27,18 +27,12 @@ test "lazy future - submit - basic" {
 }
 
 test "lazy future - just - basic" {
-    if (builtin.single_threaded) {
-        return error.SkipZigTest;
-    }
     var just = future.just();
     try future.get(&just);
 }
 
-test "lazy future - ready - basic" {
-    if (builtin.single_threaded) {
-        return error.SkipZigTest;
-    }
-    var ready = future.ready(@as(usize, 44));
-    const result = try future.get(&ready);
+test "lazy future - value - basic" {
+    var value = future.value(@as(usize, 44));
+    const result = try future.get(&value);
     try testing.expectEqual(44, result);
 }

@@ -11,7 +11,7 @@ pub const Impl = struct {
 
     pub const submit = make.submit;
     pub const just = make.just;
-    pub const ready = make.ready;
+    pub const value = make.value;
 };
 
 // --- internal implementation ---

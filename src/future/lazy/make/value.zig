@@ -11,7 +11,7 @@ const model = future.model;
 const Computation = model.Computation;
 const meta = future.meta;
 
-fn Ready(V: type) type {
+fn Value(V: type) type {
     return struct {
         pub const ValueType = V;
         value: V,
@@ -41,6 +41,6 @@ fn Ready(V: type) type {
     };
 }
 
-pub fn ready(value: anytype) Ready(@TypeOf(value)) {
-    return .{ .value = value };
+pub fn value(v: anytype) Value(@TypeOf(value)) {
+    return .{ .value = v };
 }
