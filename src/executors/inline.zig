@@ -1,12 +1,14 @@
 const std = @import("std");
-const Executor = @import("../executor.zig");
-const Runnable = @import("../executors.zig").Runnable;
+const Executor = @import("./main.zig").Executor;
+const core = @import("../main.zig").core;
+const Runnable = core.Runnable;
 const InlineExecutor = @This();
 
-executor: Executor = .{
-    .vtable = .{ .submitFn = InlineExecutor.Submit },
-},
+pub const executor: Executor = .{
+    .vtable = .{ .submit = InlineExecutor.Submit },
+    .ptr = undefined,
+};
 
-pub fn Submit(_: *Executor, runnable: *Runnable) void {
-    runnable.run(runnable);
+pub fn Submit(_: *anyopaque, runnable: *Runnable) void {
+    runnable.run();
 }
