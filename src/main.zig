@@ -7,4 +7,4 @@ pub const fault = @import("./fault/main.zig");
 pub const Fiber = @import("./fiber/main.zig");
 pub const io = @import("./io/");
 pub const sync = @import("./sync/main.zig");
-pub const Future = @import("./future/main.zig");
+pub const future = @import("./future/main.zig");

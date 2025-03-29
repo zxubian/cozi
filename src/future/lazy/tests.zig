@@ -3,7 +3,7 @@ const builtin = @import("builtin");
 const testing = std.testing;
 const assert = std.debug.assert;
 const executors = @import("../../main.zig").executors;
-const Future = @import("./main.zig");
+const future = @import("../main.zig").lazy;
 
 test "lazy future - submit - basic" {
     if (builtin.single_threaded) {
@@ -14,7 +14,7 @@ test "lazy future - submit - basic" {
     defer pool.deinit();
     try pool.start();
     defer pool.stop();
-    var compute = Future.submit(
+    var compute = future.submit(
         pool.executor(),
         struct {
             pub fn run() usize {
@@ -22,6 +22,6 @@ test "lazy future - submit - basic" {
             }
         }.run,
     );
-    const result: anyerror!usize = Future.get(&compute);
+    const result: anyerror!usize = future.get(&compute);
     try testing.expectEqual(11, result);
 }
