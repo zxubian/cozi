@@ -7,8 +7,11 @@ const Runnable = core.Runnable;
 
 /// --- external re-exports ---
 pub const Impl = struct {
-    pub const submit = make.submit;
     pub const get = run.get;
+
+    pub const submit = make.submit;
+    pub const just = make.just;
+    pub const ready = make.ready;
 };
 
 // --- internal implementation ---

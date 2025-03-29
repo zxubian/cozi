@@ -22,6 +22,23 @@ test "lazy future - submit - basic" {
             }
         }.run,
     );
-    const result: anyerror!usize = future.get(&compute);
+    const result: usize = try future.get(&compute);
     try testing.expectEqual(11, result);
+}
+
+test "lazy future - just - basic" {
+    if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
+    var just = future.just();
+    try future.get(&just);
+}
+
+test "lazy future - ready - basic" {
+    if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
+    var ready = future.ready(@as(usize, 44));
+    const result = try future.get(&ready);
+    try testing.expectEqual(44, result);
 }
