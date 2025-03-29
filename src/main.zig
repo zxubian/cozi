@@ -1,5 +1,3 @@
-const std = @import("std");
-
 pub const Await = @import("./await/main.zig");
 pub const containers = @import("/containers/main.zig");
 pub const core = @import("./core/main.zig");
@@ -9,3 +7,4 @@ pub const fault = @import("./fault/main.zig");
 pub const Fiber = @import("./fiber/main.zig");
 pub const io = @import("./io/");
 pub const sync = @import("./sync/main.zig");
+pub const Future = @import("./future/main.zig");
