@@ -21,12 +21,18 @@ const ThreadExt = sync.Thread;
 
 pub const SelectOperation = enum {
     receive,
+    /// TODO:
     send,
 };
 
 pub const CASE_INDEX = u16;
 pub const MAX_CASES = std.math.maxInt(CASE_INDEX);
 
+/// Wait on multiple channel operations
+/// Polls channels in a random order, and returns the first available result.
+/// If no channels are ready to produce a result, parks the current fiber
+/// until a result is ready.
+/// The number and type of cases must be comptime-known.
 pub fn select(cases: anytype) SelectResultType(@TypeOf(cases)) {
     const Cases = @TypeOf(cases);
     return Select(Cases).select(cases);
@@ -258,6 +264,7 @@ fn Select(Cases: type) type {
     };
 }
 
+/// sort locks in order of pointer address
 fn sortLocks(cases: anytype, locks: []*Spinlock) void {
     if (locks.len != 2) {
         @panic("TODO");

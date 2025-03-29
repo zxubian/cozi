@@ -38,16 +38,16 @@ Other considerations:
 
 ### Fibers - stackfull cooperatively-scheduled user-space threads
 - [x] Basic support
-  - [x] Yield
+- [x] Yield
+
 Synchronization primitives
   - [x] Mutex
   - [x] Event
   - [x] Wait Group
   - [x] Barrier 
-- [ ] Channel (spinlock implementation)
-- [ ] Select
-- [ ] Lock-free channel/select 
-  - [Koval, N., Alistarh, D., & Elizarov, R. (2023, February). Fast and scalable channels in kotlin coroutines. In Proceedings of the 28th ACM SIGPLAN Annual Symposium on Principles and Practice of Parallel Programming (pp. 107-118).](https://arxiv.org/abs/2211.04986)
+
+Channel
+- https://github.com/zxubian/zig-async/issues/2
 
 ### Futures & Promises
 - [ ] eager (consider if this should be removed & only "lazy" should be kept)
@@ -58,7 +58,7 @@ Synchronization primitives
 - [ ] nursery?
 
 ### Testing
-- [ ] basic random fault injection for unit tests
+- [x] basic random fault injection for unit tests
 - [ ] study [Twist](https://gitlab.com/Lipovsky/twist) & consider which features to port
 
 ### Core
