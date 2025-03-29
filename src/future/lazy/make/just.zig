@@ -27,7 +27,7 @@ const Just = struct {
     }
 
     pub fn materialize(
-        _: *@This(),
+        _: @This(),
         continuation: anytype,
     ) Computation(JustComputation(@TypeOf(continuation))) {
         return .{

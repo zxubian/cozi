@@ -30,7 +30,7 @@ fn Value(V: type) type {
         }
 
         pub fn materialize(
-            self: *@This(),
+            self: @This(),
             continuation: anytype,
         ) Computation(JustComputation(@TypeOf(continuation))) {
             return .{
@@ -41,6 +41,6 @@ fn Value(V: type) type {
     };
 }
 
-pub fn value(v: anytype) Value(@TypeOf(value)) {
+pub fn value(v: anytype) Value(@TypeOf(v)) {
     return .{ .value = v };
 }

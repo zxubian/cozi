@@ -7,8 +7,7 @@ pub fn ResultType(ctx: anytype) type {
     return ReturnType(run_function);
 }
 
-pub fn ReturnType(function: anytype) type {
-    const Lambda = @TypeOf(function);
-    const lambda_info: std.builtin.Type.Fn = @typeInfo(Lambda).@"fn";
+pub fn ReturnType(Function: type) type {
+    const lambda_info: std.builtin.Type.Fn = @typeInfo(Function).@"fn";
     return lambda_info.return_type.?;
 }

@@ -4,11 +4,15 @@ const model = future.model;
 const Thunk = model.Thunk;
 const Demand = @import("./main.zig").Demand;
 
-pub fn get(future_ptr: anytype) !@TypeOf(future_ptr.*).ValueType {
-    const Future = Thunk(@TypeOf(future_ptr.*));
+const Get = @This();
+
+pub fn get(
+    future_: anytype,
+) !@TypeOf(future_).ValueType {
+    const Future = Thunk(@TypeOf(future_));
     const V = Future.ValueType;
     var demand: Demand(V) = .{};
-    var computation = future_ptr.materialize(&demand);
+    var computation = future_.materialize(&demand);
     computation.start();
     return demand.result;
 }
