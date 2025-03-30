@@ -9,7 +9,7 @@ const State = future.State;
 const model = future.model;
 const meta = future.meta;
 
-fn Map(MapFn: type) type {
+pub fn Map(MapFn: type) type {
     const Args = std.meta.ArgsTuple(MapFn);
     const OutputValueType = meta.ReturnType(MapFn);
 

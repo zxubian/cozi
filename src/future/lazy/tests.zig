@@ -90,23 +90,23 @@ test "lazy future - pipeline - syntax" {
 }
 
 test "lazy future - submit - basic" {
-    return error.SkipZigTest;
-    //     if (builtin.single_threaded) {
-    //         return error.SkipZigTest;
-    //     }
-    //     const allocator = testing.allocator;
-    //     var pool: executors.ThreadPools.Compute = try .init(1, allocator);
-    //     defer pool.deinit();
-    //     try pool.start();
-    //     defer pool.stop();
-    //     const compute = future.submit(
-    //         pool.executor(),
-    //         struct {
-    //             pub fn run() usize {
-    //                 return 11;
-    //             }
-    //         }.run,
-    //     );
-    //     const result: usize = try future.get(compute);
-    //     try testing.expectEqual(11, result);
+    if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
+    const allocator = testing.allocator;
+    var pool: executors.ThreadPools.Compute = try .init(1, allocator);
+    defer pool.deinit();
+    try pool.start();
+    defer pool.stop();
+    const compute = future.submit(
+        pool.executor(),
+        struct {
+            pub fn run(_: ?*anyopaque) usize {
+                return 11;
+            }
+        }.run,
+        null,
+    );
+    const result: usize = try future.get(compute);
+    try testing.expectEqual(11, result);
 }

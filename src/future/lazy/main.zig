@@ -9,15 +9,15 @@ const Runnable = core.Runnable;
 pub const Impl = struct {
     // --- generators ---
     pub const submit = make.submit;
-    pub const just = make.just;
+    pub const just = make.just.just;
     pub const value = make.value;
     // --- combinators ---
-    pub const via = combinators.via;
-    pub const map = combinators.map;
+    pub const via = combinators.via.via;
+    pub const map = combinators.map.map;
     // --- terminators ---
     pub const get = run.get;
     // --- syntax ---
-    pub const pipeline = syntax.pipeline;
+    pub const pipeline = syntax.pipeline.pipeline;
 };
 
 // --- internal implementation ---

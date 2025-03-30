@@ -10,30 +10,29 @@ const State = future.State;
 const model = future.model;
 const meta = future.meta;
 
-const Just = struct {
-    pub const ValueType = void;
+const Just = @This();
+pub const ValueType = void;
 
-    pub fn Computation(Continuation: anytype) type {
-        return struct {
-            next: Continuation,
+pub fn Computation(Continuation: anytype) type {
+    return struct {
+        next: Continuation,
 
-            pub fn start(self: *@This()) void {
-                self.next.@"continue"({}, .{
-                    .executor = InlineExecutor,
-                });
-            }
-        };
-    }
+        pub fn start(self: *@This()) void {
+            self.next.@"continue"({}, .{
+                .executor = InlineExecutor,
+            });
+        }
+    };
+}
 
-    pub fn materialize(
-        _: @This(),
-        continuation: anytype,
-    ) Computation(@TypeOf(continuation)) {
-        return .{
-            .next = continuation,
-        };
-    }
-};
+pub fn materialize(
+    _: @This(),
+    continuation: anytype,
+) Computation(@TypeOf(continuation)) {
+    return .{
+        .next = continuation,
+    };
+}
 
 pub fn just() Just {
     return .{};

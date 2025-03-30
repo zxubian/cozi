@@ -1,1 +1,1 @@
-pub const pipeline = @import("./pipeline.zig").pipeline;
+pub const pipeline = @import("./pipeline.zig");

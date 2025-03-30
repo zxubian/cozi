@@ -2,7 +2,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 const meta = std.meta;
 
-fn Result(Args: type) type {
+pub fn Result(Args: type) type {
     const IntermediatesType = Intermediates(Args);
     const intermediates_info = @typeInfo(IntermediatesType);
     const args_count = argsCount(Args);
