@@ -18,10 +18,11 @@ fn Map(MapFn: type) type {
         map_ctx: ?*anyopaque,
 
         fn MapFuture(InputFuture: type) type {
-            comptime {
-                const args_info: std.builtin.Type.Struct = @typeInfo(Args).@"struct";
-                // TODO: make this more flexible?
-                assert(args_info.fields[0].type == ?*anyopaque);
+            const args_info: std.builtin.Type.Struct = @typeInfo(Args).@"struct";
+            const map_fn_has_args = args_info.fields.len > 1;
+            // TODO: make this more flexible?
+            assert(args_info.fields[0].type == ?*anyopaque);
+            if (map_fn_has_args) {
                 assert(args_info.fields[1].type == InputFuture.ValueType);
             }
             return struct {
@@ -61,11 +62,19 @@ fn Map(MapFn: type) type {
                                 wait_group: std.Thread.WaitGroup = .{},
                                 pub fn run(ctx_: *anyopaque) void {
                                     const ctx: *@This() = @alignCast(@ptrCast(ctx_));
-                                    ctx.output.* = @call(
-                                        .auto,
-                                        ctx.map_fn,
-                                        .{ ctx.map_ctx, ctx.input.* },
-                                    );
+                                    if (map_fn_has_args) {
+                                        ctx.output.* = @call(
+                                            .auto,
+                                            ctx.map_fn,
+                                            .{ ctx.map_ctx, ctx.input.* },
+                                        );
+                                    } else {
+                                        ctx.output.* = @call(
+                                            .auto,
+                                            ctx.map_fn,
+                                            .{ctx.map_ctx},
+                                        );
+                                    }
                                     ctx.wait_group.finish();
                                 }
                             };

@@ -13,7 +13,7 @@ const meta = future.meta;
 const Just = struct {
     pub const ValueType = void;
 
-    fn Computation(Continuation: anytype) type {
+    pub fn Computation(Continuation: anytype) type {
         return struct {
             next: Continuation,
 
@@ -30,7 +30,7 @@ const Just = struct {
         continuation: anytype,
     ) Computation(@TypeOf(continuation)) {
         return .{
-            .continuation = continuation,
+            .next = continuation,
         };
     }
 };

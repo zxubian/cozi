@@ -54,6 +54,22 @@ test "lazy future - pipeline - multiple" {
     try testing.expectEqual(3, result);
 }
 
+test "lazy future map - with side effects" {
+    const just = future.just();
+    const via = future.via(executors.@"inline").pipe(just);
+    var done: bool = false;
+    const map = future.map(struct {
+        pub fn run(
+            ctx: ?*anyopaque,
+        ) void {
+            const done_: *bool = @alignCast(@ptrCast(ctx));
+            done_.* = true;
+        }
+    }.run, @alignCast(@ptrCast(&done))).pipe(via);
+    try future.get(map);
+    try testing.expect(done);
+}
+
 test "lazy future - submit - basic" {
     return error.SkipZigTest;
     //     if (builtin.single_threaded) {
