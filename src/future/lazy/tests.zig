@@ -23,7 +23,7 @@ test "lazy future - pipeline - basic" {
         pub fn run(
             _: ?*anyopaque,
             in: usize,
-        ) u32 {
+        ) usize {
             return in + 1;
         }
     }.run, null).pipe(via);
@@ -68,6 +68,25 @@ test "lazy future map - with side effects" {
     }.run, @alignCast(@ptrCast(&done))).pipe(via);
     try future.get(map);
     try testing.expect(done);
+}
+
+test "lazy future - pipeline - syntax" {
+    const pipeline = future.pipeline(
+        .{
+            future.value(@as(u32, 123)),
+            future.via(executors.@"inline"),
+            future.map(struct {
+                pub fn run(
+                    _: ?*anyopaque,
+                    in: u32,
+                ) u32 {
+                    return in + 1;
+                }
+            }.run, null),
+        },
+    );
+    const result = try future.get(pipeline);
+    try testing.expectEqual(124, result);
 }
 
 test "lazy future - submit - basic" {

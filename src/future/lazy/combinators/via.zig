@@ -13,11 +13,7 @@ const Via = @This();
 
 next_executor: Executor,
 
-pub fn PipeResult(T: type) type {
-    return T;
-}
-
-fn ViaFuture(InputFuture: type) type {
+pub fn Future(InputFuture: type) type {
     return struct {
         input_future: InputFuture,
         next_executor: Executor,
@@ -72,7 +68,7 @@ fn ViaFuture(InputFuture: type) type {
 pub fn pipe(
     self: *const Via,
     f: anytype,
-) ViaFuture(@TypeOf(f)) {
+) Future(@TypeOf(f)) {
     return .{
         .input_future = f,
         .next_executor = self.next_executor,
