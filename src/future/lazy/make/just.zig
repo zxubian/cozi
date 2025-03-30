@@ -8,18 +8,17 @@ const Runnable = core.Runnable;
 const future = @import("../main.zig");
 const State = future.State;
 const model = future.model;
-const Computation = model.Computation;
 const meta = future.meta;
 
 const Just = struct {
     pub const ValueType = void;
 
-    fn JustComputation(Continuation: anytype) type {
+    fn Computation(Continuation: anytype) type {
         return struct {
-            continuation: Continuation,
+            next: Continuation,
 
             pub fn start(self: *@This()) void {
-                self.continuation.@"continue"({}, .{
+                self.next.@"continue"({}, .{
                     .executor = InlineExecutor,
                 });
             }
@@ -29,7 +28,7 @@ const Just = struct {
     pub fn materialize(
         _: @This(),
         continuation: anytype,
-    ) Computation(JustComputation(@TypeOf(continuation))) {
+    ) Computation(@TypeOf(continuation)) {
         return .{
             .continuation = continuation,
         };

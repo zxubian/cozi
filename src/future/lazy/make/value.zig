@@ -8,7 +8,6 @@ const Runnable = core.Runnable;
 const future = @import("../main.zig");
 const State = future.State;
 const model = future.model;
-const Computation = model.Computation;
 const meta = future.meta;
 
 fn Value(V: type) type {
@@ -16,13 +15,13 @@ fn Value(V: type) type {
         pub const ValueType = V;
         value: V,
 
-        fn JustComputation(Continuation: anytype) type {
+        pub fn Computation(Continuation: anytype) type {
             return struct {
-                continuation: Continuation,
+                next: Continuation,
                 value: V,
 
                 pub fn start(self: *@This()) void {
-                    self.continuation.@"continue"(self.value, .{
+                    self.next.@"continue"(self.value, .{
                         .executor = InlineExecutor,
                     });
                 }
@@ -32,9 +31,9 @@ fn Value(V: type) type {
         pub fn materialize(
             self: @This(),
             continuation: anytype,
-        ) Computation(JustComputation(@TypeOf(continuation))) {
+        ) Computation(@TypeOf(continuation)) {
             return .{
-                .continuation = continuation,
+                .next = continuation,
                 .value = self.value,
             };
         }

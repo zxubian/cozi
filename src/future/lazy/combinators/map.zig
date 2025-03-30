@@ -32,23 +32,22 @@ fn Map(MapFn: type) type {
                 pub const ValueType = OutputValueType;
 
                 pub const ContinuationForInputFuture = struct {
-                    input_value: InputFuture.ValueType = undefined,
-                    input_state: State = undefined,
+                    value: InputFuture.ValueType = undefined,
+                    state: State = undefined,
+
                     pub fn @"continue"(
                         self: *@This(),
                         value: InputFuture.ValueType,
                         state: State,
                     ) void {
-                        self.input_value = value;
-                        self.input_state = state;
+                        self.value = value;
+                        self.state = state;
                     }
                 };
 
                 fn Computation(Continuation: anytype) type {
                     return struct {
-                        input: InputFuture.ValueType,
-                        output: OutputValueType,
-                        state: State,
+                        input_computation: InputFuture.Computation(ContinuationForInputFuture),
                         map_fn: *const MapFn,
                         map_ctx: ?*anyopaque,
                         next: Continuation,
@@ -70,9 +69,13 @@ fn Map(MapFn: type) type {
                                     ctx.wait_group.finish();
                                 }
                             };
+                            self.input_computation.start();
+                            const input_value: *InputFuture.ValueType = &self.input_computation.next.value;
+                            const input_state: *State = &self.input_computation.next.state;
+                            var output: OutputValueType = undefined;
                             var ctx: Ctx = .{
-                                .input = &self.input,
-                                .output = &self.output,
+                                .input = input_value,
+                                .output = &output,
                                 .map_fn = self.map_fn,
                                 .map_ctx = self.map_ctx,
                             };
@@ -81,13 +84,10 @@ fn Map(MapFn: type) type {
                                 .runFn = Ctx.run,
                                 .ptr = &ctx,
                             };
-                            self.state.executor.submitRunnable(&runnable);
+                            input_state.executor.submitRunnable(&runnable);
                             ctx.wait_group.finish();
                             ctx.wait_group.wait();
-                            self.next.@"continue"(
-                                self.output,
-                                self.state,
-                            );
+                            self.next.@"continue"(output, input_state.*);
                         }
 
                         pub fn makeRunnable(self: *@This()) Runnable {
@@ -103,13 +103,9 @@ fn Map(MapFn: type) type {
                     self: @This(),
                     continuation: anytype,
                 ) Computation(@TypeOf(continuation)) {
-                    var input_future_result: ContinuationForInputFuture = .{};
-                    var input_computation = self.input_future.materialize(&input_future_result);
-                    input_computation.start();
+                    const input_computation = self.input_future.materialize(ContinuationForInputFuture{});
                     return .{
-                        .input = input_future_result.input_value,
-                        .output = undefined,
-                        .state = input_future_result.input_state,
+                        .input_computation = input_computation,
                         .map_fn = self.map_fn,
                         .map_ctx = self.map_ctx,
                         .next = continuation,
