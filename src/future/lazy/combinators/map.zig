@@ -17,13 +17,25 @@ fn Map(MapFn: type) type {
         map_fn: *const MapFn,
         map_ctx: ?*anyopaque,
 
-        fn MapFuture(InputFuture: type) type {
+        pub fn Future(InputFuture: type) type {
             const args_info: std.builtin.Type.Struct = @typeInfo(Args).@"struct";
             const map_fn_has_args = args_info.fields.len > 1;
             // TODO: make this more flexible?
             assert(args_info.fields[0].type == ?*anyopaque);
             if (map_fn_has_args) {
-                assert(args_info.fields[1].type == InputFuture.ValueType);
+                const MapFnArgType = args_info.fields[1].type;
+                if (InputFuture.ValueType != MapFnArgType) {
+                    @compileError(std.fmt.comptimePrint(
+                        "Incorrect argument type for map function {} in {} with input future {}. Expected: {}. Got: {}",
+                        .{
+                            MapFn,
+                            @This(),
+                            InputFuture,
+                            InputFuture.ValueType,
+                            MapFnArgType,
+                        },
+                    ));
+                }
             }
             return struct {
                 input_future: InputFuture,
@@ -127,7 +139,7 @@ fn Map(MapFn: type) type {
         pub fn pipe(
             self: @This(),
             f: anytype,
-        ) MapFuture(@TypeOf(f)) {
+        ) Future(@TypeOf(f)) {
             return .{
                 .input_future = f,
                 .map_fn = self.map_fn,

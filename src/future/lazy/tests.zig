@@ -23,7 +23,7 @@ test "lazy future - pipeline - basic" {
         pub fn run(
             _: ?*anyopaque,
             in: usize,
-        ) usize {
+        ) u32 {
             return in + 1;
         }
     }.run, null).pipe(via);
