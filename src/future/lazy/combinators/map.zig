@@ -118,7 +118,7 @@ fn Map(MapFn: type) type {
             };
         }
 
-        /// F<V> -> F<V>
+        /// F<V> -> F<map(V)>
         pub fn pipe(
             self: @This(),
             f: anytype,
