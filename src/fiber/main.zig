@@ -219,11 +219,12 @@ pub fn current() ?*Fiber {
     return current_fiber;
 }
 
+/// Suspend current fiber, and reschedule it for execution on the same executor.
 pub fn yield() void {
     if (current_fiber) |curr| {
         curr.yield_();
     } else {
-        std.debug.panic("Must use Fiber.Yield only when executing inside of fiber", .{});
+        std.debug.panic("Must use Fiber.yield only when executing on a fiber", .{});
     }
 }
 
@@ -253,6 +254,22 @@ pub fn @"resume"(self: *Fiber) void {
 pub fn scheduleSelf(self: *Fiber) void {
     log.debug("{s} getting scheduled", .{self.name});
     self.executor.submitRunnable(&self.tick_runnable);
+}
+
+/// Suspend the current fiber, and reschedule it on new_executor
+pub fn switchTo(new_executor: Executor) void {
+    if (current_fiber) |curr| {
+        curr.switchTo_(new_executor);
+    } else {
+        std.debug.panic("Must use Fiber.switchTo only when executing on a fiber", .{});
+    }
+}
+
+/// Suspend self, and schedule it on new_executor
+fn switchTo_(self: *Fiber, new_executor: Executor) void {
+    var switch_awaiter: SwitchAwaiter = .{ .executor = new_executor };
+    log.debug("{s} about to switch executors: {*} -> {*}", .{ self.name, self.executor.ptr, new_executor.ptr });
+    Await(&switch_awaiter);
 }
 
 pub inline fn runTickAndMaybeTransfer(self: *Fiber, comptime owns_stack: bool) ?*Fiber {
@@ -376,6 +393,35 @@ const YieldAwaiter = struct {
     }
 
     pub fn awaitResume(_: *YieldAwaiter, _: bool) void {}
+};
+
+const SwitchAwaiter = struct {
+    executor: Executor,
+    // --- type-erased awaiter interface ---
+    pub fn awaitSuspend(
+        ctx: *anyopaque,
+        handle: *anyopaque,
+    ) Awaiter.AwaitSuspendResult {
+        const self: *@This() = @alignCast(@ptrCast(ctx));
+        var fiber: *Fiber = @alignCast(@ptrCast(handle));
+        fiber.executor = self.executor;
+        fiber.scheduleSelf();
+        return .always_suspend;
+    }
+
+    pub fn awaiter(self: *SwitchAwaiter) Awaiter {
+        return Awaiter{
+            .ptr = self,
+            .vtable = .{ .await_suspend = awaitSuspend },
+        };
+    }
+
+    /// --- comptime awaiter interface ---
+    pub fn awaitReady(_: *SwitchAwaiter) bool {
+        return false;
+    }
+
+    pub fn awaitResume(_: *SwitchAwaiter, _: bool) void {}
 };
 
 test {

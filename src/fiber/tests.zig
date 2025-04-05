@@ -2,6 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const build_config = @import("build_config");
 
+const assert = std.debug.assert;
 const testing = std.testing;
 const alloc = testing.allocator;
 const fault = @import("../fault/main.zig");
@@ -235,4 +236,58 @@ test "Pre-supplied stack" {
     );
     _ = manual_executor.drain();
     try testing.expectEqual(step, 1);
+}
+
+test "fiber - switch" {
+    if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
+    const Ctx = struct {
+        manual_executor_1: *ManualExecutor,
+        manual_executor_2: *ManualExecutor,
+        thread_pool: *ThreadPool,
+        stage: usize,
+        wait_group: WaitGroup,
+
+        inline fn expectEqualPtrs(expected: *anyopaque, actual: anytype) void {
+            const actual_as_anyopaque: *anyopaque = @alignCast(@ptrCast(actual));
+            assert(expected == actual_as_anyopaque);
+        }
+
+        pub fn run(self: *@This()) void {
+            self.stage += 1;
+            const fiber = Fiber.current().?;
+            expectEqualPtrs(fiber.executor.ptr, self.manual_executor_1);
+            Fiber.switchTo(self.manual_executor_2.executor());
+            self.stage += 1;
+            expectEqualPtrs(fiber.executor.ptr, self.manual_executor_2);
+            Fiber.switchTo(self.thread_pool.executor());
+            self.stage += 1;
+            expectEqualPtrs(fiber.executor.ptr, self.thread_pool);
+            assert(ThreadPool.current() == self.thread_pool);
+            self.wait_group.finish();
+        }
+    };
+    var manual_executor_1 = ManualExecutor{};
+    var manual_executor_2 = ManualExecutor{};
+    var thread_pool = try ThreadPool.init(1, alloc);
+    defer thread_pool.deinit();
+    var ctx: Ctx = .{
+        .stage = 0,
+        .manual_executor_1 = &manual_executor_1,
+        .manual_executor_2 = &manual_executor_2,
+        .thread_pool = &thread_pool,
+        .wait_group = .{},
+    };
+    try Fiber.go(Ctx.run, .{&ctx}, alloc, manual_executor_1.executor());
+    try testing.expectEqual(0, ctx.stage);
+    _ = manual_executor_1.drain();
+    try testing.expectEqual(1, ctx.stage);
+    _ = manual_executor_2.drain();
+    try testing.expectEqual(2, ctx.stage);
+    try thread_pool.start();
+    defer thread_pool.stop();
+    ctx.wait_group.start();
+    ctx.wait_group.wait();
+    try testing.expectEqual(3, ctx.stage);
 }
