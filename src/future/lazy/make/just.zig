@@ -18,9 +18,12 @@ pub fn Computation(Continuation: anytype) type {
         next: Continuation,
 
         pub fn start(self: *@This()) void {
-            self.next.@"continue"({}, .{
-                .executor = InlineExecutor,
-            });
+            self.next.@"continue"(
+                {},
+                .{
+                    .executor = InlineExecutor,
+                },
+            );
         }
     };
 }
