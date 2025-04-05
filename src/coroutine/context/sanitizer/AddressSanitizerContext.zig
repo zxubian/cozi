@@ -3,7 +3,7 @@ const AddressSanitizerContext = @This();
 const Core = @import("../../../core/main.zig");
 const Stack = Core.Stack;
 
-stack: Stack,
+stack: Stack = undefined,
 fake_stack: *anyopaque = undefined,
 previous_context: ?*AddressSanitizerContext = null,
 
