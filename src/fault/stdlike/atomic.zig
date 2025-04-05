@@ -1,5 +1,5 @@
 const std = @import("std");
-const fault_injection_builtin = @import("zig_async_fault_injection");
+const fault_injection_builtin = @import("zinc_fault_injection");
 const injectFault = @import("../main.zig").injectFault;
 const AtomicOrder = std.builtin.AtomicOrder;
 

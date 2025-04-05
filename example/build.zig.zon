@@ -1,9 +1,9 @@
 .{
-    .name = .zig_async_example,
+    .name = .zinc_example,
     .fingerprint = 0x37546dcbe486678,
     .version = "0.0.0",
     .minimum_zig_version = "0.14.0-dev.909+f9f894200",
-    .dependencies = .{ .zig_async = .{ .path = "../" } },
+    .dependencies = .{ .zinc = .{ .path = "../" } },
     .paths = .{
         "build.zig",
         "build.zig.zon",

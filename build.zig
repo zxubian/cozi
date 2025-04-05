@@ -66,7 +66,7 @@ pub fn build(b: *std.Build) void {
         fault_build_variant,
     );
 
-    root.addOptions("zig_async_fault_injection", fault_injection_builtin);
+    root.addOptions("zinc_fault_injection", fault_injection_builtin);
 
     addAssemblyForMachineContext(b, root, &target);
 
@@ -115,7 +115,7 @@ pub fn build(b: *std.Build) void {
     );
 
     unit_tests.root_module.addOptions(
-        "zig_async_fault_injection",
+        "zinc_fault_injection",
         fault_injection_builtin,
     );
 

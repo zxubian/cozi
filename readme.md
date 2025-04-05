@@ -1,4 +1,4 @@
-# zig-async
+# zinc - concurrency primitives for zig
 
 ## Goals
 - empower Zig users to solve concurrent & parallel engineering problems

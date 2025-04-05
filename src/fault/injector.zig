@@ -1,6 +1,6 @@
 const std = @import("std");
 const Injector = @This();
-const fault_injection_builtin = @import("zig_async_fault_injection");
+const fault_injection_builtin = @import("zinc_fault_injection");
 const Fiber = @import("../fiber/main.zig");
 
 const inject_frequency = 9;

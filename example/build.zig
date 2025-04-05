@@ -18,16 +18,16 @@ pub fn build(b: *std.Build) void {
         "fault_inject",
         "Which fault injection build type to use",
     );
-    const zig_async = blk: {
+    const zinc = blk: {
         if (fault_inject_variant) |user_input| {
-            break :blk b.dependency("zig_async", .{
+            break :blk b.dependency("zinc", .{
                 .fault_inject = user_input,
             });
         }
-        break :blk b.dependency("zig_async", .{});
+        break :blk b.dependency("zinc", .{});
     };
 
-    exe.root_module.addImport("zig-async", zig_async.module("root"));
+    exe.root_module.addImport("zinc", zinc.module("root"));
 
     const install_cmd = b.addInstallArtifact(exe, .{});
     install_cmd.step.dependOn(&exe.step);

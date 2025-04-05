@@ -1,6 +1,6 @@
 const std = @import("std");
-const ZigAsync = @import("zig-async");
-const ThreadPool = ZigAsync.Executors.ThreadPools.Compute;
+const Zinc = @import("zinc");
+const ThreadPool = Zinc.Executors.ThreadPools.Compute;
 
 pub fn main() !void {
     const Ctx = struct {
