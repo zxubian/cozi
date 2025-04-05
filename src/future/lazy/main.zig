@@ -22,7 +22,6 @@ pub const Impl = struct {
 
 // --- internal implementation ---
 pub const meta = @import("./meta.zig");
-pub const model = @import("./model.zig");
 pub const make = @import("./make/main.zig");
 pub const terminators = @import("./terminators//main.zig");
 pub const combinators = @import("./combinators/main.zig");
