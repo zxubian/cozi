@@ -20,7 +20,7 @@ test {
     _ = @import("./sync.zig");
 }
 
-test "Fiber basic" {
+test "fiber - basic" {
     var step: usize = 0;
     const Ctx = struct {
         pub fn run(step_: *usize) void {
@@ -33,7 +33,7 @@ test "Fiber basic" {
     try testing.expectEqual(step, 1);
 }
 
-test "Fiber context" {
+test "fiber - context" {
     const Ctx = struct {
         pub fn run() void {
             testing.expect(Fiber.isInFiber()) catch |e| {
@@ -48,7 +48,7 @@ test "Fiber context" {
     try testing.expect(!Fiber.isInFiber());
 }
 
-test "Fiber Thread Pool" {
+test "fiber - thread pool" {
     const Ctx = struct {
         step: usize = 0,
         wait_group: WaitGroup = .{},
@@ -68,7 +68,7 @@ test "Fiber Thread Pool" {
     try testing.expectEqual(ctx.step, 1);
 }
 
-test "Fiber Yield" {
+test "fiber - yield" {
     const Ctx = struct {
         step: usize = 0,
         pub fn run(self: *@This()) void {
@@ -85,7 +85,7 @@ test "Fiber Yield" {
     try testing.expectEqual(ctx.step, 3);
 }
 
-test "Fiber threadpool child" {
+test "fiber - threadpool child" {
     const Ctx = struct {
         step: Atomic(usize) = .init(0),
         wait_group: WaitGroup = .{},
@@ -107,7 +107,7 @@ test "Fiber threadpool child" {
     try testing.expectEqual(ctx.step.load(.monotonic), 2);
 }
 
-test "Ping Pong" {
+test "fiber - Ping Pong" {
     const State = enum {
         ping,
         pong,
@@ -144,7 +144,7 @@ test "Ping Pong" {
     ctx.wait_group.wait();
 }
 
-test "Fiber - Two Pools" {
+test "fiber - two pools" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
@@ -211,7 +211,7 @@ test "Fiber - Two Pools" {
     wait_group.wait();
 }
 
-test "Pre-supplied stack" {
+test "fiber - Pre-supplied stack" {
     const size = 1024 * 1024 * 16;
     const slice = try alloc.alignedAlloc(
         u8,
