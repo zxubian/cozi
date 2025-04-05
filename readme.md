@@ -30,11 +30,12 @@ Thread pool
   - [ ] Option to "pin" thread pool worker threads to CPU core (core affinity)
 - [ ] Fiber pool
   - reference: [Parallelizing the Naughty Dog Engine Using Fibers](https://www.youtube.com/watch?v=HIVBhKj7gQU&t=628s)
-  - [ ] Worker abstraction over fibers and threads
+  - [ ] Worker abstraction over fibers and threads?
+     
 Other considerations:
-- [ ] Separate "scheduler" from "executor"
+- [ ] Separate "scheduler" from "executor"? (scheduler responsible for picking next task out of queue(s), executor actually runs it)
 - [ ] Scheduler "submit" hints (inline/lifo/queue-end etc)
-- [ ] Pass context to all tasks submitted to executor/scheduler
+- [ ] Pass context with nursery etc. to all tasks submitted to executor/scheduler -> for structured concurrency 
 
 ### Fibers - stackfull cooperatively-scheduled user-space threads
 - [x] Basic support
@@ -50,8 +51,9 @@ Channel
 - https://github.com/zxubian/zig-async/issues/2
 
 ### Futures & Promises
-- [ ] eager (consider if this should be removed & only "lazy" should be kept)
 - [ ] lazy
+- [ ] eager ? (consider if this should be removed & only "lazy" should be kept)
+
 
 ### Structured Concurrency
 - [ ] cancellation token/source
@@ -59,7 +61,7 @@ Channel
 
 ### Testing
 - [x] basic random fault injection for unit tests
-- [ ] study [Twist](https://gitlab.com/Lipovsky/twist) & consider which features to port
+- [ ] study [Twist](https://gitlab.com/Lipovsky/twist)
 
 ### Core
 - [x] spin lock
@@ -68,9 +70,8 @@ Channel
 - [ ] hazard pointers
 
 ### Performance
-- [ ] reconsider interface implementation: performance penalty of type-erased ptr approach
 - [ ] integrate with Tracy etc.
-- [ ] Optimize memory orders
+- [ ] optimize memory orders
 
 ### IO
 - [ ] Play around with self-hosted IO dispatch
