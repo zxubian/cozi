@@ -75,6 +75,7 @@ pub fn pipe(
     };
 }
 
+///Make the Future following Via to be executed on `executor`
 pub fn via(executor: Executor) Via {
     return .{
         .next_executor = executor,

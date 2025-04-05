@@ -37,6 +37,7 @@ pub fn materialize(
     };
 }
 
+///Future that instantly returns void
 pub fn just() Just {
     return .{};
 }

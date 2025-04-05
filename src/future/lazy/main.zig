@@ -8,9 +8,11 @@ const Runnable = core.Runnable;
 /// --- external re-exports ---
 pub const Impl = struct {
     // --- generators ---
-    pub const submit = make.submit;
+    pub const submit = make.submit.submit;
     pub const just = make.just.just;
-    pub const value = make.value;
+    pub const constValue = make.constValue.constValue;
+    pub const Value = make.value.Value;
+    pub const value = make.value.value;
     // --- combinators ---
     pub const via = combinators.via.via;
     pub const map = combinators.map.map;

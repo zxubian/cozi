@@ -10,6 +10,12 @@ test "lazy future - just - basic" {
     future.get(just);
 }
 
+test "lazy future - const value - basic" {
+    const value = future.constValue(@as(usize, 44));
+    const result = future.get(value);
+    try testing.expectEqual(44, result);
+}
+
 test "lazy future - value - basic" {
     const value = future.value(@as(usize, 44));
     const result = future.get(value);
