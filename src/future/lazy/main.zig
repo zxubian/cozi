@@ -18,6 +18,7 @@ pub const Impl = struct {
     pub const map = combinators.map.map;
     pub const mapOk = combinators.mapOk.mapOk;
     pub const andThen = combinators.andThen.andThen;
+    pub const orElse = combinators.orElse.orElse;
     // --- terminators ---
     pub const get = terminators.get;
     // --- syntax ---

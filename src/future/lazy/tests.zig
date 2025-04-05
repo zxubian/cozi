@@ -274,3 +274,109 @@ test "lazy future - andThen - return error" {
     const result = future.get(pipeline);
     try testing.expectError(IoError.file_not_found, result);
 }
+
+test "lazy future - orElse" {
+    const IoError = error{
+        file_not_found,
+    };
+    const pipeline = future.pipeline(
+        .{
+            future.constValue(@as(IoError!u32, IoError.file_not_found)),
+            future.orElse(struct {
+                pub fn run(
+                    _: ?*anyopaque,
+                    _: IoError,
+                ) future.Value(u32) {
+                    return future.value(@as(u32, 123));
+                }
+            }.run, null),
+        },
+    );
+    const result = future.get(pipeline);
+    try testing.expectEqual(123, result);
+}
+
+test "lazy future - orElse - return value" {
+    const IoError = error{
+        file_not_found,
+    };
+    const pipeline = future.pipeline(
+        .{
+            future.constValue(@as(IoError!u32, 123)),
+            future.orElse(struct {
+                pub fn run(
+                    _: ?*anyopaque,
+                    _: IoError,
+                ) future.Value(u32) {
+                    unreachable;
+                }
+            }.run, null),
+        },
+    );
+    const result = future.get(pipeline);
+    try testing.expectEqual(123, result);
+}
+
+test "lazy future - pipeline - combinators" {
+    const IoError = error{
+        file_not_found,
+    };
+    const pipeline = future.pipeline(
+        .{
+            future.just(),
+            future.map(struct {
+                pub fn run(
+                    _: ?*anyopaque,
+                ) IoError!u32 {
+                    return 3;
+                }
+            }.run, null),
+            future.orElse(struct {
+                pub fn run(
+                    _: ?*anyopaque,
+                    _: IoError,
+                ) future.Value(u32) {
+                    unreachable;
+                }
+            }.run, null),
+            future.andThen(struct {
+                pub fn run(
+                    _: ?*anyopaque,
+                    _: u32,
+                ) future.Value(IoError!u32) {
+                    return future.value(@as(
+                        IoError!u32,
+                        IoError.file_not_found,
+                    ));
+                }
+            }.run, null),
+            future.andThen(struct {
+                pub fn run(
+                    _: ?*anyopaque,
+                    _: u32,
+                ) future.Value(IoError!u32) {
+                    unreachable;
+                }
+            }.run, null),
+            future.orElse(struct {
+                pub fn run(
+                    _: ?*anyopaque,
+                    err: IoError,
+                ) future.Value(IoError!u32) {
+                    assert(err == IoError.file_not_found);
+                    return future.value(@as(IoError!u32, 3));
+                }
+            }.run, null),
+            future.mapOk(struct {
+                pub fn run(
+                    _: ?*anyopaque,
+                    in: u32,
+                ) u32 {
+                    return in + 1;
+                }
+            }.run, null),
+        },
+    );
+    const result = try future.get(pipeline);
+    try testing.expectEqual(4, result);
+}

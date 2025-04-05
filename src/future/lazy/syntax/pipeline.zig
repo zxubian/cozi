@@ -1,6 +1,7 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const meta = std.meta;
+const future_ = @import("../main.zig");
 
 pub fn Result(Args: type) type {
     const IntermediatesType = Intermediates(Args);

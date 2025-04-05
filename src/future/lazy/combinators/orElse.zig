@@ -9,11 +9,11 @@ const State = future.State;
 const model = future.model;
 const meta = future.meta;
 
-pub fn AndThen(AndThenFn: type) type {
-    const Args = std.meta.ArgsTuple(AndThenFn);
+pub fn OrElse(OrElseFn: type) type {
+    const Args = std.meta.ArgsTuple(OrElseFn);
 
     return struct {
-        map_fn: *const AndThenFn,
+        map_fn: *const OrElseFn,
         map_ctx: ?*anyopaque,
 
         pub fn Future(InputFuture: type) type {
@@ -25,35 +25,44 @@ pub fn AndThen(AndThenFn: type) type {
                 @compileError(std.fmt.comptimePrint(
                     "Map function {} in {} with input future {} must accept a parameter",
                     .{
-                        AndThenFn,
+                        OrElseFn,
                         @This(),
                         InputFuture,
                     },
                 ));
             }
-            const AndThenFnArgType = args_info.fields[1].type;
-            const AndThenReturnFuture = meta.ReturnType(AndThenFn);
-            const FlattenedType = AndThenReturnFuture.ValueType;
+            const OrElseFnArgType = args_info.fields[1].type;
             const input_future_value_type_info = @typeInfo(InputFuture.ValueType);
-            const input_is_error_union = comptime std.meta.activeTag(input_future_value_type_info) == .error_union;
-            if (input_is_error_union) {
-                const UnwrappedValueType = input_future_value_type_info.error_union.payload;
-                if (input_future_value_type_info.error_union.payload != AndThenFnArgType) {
-                    @compileError(std.fmt.comptimePrint(
-                        "Incompatible parameter type for map function {} in {} with input future {}. Expected: !{}. Got: !{}",
-                        .{
-                            AndThenFn,
-                            @This(),
-                            InputFuture,
-                            UnwrappedValueType,
-                            AndThenFnArgType,
-                        },
-                    ));
-                }
+            if (std.meta.activeTag(input_future_value_type_info) != .error_union) {
+                @compileError(std.fmt.comptimePrint(
+                    "Parameter of map function {} in {} with input future {} must be an error-union. Actual type: {}",
+                    .{
+                        OrElseFn,
+                        @This(),
+                        InputFuture,
+                        InputFuture.ValueType,
+                    },
+                ));
+            }
+            const OrElseReturnFuture = meta.ReturnType(OrElseFn);
+            const FlattenedType = OrElseReturnFuture.ValueType;
+            const UnwrappedValueType = input_future_value_type_info.error_union.payload;
+            const Error = input_future_value_type_info.error_union.error_set;
+            if (Error != OrElseFnArgType) {
+                @compileError(std.fmt.comptimePrint(
+                    "Incompatible parameter type for map function {} in {} with input future {}. Expected: !{}. Got: !{}",
+                    .{
+                        OrElseFn,
+                        @This(),
+                        InputFuture,
+                        UnwrappedValueType,
+                        OrElseFnArgType,
+                    },
+                ));
             }
             return struct {
                 input_future: InputFuture,
-                map_fn: *const AndThenFn,
+                map_fn: *const OrElseFn,
                 map_ctx: ?*anyopaque,
 
                 pub const ValueType = FlattenedType;
@@ -91,28 +100,27 @@ pub fn AndThen(AndThenFn: type) type {
                         };
 
                         input_computation: InputFuture.Computation(ContinuationForInputFuture),
-                        map_fn: *const AndThenFn,
+                        map_fn: *const OrElseFn,
                         map_ctx: ?*anyopaque,
                         next: Continuation,
                         map_runnable: Runnable = undefined,
-                        output_future: AndThenReturnFuture = undefined,
-                        output_future_computation: AndThenReturnFuture.Computation(*ContinuationForOutputFuture) = undefined,
+                        output_future: OrElseReturnFuture = undefined,
+                        output_future_computation: OrElseReturnFuture.Computation(*ContinuationForOutputFuture) = undefined,
                         output_future_continuation: ContinuationForOutputFuture = .{},
 
                         pub fn runMap(ctx_: *anyopaque) void {
                             const self: *Self = @alignCast(@ptrCast(ctx_));
-                            const input_value =
-                                if (input_is_error_union)
-                                    self.input_computation.next.value catch unreachable
-                                else
-                                    self.input_computation.next.value;
+                            const input_value = &self.input_computation.next.value;
+                            const error_value = blk: {
+                                _ = input_value.* catch |err| {
+                                    break :blk err;
+                                };
+                                unreachable;
+                            };
                             self.output_future = @call(
                                 .auto,
                                 self.map_fn,
-                                .{
-                                    self.map_ctx,
-                                    input_value,
-                                },
+                                .{ self.map_ctx, error_value },
                             );
                             self.output_future_computation = self.output_future.materialize(&self.output_future_continuation);
                             self.output_future_computation.start();
@@ -120,26 +128,17 @@ pub fn AndThen(AndThenFn: type) type {
 
                         pub fn start(self: *@This()) void {
                             self.input_computation.start();
-                            if (input_is_error_union) {
-                                const ErrorUnion = InputFuture.ValueType;
-                                const input_value: *ErrorUnion = &self.input_computation.next.value;
-                                const input_state: *State = &self.input_computation.next.state;
-                                if (std.meta.isError(input_value.*)) {
-                                    self.next.@"continue"(input_value.*, input_state.*);
-                                } else {
-                                    self.map_runnable = .{
-                                        .runFn = runMap,
-                                        .ptr = self,
-                                    };
-                                    input_state.executor.submitRunnable(&self.map_runnable);
-                                }
-                            } else {
-                                const input_state: *State = &self.input_computation.next.state;
+                            const ErrorUnion = InputFuture.ValueType;
+                            const input_value: *ErrorUnion = &self.input_computation.next.value;
+                            const input_state: *State = &self.input_computation.next.state;
+                            if (std.meta.isError(input_value.*)) {
                                 self.map_runnable = .{
                                     .runFn = runMap,
                                     .ptr = self,
                                 };
                                 input_state.executor.submitRunnable(&self.map_runnable);
+                            } else {
+                                self.next.@"continue"(input_value.* catch unreachable, input_state.*);
                             }
                         }
                     };
@@ -174,10 +173,10 @@ pub fn AndThen(AndThenFn: type) type {
     };
 }
 
-pub fn andThen(
+pub fn orElse(
     map_fn: anytype,
     ctx: ?*anyopaque,
-) AndThen(@TypeOf(map_fn)) {
+) OrElse(@TypeOf(map_fn)) {
     return .{
         .map_fn = map_fn,
         .map_ctx = ctx,

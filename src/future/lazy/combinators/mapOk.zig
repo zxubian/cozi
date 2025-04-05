@@ -97,7 +97,7 @@ pub fn MapOk(MapOkFn: type) type {
                     }
                 };
 
-                fn Computation(Continuation: anytype) type {
+                pub fn Computation(Continuation: anytype) type {
                     return struct {
                         input_computation: InputFuture.Computation(ContinuationForInputFuture),
                         map_fn: *const MapOkFn,
