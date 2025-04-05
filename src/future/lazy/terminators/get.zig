@@ -8,7 +8,7 @@ const Get = @This();
 
 pub fn get(
     future_: anytype,
-) !@TypeOf(future_).ValueType {
+) @TypeOf(future_).ValueType {
     const Future = Thunk(@TypeOf(future_));
     const V = Future.ValueType;
     var demand: Demand(V) = .{};

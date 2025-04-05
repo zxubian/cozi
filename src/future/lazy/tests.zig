@@ -7,12 +7,12 @@ const future = @import("../main.zig").lazy;
 
 test "lazy future - just - basic" {
     const just = future.just();
-    try future.get(just);
+    future.get(just);
 }
 
 test "lazy future - value - basic" {
     const value = future.value(@as(usize, 44));
-    const result = try future.get(value);
+    const result = future.get(value);
     try testing.expectEqual(44, result);
 }
 
@@ -27,7 +27,7 @@ test "lazy future - pipeline - basic" {
             return in + 1;
         }
     }.run, null).pipe(via);
-    const result = try future.get(map);
+    const result = future.get(map);
     try testing.expectEqual(45, result);
 }
 
@@ -50,7 +50,7 @@ test "lazy future - pipeline - multiple" {
             return in + 2;
         }
     }.run, null).pipe(map);
-    const result = try future.get(map_2);
+    const result = future.get(map_2);
     try testing.expectEqual(3, result);
 }
 
@@ -66,7 +66,7 @@ test "lazy future map - with side effects" {
             done_.* = true;
         }
     }.run, @alignCast(@ptrCast(&done))).pipe(via);
-    try future.get(map);
+    future.get(map);
     try testing.expect(done);
 }
 
@@ -85,7 +85,7 @@ test "lazy future - pipeline - syntax" {
             }.run, null),
         },
     );
-    const result = try future.get(pipeline);
+    const result = future.get(pipeline);
     try testing.expectEqual(124, result);
 }
 
@@ -107,6 +107,6 @@ test "lazy future - submit - basic" {
         }.run,
         null,
     );
-    const result: usize = try future.get(compute);
+    const result: usize = future.get(compute);
     try testing.expectEqual(11, result);
 }
