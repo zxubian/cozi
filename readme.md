@@ -1,4 +1,5 @@
-# zinc - concurrency primitives for zig
+# **zinc** - concurrency primitives for Zig
+_Fibers, thread pools, futures - all in userland Zig. Oh My!_
 
 ## Goals
 - empower Zig users to solve concurrent & parallel engineering problems
@@ -84,6 +85,15 @@ Channel
 
 ## Memory Management Policy:
   - API must allow fine-grained control over allocations for users who care
-  - provide "managed" API for users who don't
-  - regardless of memory management approach chosen by the user, library must minimize # of runtime allocations
+  - it's nice to provide "managed" API for users who don't (e.g. for testing)
+  - regardless of memory management approach chosen by the user, library must minimize number of runtime allocations
 
+# Acknowledgements
+The design of **zinc** is heavily based on prior work, especialy the [concurrency course](https://www.youtube.com/watch?v=zw6V3SDsXDk&list=PL4_hYwCyhAva37lNnoMuBcKRELso5nvBm) taught by [Roman Lipovsky](https://gitlab.com/Lipovsky) at MIPT. The author would like to express his deepest gratitude to Roman for all of the knowledge that he shares publicly, and for his dedication to education in technology. This library began as a fun exercise to go along with the course, and would not exist without it.
+
+**Honourable mentions:**
+- [YACLib](https://github.com/YACLib/YACLib)
+- GoLang
+    - [select](https://github.com/golang/go/blob/master/src/runtime/select.go)
+- Rust
+    - [zero-cost futures](https://aturon.github.io/tech/2016/09/07/futures-design/)
