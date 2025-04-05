@@ -15,7 +15,7 @@ pub const Impl = struct {
     pub const via = combinators.via.via;
     pub const map = combinators.map.map;
     // --- terminators ---
-    pub const get = run.get;
+    pub const get = terminators.get;
     // --- syntax ---
     pub const pipeline = syntax.pipeline.pipeline;
 };
@@ -24,7 +24,7 @@ pub const Impl = struct {
 pub const meta = @import("./meta.zig");
 pub const model = @import("./model.zig");
 pub const make = @import("./make/main.zig");
-pub const run = @import("./run/main.zig");
+pub const terminators = @import("./terminators//main.zig");
 pub const combinators = @import("./combinators/main.zig");
 pub const syntax = @import("./syntax/main.zig");
 
