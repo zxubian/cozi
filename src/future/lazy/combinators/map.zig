@@ -26,7 +26,7 @@ pub fn Map(MapFn: type) type {
                 const MapFnArgType = args_info.fields[1].type;
                 if (InputFuture.ValueType != MapFnArgType) {
                     @compileError(std.fmt.comptimePrint(
-                        "Incorrect argument type for map function {} in {} with input future {}. Expected: {}. Got: {}",
+                        "Incorrect parameter type for map function {} in {} with input future {}. Expected: {}. Got: {}",
                         .{
                             MapFn,
                             @This(),
@@ -58,78 +58,61 @@ pub fn Map(MapFn: type) type {
                     }
                 };
 
-                fn Computation(Continuation: anytype) type {
+                pub fn Computation(Continuation: anytype) type {
                     return struct {
                         input_computation: InputFuture.Computation(ContinuationForInputFuture),
                         map_fn: *const MapFn,
                         map_ctx: ?*anyopaque,
                         next: Continuation,
+                        runnable: Runnable = undefined,
+                        const Self = @This();
 
-                        pub fn start(self: *@This()) void {
-                            const Ctx = struct {
-                                input: *InputFuture.ValueType,
-                                output: *OutputValueType,
-                                map_fn: *const MapFn,
-                                map_ctx: ?*anyopaque,
-                                wait_group: std.Thread.WaitGroup = .{},
-                                pub fn run(ctx_: *anyopaque) void {
-                                    const ctx: *@This() = @alignCast(@ptrCast(ctx_));
-                                    if (map_fn_has_args) {
-                                        ctx.output.* = @call(
-                                            .auto,
-                                            ctx.map_fn,
-                                            .{ ctx.map_ctx, ctx.input.* },
-                                        );
-                                    } else {
-                                        ctx.output.* = @call(
-                                            .auto,
-                                            ctx.map_fn,
-                                            .{ctx.map_ctx},
-                                        );
-                                    }
-                                    ctx.wait_group.finish();
+                        pub fn run(ctx_: *anyopaque) void {
+                            const self: *Self = @alignCast(@ptrCast(ctx_));
+                            const input_value = &self.input_computation.next.value;
+                            const output: OutputValueType = blk: {
+                                if (map_fn_has_args) {
+                                    break :blk @call(
+                                        .auto,
+                                        self.map_fn,
+                                        .{
+                                            self.map_ctx,
+                                            input_value.*,
+                                        },
+                                    );
+                                } else {
+                                    break :blk @call(
+                                        .auto,
+                                        self.map_fn,
+                                        .{self.map_ctx},
+                                    );
                                 }
                             };
-                            self.input_computation.start();
-                            const input_value: *InputFuture.ValueType = &self.input_computation.next.value;
-                            const input_state: *State = &self.input_computation.next.state;
-                            var output: OutputValueType = undefined;
-                            var ctx: Ctx = .{
-                                .input = input_value,
-                                .output = &output,
-                                .map_fn = self.map_fn,
-                                .map_ctx = self.map_ctx,
-                            };
-                            ctx.wait_group.startMany(2);
-                            var runnable: Runnable = .{
-                                .runFn = Ctx.run,
-                                .ptr = &ctx,
-                            };
-                            input_state.executor.submitRunnable(&runnable);
-                            ctx.wait_group.finish();
-                            ctx.wait_group.wait();
-                            self.next.@"continue"(output, input_state.*);
+                            self.next.@"continue"(output, self.input_computation.next.state);
                         }
 
-                        pub fn makeRunnable(self: *@This()) Runnable {
-                            return Runnable{
-                                .runFn = @This().run,
+                        pub fn start(self: *@This()) void {
+                            self.input_computation.start();
+                            const input_state: *State = &self.input_computation.next.state;
+                            self.runnable = .{
+                                .runFn = run,
                                 .ptr = self,
                             };
+                            input_state.executor.submitRunnable(&self.runnable);
                         }
                     };
                 }
 
                 pub fn materialize(
                     self: @This(),
-                    continuation: anytype,
-                ) Computation(@TypeOf(continuation)) {
+                    continuation_ptr: anytype,
+                ) Computation(@TypeOf(continuation_ptr)) {
                     const input_computation = self.input_future.materialize(ContinuationForInputFuture{});
                     return .{
                         .input_computation = input_computation,
                         .map_fn = self.map_fn,
                         .map_ctx = self.map_ctx,
-                        .next = continuation,
+                        .next = continuation_ptr,
                     };
                 }
             };
