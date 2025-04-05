@@ -146,13 +146,6 @@ pub fn MapOk(MapOkFn: type) type {
                                 input_state.executor.submitRunnable(&self.runnable);
                             }
                         }
-
-                        pub fn makeRunnable(self: *@This()) Runnable {
-                            return Runnable{
-                                .runFn = @This().run,
-                                .ptr = self,
-                            };
-                        }
                     };
                 }
 
