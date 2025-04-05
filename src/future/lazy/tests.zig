@@ -110,3 +110,119 @@ test "lazy future - submit - basic" {
     const result: usize = future.get(compute);
     try testing.expectEqual(11, result);
 }
+
+test "lazy future - submit - timer" {
+    if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
+    const allocator = testing.allocator;
+    var pool: executors.ThreadPools.Compute = try .init(1, allocator);
+    defer pool.deinit();
+    try pool.start();
+    defer pool.stop();
+    const compute = future.submit(
+        pool.executor(),
+        struct {
+            pub fn run(_: ?*anyopaque) usize {
+                std.Thread.sleep(std.time.ns_per_s);
+                return 12;
+            }
+        }.run,
+        null,
+    );
+    var timer: std.time.Timer = try .start();
+    defer timer.reset();
+    const result: usize = future.get(compute);
+    const now = timer.read();
+    try testing.expect(try std.math.divCeil(u64, now, std.time.ns_per_s) > 1);
+    try testing.expectEqual(12, result);
+}
+
+test "lazy future - pipeline - fallible" {
+    const pipeline = future.pipeline(
+        .{
+            future.value(@as(u32, 123)),
+            future.map(struct {
+                pub fn run(
+                    _: ?*anyopaque,
+                    in: u32,
+                ) !u32 {
+                    return in + 1;
+                }
+            }.run, null),
+        },
+    );
+    const result = try future.get(pipeline);
+    try testing.expectEqual(124, result);
+}
+
+test "lazy future - MapOk" {
+    const pipeline = future.pipeline(
+        .{
+            future.value(@as(anyerror!u32, 123)),
+            future.mapOk(struct {
+                pub fn run(
+                    _: ?*anyopaque,
+                    in: u32,
+                ) u32 {
+                    return in + 1;
+                }
+            }.run, null),
+        },
+    );
+    const result = future.get(pipeline);
+    try testing.expectEqual(124, result);
+}
+
+test "lazy future - MapOk - not called on error" {
+    const IoError = error{
+        file_not_found,
+    };
+    const pipeline = future.pipeline(
+        .{
+            future.value(@as(IoError!u32, IoError.file_not_found)),
+            future.mapOk(struct {
+                pub fn run(
+                    _: ?*anyopaque,
+                    _: u32,
+                ) u32 {
+                    unreachable;
+                }
+            }.run, null),
+        },
+    );
+    const result = future.get(pipeline);
+    try testing.expectError(IoError.file_not_found, result);
+}
+
+test "lazy future - MapOk - return error" {
+    const IoError = error{
+        file_not_found,
+    };
+    const MapError = error{
+        some_other_error,
+    };
+    const ThirdErrorType = error{
+        abcd,
+    };
+    _ = ThirdErrorType;
+    const pipeline = future.pipeline(
+        .{
+            future.value(@as(IoError!u32, 123)),
+            future.mapOk(struct {
+                pub fn run(
+                    _: ?*anyopaque,
+                    _: u32,
+                ) MapError!u32 {
+                    return MapError.some_other_error;
+                }
+            }.run, null),
+        },
+    );
+    _ = future.get(pipeline) catch |err| switch (err) {
+        IoError.file_not_found => unreachable,
+        MapError.some_other_error => {},
+        // uncommenting this will cause a compile error
+        // ThirdErrorType.abcd => {},
+    };
+}
