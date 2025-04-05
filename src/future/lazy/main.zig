@@ -17,6 +17,7 @@ pub const Impl = struct {
     pub const via = combinators.via.via;
     pub const map = combinators.map.map;
     pub const mapOk = combinators.mapOk.mapOk;
+    pub const andThen = combinators.andThen.andThen;
     // --- terminators ---
     pub const get = terminators.get;
     // --- syntax ---

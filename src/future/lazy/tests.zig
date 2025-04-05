@@ -232,3 +232,45 @@ test "lazy future - MapOk - return error" {
         // ThirdErrorType.abcd => {},
     };
 }
+
+test "lazy future - andThen" {
+    const IoError = error{
+        file_not_found,
+    };
+    const pipeline = future.pipeline(
+        .{
+            future.constValue(@as(IoError!u32, 123)),
+            future.andThen(struct {
+                pub fn run(
+                    _: ?*anyopaque,
+                    input: u32,
+                ) future.Value(IoError!u32) {
+                    return future.value(@as(IoError!u32, input + 1));
+                }
+            }.run, null),
+        },
+    );
+    const result = future.get(pipeline);
+    try testing.expectEqual(124, result);
+}
+
+test "lazy future - andThen - return error" {
+    const IoError = error{
+        file_not_found,
+    };
+    const pipeline = future.pipeline(
+        .{
+            future.constValue(@as(IoError!u32, IoError.file_not_found)),
+            future.andThen(struct {
+                pub fn run(
+                    _: ?*anyopaque,
+                    _: u32,
+                ) future.Value(IoError!u32) {
+                    unreachable;
+                }
+            }.run, null),
+        },
+    );
+    const result = future.get(pipeline);
+    try testing.expectError(IoError.file_not_found, result);
+}
