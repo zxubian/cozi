@@ -10,6 +10,44 @@ _Fibers, thread pools, futures - all in userland Zig. Oh My!_
   - composable - components can be combined to produce more powerful behaviours.
   - extensible - we cannot anticipate every use-case. So, our APIs must be designed in a way that allows users of the library to integrate their custom solutions.
 
+## Installation
+
+### Zig Version
+
+```
+0.15.0-dev.337+4e700fdf8
+```
+
+### Steps
+
+1. Install package:
+```bash
+zig fetch --save git+https://github.com/zxubian/zinc.git#main
+```
+
+2. Add `zinc` module to your executable:
+```zig
+// build.zig
+    const fault_inject_variant = b.option(
+        []const u8,
+        "zinc_fault_inject",
+        "Which fault injection build type to use",
+    );
+    const zinc = blk: {
+        if (fault_inject_variant) |user_input| {
+            break :blk b.dependency("zinc", .{
+                .fault_inject = user_input,
+            });
+        }
+        break :blk b.dependency("zinc", .{});
+    };
+    exe.root_module.addImport("zinc", zinc.module("root"));
+```
+
+3. Import `zinc` and use:
+- [example](example/main.zig)
+
+
 ## Features & Roadmap
 
 ### Stackfull Coroutine - a function you can suspend & resume

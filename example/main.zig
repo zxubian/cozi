@@ -1,6 +1,6 @@
 const std = @import("std");
 const Zinc = @import("zinc");
-const ThreadPool = Zinc.Executors.ThreadPools.Compute;
+const ThreadPool = Zinc.executors.threadPools.Compute;
 
 pub fn main() !void {
     const Ctx = struct {

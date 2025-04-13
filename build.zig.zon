@@ -1,8 +1,8 @@
 .{
     .name = .zinc,
-    .version = "0.0.0",
+    .version = "0.0.1",
     .fingerprint = 0x4d051980d494e470,
-    .minimum_zig_version = "0.14.0-dev.909+f9f894200",
+    .minimum_zig_version = "0.15.0-dev.337+4e700fdf8",
     .dependencies = .{},
     .paths = .{
         "build.zig",

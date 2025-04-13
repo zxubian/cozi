@@ -15,7 +15,7 @@ pub fn build(b: *std.Build) void {
 
     const fault_inject_variant = b.option(
         []const u8,
-        "fault_inject",
+        "zinc_fault_inject",
         "Which fault injection build type to use",
     );
     const zinc = blk: {
