@@ -47,13 +47,15 @@ zig fetch --save git+https://github.com/zxubian/zinc.git#main
 3. Import `zinc` and use:
 - [example](example/main.zig)
 
+### Stability Guarantees
+`zinc` is experimental and unstable. Expect `main` branch to occasionally break.
 
 ## Features & Roadmap
 
 ### Stackfull Coroutine - a function you can suspend & resume
 - [x] Basic support 
 - Back-ends for machine context switch:
-  - [x] aarch64
+  - [x] aarch64-macos
   - [ ] x86-64
     - [ ] Microsoft x64
     - [ ] System V AMD64 ABI
