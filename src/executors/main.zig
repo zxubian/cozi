@@ -1,6 +1,6 @@
 const std = @import("std");
 
-pub const ThreadPools = @import("./threadPools.zig");
+pub const threadPools = @import("./threadPools.zig");
 pub const Manual = @import("./manual.zig");
 pub const Executor = @import("./executor.zig");
 

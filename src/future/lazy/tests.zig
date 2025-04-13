@@ -4,6 +4,8 @@ const testing = std.testing;
 const assert = std.debug.assert;
 const executors = @import("../../main.zig").executors;
 const future = @import("../main.zig").lazy;
+const ThreadPool = executors.threadPools.Compute;
+const InlineExecutor = executors.@"inline";
 
 test "lazy future - just - basic" {
     const just = future.just();
@@ -24,7 +26,7 @@ test "lazy future - value - basic" {
 
 test "lazy future - pipeline - basic" {
     const value = future.value(@as(usize, 44));
-    const via = future.via(executors.@"inline").pipe(value);
+    const via = future.via(InlineExecutor).pipe(value);
     const map = future.map(struct {
         pub fn run(
             _: ?*anyopaque,
@@ -39,7 +41,7 @@ test "lazy future - pipeline - basic" {
 
 test "lazy future - pipeline - multiple" {
     const value = future.value(@as(usize, 0));
-    const via = future.via(executors.@"inline").pipe(value);
+    const via = future.via(InlineExecutor).pipe(value);
     const map = future.map(struct {
         pub fn run(
             _: ?*anyopaque,
@@ -62,7 +64,7 @@ test "lazy future - pipeline - multiple" {
 
 test "lazy future map - with side effects" {
     const just = future.just();
-    const via = future.via(executors.@"inline").pipe(just);
+    const via = future.via(InlineExecutor).pipe(just);
     var done: bool = false;
     const map = future.map(struct {
         pub fn run(
@@ -80,7 +82,7 @@ test "lazy future - pipeline - syntax" {
     const pipeline = future.pipeline(
         .{
             future.value(@as(u32, 123)),
-            future.via(executors.@"inline"),
+            future.via(InlineExecutor),
             future.map(struct {
                 pub fn run(
                     _: ?*anyopaque,
@@ -100,7 +102,7 @@ test "lazy future - submit - basic" {
         return error.SkipZigTest;
     }
     const allocator = testing.allocator;
-    var pool: executors.ThreadPools.Compute = try .init(1, allocator);
+    var pool: ThreadPool = try .init(1, allocator);
     defer pool.deinit();
     try pool.start();
     defer pool.stop();
@@ -122,7 +124,7 @@ test "lazy future - submit - timer" {
         return error.SkipZigTest;
     }
     const allocator = testing.allocator;
-    var pool: executors.ThreadPools.Compute = try .init(1, allocator);
+    var pool: ThreadPool = try .init(1, allocator);
     defer pool.deinit();
     try pool.start();
     defer pool.stop();

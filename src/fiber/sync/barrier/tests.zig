@@ -11,10 +11,10 @@ const WaitGroup = std.Thread.WaitGroup;
 const Fiber = @import("../../../fiber/main.zig");
 const Barrier = Fiber.Barrier;
 const Mutex = Fiber.Mutex;
-const Executors = @import("../../../executors/main.zig");
-const ManualExecutor = Executors.Manual;
-const ThreadPool = Executors.ThreadPools.Compute;
-const Executor = Executors.Executor;
+const executors = @import("../../../executors/main.zig");
+const ManualExecutor = executors.Manual;
+const ThreadPool = executors.threadPools.Compute;
+const Executor = executors.Executor;
 
 test "barrier - basic - single thread" {
     var executor = ManualExecutor{};

@@ -7,9 +7,9 @@ const Fiber = @import("../../main.zig");
 const select = Fiber.select;
 const Channel = Fiber.Channel;
 
-const Executors = @import("../../../executors/main.zig");
-const ManualExecutor = Executors.Manual;
-const ThreadPool = Executors.ThreadPools.Compute;
+const executors = @import("../../../executors/main.zig");
+const ManualExecutor = executors.Manual;
+const ThreadPool = executors.threadPools.Compute;
 
 const fault = @import("../../../fault/main.zig");
 const Atomic = fault.stdlike.atomic;

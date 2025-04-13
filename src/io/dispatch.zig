@@ -10,8 +10,8 @@ const Dispatch = @This();
 const Core = @import("../core/main.zig");
 const Runnable = Core.Runnable;
 const Closure = Core.Closure;
-const Executors = @import("../executors/main.zig");
-const Executor = Executors.Executor;
+const executors = @import("../executors/main.zig");
+const Executor = executors.Executor;
 
 pub const OnEntryCompleted = *const fn (
     dispatch: *Dispatch,

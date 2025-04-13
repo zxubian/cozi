@@ -11,9 +11,9 @@ const Atomic = stdlike.atomic.Value;
 const WaitGroup = std.Thread.WaitGroup;
 
 const Fiber = @import("./main.zig");
-const Executors = @import("../executors/main.zig");
-const ManualExecutor = Executors.Manual;
-const ThreadPool = Executors.ThreadPools.Compute;
+const executors = @import("../executors/main.zig");
+const ManualExecutor = executors.Manual;
+const ThreadPool = executors.threadPools.Compute;
 const Stack = @import("../core/main.zig").Stack;
 
 test {

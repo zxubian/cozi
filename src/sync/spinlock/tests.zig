@@ -4,8 +4,8 @@ const builtin = @import("builtin");
 
 const Thread = std.Thread;
 const WaitGroup = Thread.WaitGroup;
-const Executors = @import("../../executors/main.zig");
-const ThreadPool = Executors.ThreadPools.Compute;
+const executors = @import("../../executors/main.zig");
+const ThreadPool = executors.threadPools.Compute;
 
 const Spinlock = @import("../spinlock.zig");
 

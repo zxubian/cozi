@@ -6,9 +6,9 @@ const build_config = @import("build_config");
 const Fiber = @import("../../main.zig");
 const Mutex = Fiber.Mutex;
 
-const Executors = @import("../../../executors/main.zig");
-const ManualExecutor = Executors.Manual;
-const ThreadPool = Executors.ThreadPools.Compute;
+const executors = @import("../../../executors/main.zig");
+const ManualExecutor = executors.Manual;
+const ThreadPool = executors.threadPools.Compute;
 const WaitGroup = std.Thread.WaitGroup;
 const TimeLimit = @import("../../../testing/TimeLimit.zig");
 

@@ -10,8 +10,8 @@ const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
 
 const Coroutine = @import("../coroutine/main.zig");
-const Executors = @import("../executors/main.zig");
-const Executor = Executors.Executor;
+const executors = @import("../executors/main.zig");
+const Executor = executors.Executor;
 const Core = @import("../core/main.zig");
 const Closure = Core.Closure;
 const Runnable = Core.Runnable;

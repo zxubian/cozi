@@ -10,9 +10,9 @@ const Atomic = stdlike.atomic.Value;
 const Fiber = @import("../../main.zig");
 const WaitGroup = Fiber.WaitGroup;
 
-const Executors = @import("../../../executors/main.zig");
-const ManualExecutor = Executors.Manual;
-const ThreadPool = Executors.ThreadPools.Compute;
+const executors = @import("../../../executors/main.zig");
+const ManualExecutor = executors.Manual;
+const ThreadPool = executors.threadPools.Compute;
 const ThreadWaitGroup = std.Thread.WaitGroup;
 
 test "counter - single thread" {

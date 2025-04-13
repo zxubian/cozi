@@ -8,9 +8,9 @@ const WaitGroup = std.Thread.WaitGroup;
 
 const Fiber = @import("../../main.zig");
 const Channel = Fiber.Channel;
-const Executors = @import("../../../executors/main.zig");
-const ThreadPool = Executors.ThreadPools.Compute;
-const ManualExecutor = Executors.Manual;
+const executors = @import("../../../executors/main.zig");
+const ThreadPool = executors.threadPools.Compute;
+const ManualExecutor = executors.Manual;
 
 test "BufferedChannel - Ping Pong" {
     var manual: ManualExecutor = .{};
