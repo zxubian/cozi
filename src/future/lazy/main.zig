@@ -20,6 +20,7 @@ pub const Impl = struct {
     pub const mapOk = combinators.mapOk.mapOk;
     pub const andThen = combinators.andThen.andThen;
     pub const orElse = combinators.orElse.orElse;
+    pub const flatten = combinators.flatten.flatten;
     // --- terminators ---
     pub const get = terminators.get;
     // --- syntax ---

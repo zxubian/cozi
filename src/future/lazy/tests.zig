@@ -382,3 +382,41 @@ test "lazy future - pipeline - combinators" {
     const result = try future.get(pipeline);
     try testing.expectEqual(4, result);
 }
+
+test "lazy future - flatten" {
+    if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
+    const allocator = testing.allocator;
+    var tp: ThreadPool = try .init(1, allocator);
+    defer tp.deinit();
+    try tp.start();
+    defer tp.stop();
+
+    const Ctx = struct {
+        executor: executors.Executor,
+        const Self = @This();
+        pub fn run(ctx: ?*anyopaque) future.Submit(InnerCtx.inner_run) {
+            const self: *Self = @alignCast(@ptrCast(ctx));
+            return future.submit(self.executor, InnerCtx.inner_run, null);
+        }
+        const InnerCtx = struct {
+            pub fn inner_run(_: ?*anyopaque) usize {
+                return 7;
+            }
+        };
+    };
+
+    var ctx: Ctx = .{ .executor = tp.executor() };
+    const nested = future.submit(
+        tp.executor(),
+        Ctx.run,
+        &ctx,
+    );
+    const flattened = future.pipeline(.{
+        nested,
+        future.flatten(),
+    });
+    const result = future.get(flattened);
+    try testing.expectEqual(7, result);
+}

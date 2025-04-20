@@ -4,3 +4,4 @@ pub const map = @import("./map.zig");
 pub const mapOk = @import("./mapOk.zig");
 pub const andThen = @import("./andThen.zig");
 pub const orElse = @import("./orElse.zig");
+pub const flatten = @import("./flatten.zig");
