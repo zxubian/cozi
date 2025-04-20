@@ -24,6 +24,7 @@ pub const Impl = struct {
     pub const flatten = combinators.flatten.flatten;
     // --- terminators ---
     pub const get = terminators.get;
+    pub const detach = terminators.detach;
     // --- syntax ---
     pub const pipeline = syntax.pipeline.pipeline;
 };

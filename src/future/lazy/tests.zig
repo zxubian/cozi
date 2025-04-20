@@ -450,3 +450,90 @@ test "lazy future - contract - thread pool" {
     const result = future.get(transform);
     try testing.expectEqual(9, result);
 }
+
+test "lazy future - detach" {
+    var manual: executors.Manual = .{};
+
+    const Ctx = struct {
+        done: bool,
+
+        pub fn run(ctx: ?*anyopaque) void {
+            const self: *@This() = @alignCast(@ptrCast(ctx.?));
+            self.done = true;
+        }
+    };
+
+    var ctx: Ctx = .{ .done = false };
+
+    const f = future.submit(manual.executor(), Ctx.run, &ctx);
+    try testing.expect(manual.isEmpty());
+    try testing.expect(!ctx.done);
+
+    try future.detach(f, std.testing.allocator);
+    try testing.expect(!manual.isEmpty());
+    try testing.expect(!ctx.done);
+
+    _ = manual.drain();
+    try testing.expect(manual.isEmpty());
+    try testing.expect(ctx.done);
+}
+
+test "lazy future - contract - detach - promise first" {
+    const allocator = testing.allocator;
+    const future_, const promise_ = try future.contractManaged(void, std.testing.allocator);
+    const Ctx = struct {
+        done: bool,
+        pub fn run(
+            ctx: ?*anyopaque,
+            _: void,
+        ) void {
+            const self: *@This() = @alignCast(@ptrCast(ctx.?));
+            self.done = true;
+        }
+    };
+    var ctx: Ctx = .{ .done = false };
+    const transform = future.pipeline(
+        .{
+            future_,
+            future.via(executors.@"inline"),
+            future.map(
+                Ctx.run,
+                &ctx,
+            ),
+        },
+    );
+    promise_.resolve({});
+    try testing.expect(!ctx.done);
+    try future.detach(transform, allocator);
+    try testing.expect(ctx.done);
+}
+
+test "lazy future - contract - detach - future first" {
+    const allocator = testing.allocator;
+    const future_, const promise_ = try future.contractManaged(void, std.testing.allocator);
+    const Ctx = struct {
+        done: bool,
+        pub fn run(
+            ctx: ?*anyopaque,
+            _: void,
+        ) void {
+            const self: *@This() = @alignCast(@ptrCast(ctx.?));
+            self.done = true;
+        }
+    };
+    var ctx: Ctx = .{ .done = false };
+    const transform = future.pipeline(
+        .{
+            future_,
+            future.via(executors.@"inline"),
+            future.map(
+                Ctx.run,
+                &ctx,
+            ),
+        },
+    );
+    try future.detach(transform, allocator);
+    try testing.expect(!ctx.done);
+    promise_.resolve({});
+    try testing.expect(ctx.done);
+}
