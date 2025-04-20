@@ -67,80 +67,78 @@ pub fn OrElse(OrElseFn: type) type {
 
                 pub const ValueType = FlattenedType;
 
-                pub const ContinuationForInputFuture = struct {
-                    value: InputFuture.ValueType = undefined,
-                    state: State = undefined,
-
-                    pub fn @"continue"(
-                        self: *@This(),
-                        value: InputFuture.ValueType,
-                        state: State,
-                    ) void {
-                        self.value = value;
-                        self.state = state;
-                    }
-                };
-
                 pub fn Computation(Continuation: anytype) type {
                     return struct {
-                        const Self = @This();
-
-                        const ContinuationForOutputFuture = struct {
-                            value: ValueType = undefined,
-                            state: State = undefined,
-
-                            pub fn @"continue"(
-                                self: *@This(),
-                                value: FlattenedType,
-                                state: State,
-                            ) void {
-                                const computation: *Self = @fieldParentPtr("output_future_continuation", self);
-                                computation.next.@"continue"(value, state);
-                            }
-                        };
-
                         input_computation: InputFuture.Computation(ContinuationForInputFuture),
-                        map_fn: *const OrElseFn,
-                        map_ctx: ?*anyopaque,
-                        next: Continuation,
-                        map_runnable: Runnable = undefined,
-                        output_future: OrElseReturnFuture = undefined,
-                        output_future_computation: OrElseReturnFuture.Computation(*ContinuationForOutputFuture) = undefined,
-                        output_future_continuation: ContinuationForOutputFuture = .{},
-
-                        pub fn runMap(ctx_: *anyopaque) void {
-                            const self: *Self = @alignCast(@ptrCast(ctx_));
-                            const input_value = &self.input_computation.next.value;
-                            const error_value = blk: {
-                                _ = input_value.* catch |err| {
-                                    break :blk err;
-                                };
-                                unreachable;
-                            };
-                            self.output_future = @call(
-                                .auto,
-                                self.map_fn,
-                                .{ self.map_ctx, error_value },
-                            );
-                            self.output_future_computation = self.output_future.materialize(&self.output_future_continuation);
-                            self.output_future_computation.start();
-                        }
 
                         pub fn start(self: *@This()) void {
                             self.input_computation.start();
-                            const ErrorUnion = InputFuture.ValueType;
-                            const input_value: *ErrorUnion = &self.input_computation.next.value;
-                            const input_state: *State = &self.input_computation.next.state;
-                            if (std.meta.isError(input_value.*)) {
-                                self.map_runnable = .{
-                                    .runFn = runMap,
-                                    .ptr = self,
-                                };
-                                input_state.executor.submitRunnable(&self.map_runnable);
-                            } else {
-                                self.next.@"continue"(input_value.* catch unreachable, input_state.*);
-                            }
                         }
+
+                        pub const ContinuationForInputFuture = struct {
+                            value: InputFuture.ValueType = undefined,
+                            state: State = undefined,
+                            map_fn: *const OrElseFn,
+                            map_ctx: ?*anyopaque,
+                            next: Continuation,
+                            map_runnable: Runnable = undefined,
+                            output_future: OrElseReturnFuture = undefined,
+                            output_future_computation: OrElseReturnFuture.Computation(*ContinuationForOutputFuture) = undefined,
+                            output_future_continuation: ContinuationForOutputFuture = .{},
+
+                            pub fn @"continue"(
+                                self: *@This(),
+                                value: InputFuture.ValueType,
+                                state: State,
+                            ) void {
+                                self.value = value;
+                                self.state = state;
+                                if (std.meta.isError(value)) {
+                                    self.map_runnable = .{
+                                        .runFn = runMap,
+                                        .ptr = self,
+                                    };
+                                    state.executor.submitRunnable(&self.map_runnable);
+                                } else {
+                                    self.next.@"continue"(value catch unreachable, state);
+                                }
+                            }
+
+                            pub fn runMap(ctx_: *anyopaque) void {
+                                const self: *@This() = @alignCast(@ptrCast(ctx_));
+                                const input_value = &self.value;
+                                const error_value = blk: {
+                                    _ = input_value.* catch |err| {
+                                        break :blk err;
+                                    };
+                                    unreachable;
+                                };
+                                self.output_future = @call(
+                                    .auto,
+                                    self.map_fn,
+                                    .{ self.map_ctx, error_value },
+                                );
+                                self.output_future_computation = self.output_future.materialize(&self.output_future_continuation);
+                                self.output_future_computation.start();
+                            }
+
+                            const ContinuationForOutputFuture = struct {
+                                value: ValueType = undefined,
+                                state: State = undefined,
+
+                                pub fn @"continue"(
+                                    self: *@This(),
+                                    value: FlattenedType,
+                                    state: State,
+                                ) void {
+                                    const computation: *ContinuationForInputFuture = @fieldParentPtr(
+                                        "output_future_continuation",
+                                        self,
+                                    );
+                                    computation.next.@"continue"(value, state);
+                                }
+                            };
+                        };
                     };
                 }
 
@@ -148,12 +146,16 @@ pub fn OrElse(OrElseFn: type) type {
                     self: @This(),
                     continuation: anytype,
                 ) Computation(@TypeOf(continuation)) {
-                    const input_computation = self.input_future.materialize(ContinuationForInputFuture{});
+                    const Result = Computation(@TypeOf(continuation));
+                    const InputContinuation = Result.ContinuationForInputFuture;
                     return .{
-                        .input_computation = input_computation,
-                        .map_fn = self.map_fn,
-                        .map_ctx = self.map_ctx,
-                        .next = continuation,
+                        .input_computation = self.input_future.materialize(
+                            InputContinuation{
+                                .map_fn = self.map_fn,
+                                .map_ctx = self.map_ctx,
+                                .next = continuation,
+                            },
+                        ),
                     };
                 }
             };

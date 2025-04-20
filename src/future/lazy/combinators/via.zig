@@ -20,33 +20,30 @@ pub fn Future(InputFuture: type) type {
 
         pub const ValueType = InputFuture.ValueType;
 
-        pub const ContinuationForInputFuture = struct {
-            value: InputFuture.ValueType = undefined,
-            pub fn @"continue"(
-                self: *@This(),
-                value: InputFuture.ValueType,
-                _: State,
-            ) void {
-                self.value = value;
-            }
-        };
-
         pub fn Computation(Continuation: anytype) type {
             return struct {
                 input_computation: InputFuture.Computation(ContinuationForInputFuture),
-                next_executor: Executor,
-                next: Continuation,
 
                 pub fn start(self: *@This()) void {
                     self.input_computation.start();
-                    const input_value: *InputFuture.ValueType = &self.input_computation.next.value;
-                    self.next.@"continue"(
-                        input_value.*,
-                        State{
-                            .executor = self.next_executor,
-                        },
-                    );
                 }
+
+                pub const ContinuationForInputFuture = struct {
+                    next_executor: Executor,
+                    next: Continuation,
+                    pub fn @"continue"(
+                        self: *@This(),
+                        value: InputFuture.ValueType,
+                        _: State,
+                    ) void {
+                        self.next.@"continue"(
+                            value,
+                            .{
+                                .executor = self.next_executor,
+                            },
+                        );
+                    }
+                };
             };
         }
 
@@ -54,11 +51,15 @@ pub fn Future(InputFuture: type) type {
             self: @This(),
             continuation: anytype,
         ) Computation(@TypeOf(continuation)) {
-            const input_computation = self.input_future.materialize(ContinuationForInputFuture{});
+            const Result = Computation(@TypeOf(continuation));
+            const InputContinuation = Result.ContinuationForInputFuture;
             return .{
-                .input_computation = input_computation,
-                .next_executor = self.next_executor,
-                .next = continuation,
+                .input_computation = self.input_future.materialize(
+                    InputContinuation{
+                        .next_executor = self.next_executor,
+                        .next = continuation,
+                    },
+                ),
             };
         }
     };
