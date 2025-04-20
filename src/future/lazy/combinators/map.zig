@@ -111,7 +111,6 @@ pub fn Map(MapFn: type) type {
                     continuation: anytype,
                 ) Computation(@TypeOf(continuation)) {
                     const Result = Computation(@TypeOf(continuation));
-
                     const InputContinuation = Result.ContinuationForInputFuture;
                     return .{
                         .input_computation = self.input_future.materialize(

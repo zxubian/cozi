@@ -10,7 +10,7 @@ const State = future.State;
 const model = future.model;
 const meta = future.meta;
 
-pub fn Value(V: type) type {
+pub fn Future(V: type) type {
     return struct {
         pub const ValueType = V;
         value: ValueType,
@@ -44,6 +44,6 @@ pub fn Value(V: type) type {
 }
 
 ///Future that instantly returns runtime-known value `v`
-pub fn value(v: anytype) Value(@TypeOf(v)) {
+pub fn value(v: anytype) Future(@TypeOf(v)) {
     return .{ .value = v };
 }

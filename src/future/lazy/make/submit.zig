@@ -11,7 +11,8 @@ const Computation = model.Computation;
 const meta = future.meta;
 const f = future.Impl;
 
-fn SubmitFuture(MapFn: type) type {
+pub fn Future(map_fn: anytype) type {
+    const MapFn = @TypeOf(map_fn);
     return future.syntax.pipeline.Result(std.meta.Tuple(&[_]type{
         future.make.just,
         future.combinators.via,
@@ -23,7 +24,7 @@ pub inline fn submit(
     executor: Executor,
     lambda: anytype,
     ctx: ?*anyopaque,
-) SubmitFuture(@TypeOf(lambda)) {
+) Future(lambda) {
     return f.pipeline(.{
         f.just(),
         f.via(executor),

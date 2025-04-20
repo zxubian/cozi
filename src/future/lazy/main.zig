@@ -9,9 +9,10 @@ const Runnable = core.Runnable;
 pub const Impl = struct {
     // --- generators ---
     pub const submit = make.submit.submit;
+    pub const Submit = make.submit.Future;
     pub const just = make.just.just;
     pub const constValue = make.constValue.constValue;
-    pub const Value = make.value.Value;
+    pub const Value = make.value.Future;
     pub const value = make.value.value;
     // --- combinators ---
     pub const via = combinators.via.via;
