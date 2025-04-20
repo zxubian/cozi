@@ -420,3 +420,33 @@ test "lazy future - flatten" {
     const result = future.get(flattened);
     try testing.expectEqual(7, result);
 }
+
+test "lazy future - contract - thread pool" {
+    if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
+    const allocator = testing.allocator;
+    var tp: ThreadPool = try .init(1, allocator);
+    defer tp.deinit();
+    try tp.start();
+    defer tp.stop();
+
+    const future_, const promise_ = try future.contractManaged(usize, std.testing.allocator);
+    const transform = future.pipeline(.{
+        future_,
+        future.map(
+            struct {
+                pub fn run(
+                    _: ?*anyopaque,
+                    value: usize,
+                ) usize {
+                    return value * 3;
+                }
+            }.run,
+            null,
+        ),
+    });
+    promise_.resolve(3);
+    const result = future.get(transform);
+    try testing.expectEqual(9, result);
+}

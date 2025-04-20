@@ -14,6 +14,7 @@ pub const Impl = struct {
     pub const constValue = make.constValue.constValue;
     pub const Value = make.value.Future;
     pub const value = make.value.value;
+    pub const contractManaged = make.contract.contractManaged;
     // --- combinators ---
     pub const via = combinators.via.via;
     pub const map = combinators.map.map;
@@ -37,6 +38,36 @@ pub const syntax = @import("./syntax/main.zig");
 pub const State = struct {
     executor: Executor,
 };
+
+pub fn Continuation(V: type) type {
+    return struct {
+        const Vtable = struct {
+            @"continue": *const fn (self: *anyopaque, value: V, state: State) void,
+        };
+        vtable: Vtable,
+        ptr: *anyopaque,
+
+        pub fn @"continue"(
+            self: @This(),
+            value: V,
+            state: State,
+        ) void {
+            self.vtable.@"continue"(self.ptr, value, state);
+        }
+
+        pub fn fromType(ptr: anytype) @This() {
+            const Ptr = @TypeOf(ptr);
+            const ptr_info: std.builtin.Type.Pointer = @typeInfo(Ptr).pointer;
+            const T = ptr_info.child;
+            return .{
+                .ptr = @alignCast(@ptrCast(ptr)),
+                .vtable = .{
+                    .@"continue" = @ptrCast(&T.@"continue"),
+                },
+            };
+        }
+    };
+}
 
 test {
     _ = @import("./tests.zig");
