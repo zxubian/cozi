@@ -53,10 +53,6 @@ pub fn Map(MapFn: type) type {
                             self.input_computation.start();
                         }
 
-                        pub fn next(self: *Computation_) void {
-                            self.input_computation.next().next;
-                        }
-
                         pub const ContinuationForInputFuture = struct {
                             map_fn: *const MapFn,
                             map_ctx: ?*anyopaque,
