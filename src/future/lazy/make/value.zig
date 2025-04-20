@@ -15,7 +15,7 @@ pub fn Future(V: type) type {
         pub const ValueType = V;
         value: ValueType,
 
-        pub fn Computation(Continuation: anytype) type {
+        pub fn Computation(Continuation: type) type {
             return struct {
                 next: Continuation,
                 input: V,

@@ -67,7 +67,7 @@ pub fn OrElse(OrElseFn: type) type {
 
                 pub const ValueType = FlattenedType;
 
-                pub fn Computation(Continuation: anytype) type {
+                pub fn Computation(Continuation: type) type {
                     return struct {
                         input_computation: InputFuture.Computation(ContinuationForInputFuture),
 

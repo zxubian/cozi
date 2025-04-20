@@ -15,7 +15,7 @@ fn ConstValue(comptime v: anytype) type {
     return struct {
         pub const ValueType = V;
 
-        pub fn Computation(Continuation: anytype) type {
+        pub fn Computation(Continuation: type) type {
             return struct {
                 next: Continuation,
                 input: void = undefined,

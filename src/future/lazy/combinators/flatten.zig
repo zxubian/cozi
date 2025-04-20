@@ -19,7 +19,7 @@ pub fn Future(InputFuture: type) type {
         input_future: OuterFuture,
         pub const ValueType = FlattenedValue;
 
-        pub fn Computation(Continuation: anytype) type {
+        pub fn Computation(Continuation: type) type {
             return struct {
                 input_computation: OuterFuture.Computation(OuterFutureContinuation),
 
