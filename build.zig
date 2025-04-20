@@ -127,4 +127,17 @@ pub fn build(b: *std.Build) void {
 
     test_step.dependOn(&run_exe_unit_tests.step);
     test_step.dependOn(&install_test_step.step);
+
+    const doc_test = b.addObject(.{
+        .name = "zinc",
+        .root_module = root,
+    });
+
+    const install_docs = b.addInstallDirectory(.{
+        .source_dir = doc_test.getEmittedDocs(),
+        .install_dir = .prefix,
+        .install_subdir = "docs",
+    });
+    const docs_step = b.step("docs", "Copy documentation artifacts to prefix path");
+    docs_step.dependOn(&install_docs.step);
 }
