@@ -44,7 +44,7 @@ pub fn build(b: *std.Build) void {
     const fault_build_variant: Fault.BuildVariant = blk: {
         const user_input = b.option(
             []const u8,
-            "fault_inject",
+            "fault-inject",
             "Which variant of fault injection to use.",
         );
         if (user_input) |string| {
@@ -62,7 +62,7 @@ pub fn build(b: *std.Build) void {
     const fault_injection_builtin = b.addOptions();
     fault_injection_builtin.addOption(
         Fault.BuildVariant,
-        "build_variant",
+        "build-variant",
         fault_build_variant,
     );
 
@@ -140,4 +140,75 @@ pub fn build(b: *std.Build) void {
     });
     const docs_step = b.step("docs", "Copy documentation artifacts to prefix path");
     docs_step.dependOn(&install_docs.step);
+
+    const examples_step = b.step("examples", "Build & install all examples");
+    buildExamples(
+        b,
+        Examples,
+        examples_step,
+        target,
+        optimize,
+        root,
+    );
+}
+
+const Examples = @import("./examples/root.zig");
+
+fn buildExamples(
+    b: *std.Build,
+    examples: type,
+    sample_step: *std.Build.Step,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    zinc_root: *std.Build.Module,
+) void {
+    const maybe_example_name = b.option([]const u8, "example-name", "Name of the example");
+    const examples_decls = comptime std.meta.declarations(examples);
+    const build_target_example = b.step("example", "Build specific example");
+    const run_target_example = b.step("example-run", "Build and run specific example");
+    if (maybe_example_name) |target_example| {
+        for (examples_decls) |example_decl| {
+            if (std.mem.eql(u8, target_example, example_decl.name)) {
+                break;
+            }
+        } else {
+            build_target_example.dependOn(&b.addFail("Unknown example name: ").step);
+            run_target_example.dependOn(&b.addFail("Unknown example name: ").step);
+        }
+    } else {
+        build_target_example.dependOn(&b.addFail("Missing required argument: -Dexample-name=...").step);
+        run_target_example.dependOn(&b.addFail("Missing required argument: -Dexample-name=...").step);
+    }
+
+    inline for (examples_decls) |example_decl| {
+        const example_name = example_decl.name;
+        const exe_main = comptime @field(examples, example_name);
+
+        const exe_mod = b.createModule(.{
+            .root_source_file = b.path(b.pathJoin(&[_][]const u8{ "examples", exe_main })),
+            .target = target,
+            .optimize = optimize,
+        });
+        exe_mod.addImport("zinc", zinc_root);
+
+        const exe = b.addExecutable(
+            .{
+                .name = example_name,
+                .root_module = exe_mod,
+            },
+        );
+
+        const install_exe_step = b.addInstallArtifact(exe, .{});
+        install_exe_step.step.dependOn(&exe.step);
+
+        const run_exe = b.addRunArtifact(exe);
+        run_exe.step.dependOn(&install_exe_step.step);
+        if (maybe_example_name) |target_sample_name| {
+            if (std.mem.eql(u8, example_name, target_sample_name)) {
+                build_target_example.dependOn(&install_exe_step.step);
+                run_target_example.dependOn(&run_exe.step);
+            }
+        }
+        sample_step.dependOn(&install_exe_step.step);
+    }
 }
