@@ -2,19 +2,19 @@ const std = @import("std");
 const testing = std.testing;
 const builtin = @import("builtin");
 const build_config = @import("build_config");
-const fault = @import("../../../fault/main.zig");
+const fault = @import("../../../fault/root.zig");
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
 
-const Containers = @import("../../main.zig");
+const Containers = @import("../../root.zig");
 const LockFree = Containers.Intrusive.LockFree;
 const Stack = LockFree.MpscStack;
 const Queue = LockFree.MpscQueue;
-const executors = @import("../../../executors/main.zig");
+const executors = @import("../../../executors/root.zig");
 const ManualExecutor = executors.Manual;
 const ThreadPool = executors.threadPools.Compute;
 const WaitGroup = std.Thread.WaitGroup;
-const Fiber = @import("../../../fiber/main.zig");
+const Fiber = @import("../../../fiber/root.zig");
 
 test "stack - basic" {
     if (build_config.sanitize == .thread) {

@@ -1,6 +1,6 @@
 const std = @import("std");
 const SanitizerOption = @import("./src/sanitizerOption.zig").SanitizerOption;
-const Fault = @import("./src/fault/main.zig");
+const Fault = @import("./src/fault/root.zig");
 
 fn addAssemblyForMachineContext(
     b: *std.Build,
@@ -34,7 +34,7 @@ pub fn build(b: *std.Build) void {
     const link_libcpp = sanitize != .none;
 
     const root = b.addModule("root", .{
-        .root_source_file = b.path("src/main.zig"),
+        .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
         .sanitize_thread = sanitize_thread,

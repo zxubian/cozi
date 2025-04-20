@@ -1,6 +1,6 @@
 const std = @import("std");
-const Executor = @import("./main.zig").Executor;
-const core = @import("../main.zig").core;
+const Executor = @import("./root.zig").Executor;
+const core = @import("../root.zig").core;
 const Runnable = core.Runnable;
 const InlineExecutor = @This();
 

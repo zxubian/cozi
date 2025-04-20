@@ -2,19 +2,19 @@ const std = @import("std");
 const assert = std.debug.assert;
 const builtin = @import("builtin");
 
-const fault = @import("../../fault/main.zig");
+const fault = @import("../../fault/root.zig");
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
 const Strand = @This();
 
-const Core = @import("../../core/main.zig");
+const Core = @import("../../core/root.zig");
 const Runnable = Core.Runnable;
 const Closure = Core.Closure;
-const Fiber = @import("../../fiber/main.zig");
-const GenericAwait = @import("../../await/main.zig");
+const Fiber = @import("../../fiber/root.zig");
+const GenericAwait = @import("../../await/root.zig");
 const Await = GenericAwait.@"await";
 const Awaiter = GenericAwait.Awaiter;
-const Containers = @import("../../containers/main.zig");
+const Containers = @import("../../containers/root.zig");
 const Intrusive = Containers.Intrusive;
 const Queue = Intrusive.LockFree.MpscQueue;
 const Stack = Intrusive.LockFree.MpscStack;

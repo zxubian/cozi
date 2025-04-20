@@ -2,8 +2,8 @@ const std = @import("std");
 const builtin = @import("builtin");
 const testing = std.testing;
 const assert = std.debug.assert;
-const executors = @import("../../main.zig").executors;
-const future = @import("../main.zig").lazy;
+const executors = @import("../../root.zig").executors;
+const future = @import("../root.zig").lazy;
 const ThreadPool = executors.threadPools.Compute;
 const InlineExecutor = executors.@"inline";
 

@@ -1,5 +1,5 @@
 const std = @import("std");
-const fault = @import("../../fault/main.zig");
+const fault = @import("../../fault/root.zig");
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
 const LockFreeQueue = @This();

@@ -1,7 +1,7 @@
 const std = @import("std");
 pub const Awaiter = @import("./awaiter.zig");
 // TODO: eliminate dependency on fiber here
-const Fiber = @import("../fiber/main.zig");
+const Fiber = @import("../fiber/root.zig");
 const log = std.log.scoped(.@"await");
 
 /// Generic await algorithm

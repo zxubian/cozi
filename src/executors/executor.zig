@@ -2,7 +2,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
 
-const Core = @import("../core/main.zig");
+const Core = @import("../core/root.zig");
 const Runnable = Core.Runnable;
 const Closure = Core.Closure;
 

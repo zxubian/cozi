@@ -1,6 +1,6 @@
 const std = @import("std");
 const fault_injection_builtin = @import("zinc_fault_injection");
-const injectFault = @import("../main.zig").injectFault;
+const injectFault = @import("../root.zig").injectFault;
 const AtomicOrder = std.builtin.AtomicOrder;
 
 pub fn Value(comptime T: type) type {

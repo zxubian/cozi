@@ -2,7 +2,7 @@ const std = @import("std");
 const testing = std.testing;
 const alloc = testing.allocator;
 
-const Containers = @import("../../../containers/main.zig");
+const Containers = @import("../../../containers/root.zig");
 const List = Containers.Intrusive.ForwardList;
 const Node = Containers.Intrusive.Node;
 

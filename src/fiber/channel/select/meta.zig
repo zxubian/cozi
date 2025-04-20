@@ -2,10 +2,10 @@ const std = @import("std");
 const builtin = @import("builtin");
 const assert = std.debug.assert;
 
-const MAX_CASES = @import("./main.zig").MAX_CASES;
-const CASE_INDEX = @import("./main.zig").CASE_INDEX;
+const MAX_CASES = @import("./root.zig").MAX_CASES;
+const CASE_INDEX = @import("./root.zig").CASE_INDEX;
 
-const SelectOperation = @import("./main.zig").SelectOperation;
+const SelectOperation = @import("./root.zig").SelectOperation;
 
 pub fn initResultType(
     Result: type,

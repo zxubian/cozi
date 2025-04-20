@@ -7,10 +7,10 @@ const atomic = std.atomic;
 
 const Dispatch = @This();
 
-const Core = @import("../core/main.zig");
+const Core = @import("../core/root.zig");
 const Runnable = Core.Runnable;
 const Closure = Core.Closure;
-const executors = @import("../executors/main.zig");
+const executors = @import("../executors/root.zig");
 const Executor = executors.Executor;
 
 pub const OnEntryCompleted = *const fn (

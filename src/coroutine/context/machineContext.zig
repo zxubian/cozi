@@ -3,7 +3,7 @@ const builtin = @import("builtin");
 const assert = std.debug.assert;
 const log = std.log.scoped(.coroutine_machine_context);
 
-const Stack = @import("../../core/main.zig").Stack;
+const Stack = @import("../../core/root.zig").Stack;
 const Trampoline = @import("./trampoline.zig");
 
 const MachineContext = @This();

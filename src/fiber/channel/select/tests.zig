@@ -3,15 +3,15 @@ const builtin = @import("builtin");
 const testing = std.testing;
 const fault_injection_builtin = @import("zinc_fault_injection");
 
-const Fiber = @import("../../main.zig");
+const Fiber = @import("../../root.zig");
 const select = Fiber.select;
 const Channel = Fiber.Channel;
 
-const executors = @import("../../../executors/main.zig");
+const executors = @import("../../../executors/root.zig");
 const ManualExecutor = executors.Manual;
 const ThreadPool = executors.threadPools.Compute;
 
-const fault = @import("../../../fault/main.zig");
+const fault = @import("../../../fault/root.zig");
 const Atomic = fault.stdlike.atomic;
 
 test "Select - heterogenous types" {

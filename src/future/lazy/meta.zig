@@ -1,5 +1,5 @@
 const std = @import("std");
-const Future = @import("./main.zig");
+const Future = @import("./root.zig");
 const Model = Future.Model;
 
 pub fn ResultType(ctx: anytype) type {

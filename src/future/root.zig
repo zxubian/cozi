@@ -1,4 +1,4 @@
-const lazy_ = @import("./lazy/main.zig");
+const lazy_ = @import("./lazy/root.zig");
 
 pub const lazy = lazy_.Impl;
 

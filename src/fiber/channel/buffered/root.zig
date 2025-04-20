@@ -1,20 +1,20 @@
 const std = @import("std");
 const log = std.log.scoped(.fiber_buffered_channel);
 const assert = std.debug.assert;
-const fault = @import("../../../fault/main.zig");
+const fault = @import("../../../fault/root.zig");
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
 
-const GenericAwait = @import("../../../await/main.zig");
+const GenericAwait = @import("../../../await/root.zig");
 const Awaiter = GenericAwait.Awaiter;
 const Await = GenericAwait.@"await";
 
-const Containers = @import("../../../containers/main.zig");
+const Containers = @import("../../../containers/root.zig");
 const Queue = Containers.Intrusive.ForwardList;
 const Node = Containers.Intrusive.Node;
 
-const Spinlock = @import("../../../sync/main.zig").Spinlock;
-const Fiber = @import("../../main.zig");
+const Spinlock = @import("../../../sync/root.zig").Spinlock;
+const Fiber = @import("../../root.zig");
 
 pub fn BufferedChannel(T: type) type {
     return struct {

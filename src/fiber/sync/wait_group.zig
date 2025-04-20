@@ -4,15 +4,15 @@
 const std = @import("std");
 const WaitGroup = @This();
 
-const fault = @import("../../fault/main.zig");
+const fault = @import("../../fault/root.zig");
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
 
-const Containers = @import("../../containers/main.zig");
+const Containers = @import("../../containers/root.zig");
 const Queue = Containers.Intrusive.LockFree.MpscQueue;
 
-const Fiber = @import("../../fiber/main.zig");
-const GenericAwait = @import("../../await/main.zig");
+const Fiber = @import("../../fiber/root.zig");
+const GenericAwait = @import("../../await/root.zig");
 const Await = GenericAwait.@"await";
 const Awaiter = GenericAwait.Awaiter;
 

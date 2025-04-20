@@ -1,6 +1,6 @@
 const builtin = @import("builtin");
 const AddressSanitizerContext = @This();
-const Core = @import("../../../core/main.zig");
+const Core = @import("../../../core/root.zig");
 const Stack = Core.Stack;
 
 stack: Stack = undefined,

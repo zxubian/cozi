@@ -1,9 +1,9 @@
 const std = @import("std");
 const assert = std.debug.assert;
-const future = @import("../main.zig");
+const future = @import("../root.zig");
 const model = future.model;
 const meta = future.meta;
-const executors = @import("../../../main.zig").executors;
+const executors = @import("../../../root.zig").executors;
 
 pub fn Contract(V: type) type {
     return struct {

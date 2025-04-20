@@ -3,13 +3,13 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const Spinlock = @This();
-const fault = @import("../fault/main.zig");
+const fault = @import("../fault/root.zig");
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
 const assert = std.debug.assert;
-const DeadlockDetector = @import("./deadlock_detector/main.zig");
+const DeadlockDetector = @import("./deadlock_detector/root.zig");
 const log = std.log.scoped(.spinlock);
-const Fiber = @import("../fiber/main.zig");
+const Fiber = @import("../fiber/root.zig");
 
 tail: Atomic(?*Node) = .init(null),
 

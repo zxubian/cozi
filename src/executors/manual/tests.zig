@@ -1,8 +1,8 @@
 const std = @import("std");
 const testing = std.testing;
 const ManualExecutor = @import("../manual.zig");
-const Executor = @import("../main.zig").Executor;
-const Core = @import("../../core/main.zig");
+const Executor = @import("../root.zig").Executor;
+const Core = @import("../../core/root.zig");
 const Runnable = Core.Runnable;
 const Allocator = std.mem.Allocator;
 

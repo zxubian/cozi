@@ -3,14 +3,14 @@ const builtin = @import("builtin");
 const build_config = @import("build_config");
 
 const testing = std.testing;
-const fault = @import("../../../fault/main.zig");
+const fault = @import("../../../fault/root.zig");
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
 
-const Fiber = @import("../../main.zig");
+const Fiber = @import("../../root.zig");
 const WaitGroup = Fiber.WaitGroup;
 
-const executors = @import("../../../executors/main.zig");
+const executors = @import("../../../executors/root.zig");
 const ManualExecutor = executors.Manual;
 const ThreadPool = executors.threadPools.Compute;
 const ThreadWaitGroup = std.Thread.WaitGroup;

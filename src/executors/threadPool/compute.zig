@@ -5,15 +5,15 @@ const log = std.log.scoped(.thread_pool);
 const Thread = std.Thread;
 const builtin = @import("builtin");
 const assert = std.debug.assert;
-const fault = @import("../../fault/main.zig");
+const fault = @import("../../fault/root.zig");
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
 const Allocator = std.mem.Allocator;
-const ThreadExt = @import("../../sync/main.zig").Thread;
+const ThreadExt = @import("../../sync/root.zig").Thread;
 
-const Core = @import("../../core/main.zig");
+const Core = @import("../../core/root.zig");
 const Runnable = Core.Runnable;
-const Executor = @import("../../executors/main.zig").Executor;
+const Executor = @import("../../executors/root.zig").Executor;
 
 const Queue = @import("./compute/queue.zig").UnboundedBlockingQueue;
 

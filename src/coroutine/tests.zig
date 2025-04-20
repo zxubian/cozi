@@ -3,8 +3,8 @@ const std = @import("std");
 const testing = std.testing;
 const alloc = testing.allocator;
 const Allocator = std.mem.Allocator;
-const Coroutine = @import("./main.zig");
-const Core = @import("../core/main.zig");
+const Coroutine = @import("./root.zig");
+const Core = @import("../core/root.zig");
 const Stack = Core.Stack;
 
 test "Suspend" {

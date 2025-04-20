@@ -5,24 +5,24 @@ const std = @import("std");
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
 
-const fault = @import("../fault/main.zig");
+const fault = @import("../fault/root.zig");
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
 
-const Coroutine = @import("../coroutine/main.zig");
-const executors = @import("../executors/main.zig");
+const Coroutine = @import("../coroutine/root.zig");
+const executors = @import("../executors/root.zig");
 const Executor = executors.Executor;
-const Core = @import("../core/main.zig");
+const Core = @import("../core/root.zig");
 const Closure = Core.Closure;
 const Runnable = Core.Runnable;
 const Stack = Core.Stack;
-const GenericAwait = @import("../await/main.zig");
+const GenericAwait = @import("../await/root.zig");
 const Await = GenericAwait.@"await";
 const Awaiter = GenericAwait.Awaiter;
 
 const Sync = @import("./sync.zig");
 pub const Barrier = Sync.Barrier;
-const Channel_ = @import("./channel/main.zig");
+const Channel_ = @import("./channel/root.zig");
 pub const Channel = Channel_.Channel;
 pub const select = Channel_.select;
 pub const Event = Sync.Event;

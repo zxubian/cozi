@@ -1,8 +1,8 @@
 const std = @import("std");
 const assert = std.debug.assert;
-const executors = @import("../../main.zig").executors;
+const executors = @import("../../root.zig").executors;
 const Executor = executors.Executor;
-const core = @import("../../main.zig").core;
+const core = @import("../../root.zig").core;
 const Runnable = core.Runnable;
 
 /// --- external re-exports ---
@@ -31,10 +31,10 @@ pub const Impl = struct {
 
 // --- internal implementation ---
 pub const meta = @import("./meta.zig");
-pub const make = @import("./make/main.zig");
-pub const terminators = @import("./terminators//main.zig");
-pub const combinators = @import("./combinators/main.zig");
-pub const syntax = @import("./syntax/main.zig");
+pub const make = @import("./make/root.zig");
+pub const terminators = @import("./terminators//root.zig");
+pub const combinators = @import("./combinators/root.zig");
+pub const syntax = @import("./syntax/root.zig");
 
 pub const State = struct {
     executor: Executor,

@@ -1,5 +1,5 @@
 const std = @import("std");
-const future_ = @import("../main.zig");
+const future_ = @import("../root.zig");
 const State = future_.State;
 const GetStorageType = future_.Storage;
 

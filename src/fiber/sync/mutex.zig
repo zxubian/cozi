@@ -6,18 +6,18 @@
 const std = @import("std");
 const assert = std.debug.assert;
 
-const fault = @import("../../fault/main.zig");
+const fault = @import("../../fault/root.zig");
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
 
 const Mutex = @This();
 
-const Fiber = @import("../../fiber/main.zig");
-const GenericAwait = @import("../../await/main.zig");
+const Fiber = @import("../../fiber/root.zig");
+const GenericAwait = @import("../../await/root.zig");
 const Await = GenericAwait.@"await";
 const Awaiter = GenericAwait.Awaiter;
 
-const Containers = @import("../../containers/main.zig");
+const Containers = @import("../../containers/root.zig");
 const Queue = Containers.Intrusive.LockFree.MpscQueue;
 
 const log = std.log.scoped(.fiber_mutex);

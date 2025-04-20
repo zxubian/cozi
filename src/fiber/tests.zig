@@ -5,16 +5,16 @@ const build_config = @import("build_config");
 const assert = std.debug.assert;
 const testing = std.testing;
 const alloc = testing.allocator;
-const fault = @import("../fault/main.zig");
+const fault = @import("../fault/root.zig");
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
 const WaitGroup = std.Thread.WaitGroup;
 
-const Fiber = @import("./main.zig");
-const executors = @import("../executors/main.zig");
+const Fiber = @import("./root.zig");
+const executors = @import("../executors/root.zig");
 const ManualExecutor = executors.Manual;
 const ThreadPool = executors.threadPools.Compute;
-const Stack = @import("../core/main.zig").Stack;
+const Stack = @import("../core/root.zig").Stack;
 
 test {
     _ = @import("./sync.zig");

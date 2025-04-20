@@ -4,12 +4,12 @@ const testing = std.testing;
 const WaitGroup = std.Thread.WaitGroup;
 const Allocator = std.mem.Allocator;
 
-const Core = @import("../../../core/main.zig");
+const Core = @import("../../../core/root.zig");
 const Closure = Core.Closure;
 const ThreadPool = @import("../compute.zig");
 const TimeLimit = @import("../../../testing/TimeLimit.zig");
 
-const fault = @import("../../../fault/main.zig");
+const fault = @import("../../../fault/root.zig");
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
 

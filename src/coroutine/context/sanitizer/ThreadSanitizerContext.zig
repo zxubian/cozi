@@ -1,6 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const Core = @import("../../../core/main.zig");
+const Core = @import("../../../core/root.zig");
 const Stack = Core.Stack;
 
 const ThreadSanitizerContext = @This();
