@@ -145,9 +145,11 @@ assert(ctx.sum.load(.seq_cst) == task_count);
 - [source](src/executors/threadPool/compute.zig)
 - [roadmap](https://github.com/zxubian/zinc/issues?q=is%3Aissue%20state%3Aopen%20label%3Afeature%20label%3A%22Thread%20Pool%22)
 
-
-
-### Fibers - stackfull cooperatively-scheduled user-space threads
+### [Fibers](src/fiber/root.zig) - stackfull cooperatively-scheduled user-space threads
+- **Stackful**: user must allocate memory for each fiber's execution stack
+- **cooperatively-scheduled**: fibers are not pre-empted by the system or the `zinc` runtime
+     - Instead, each fiber itself is responsible for releasing control of the underlying thread and allow other fibers to run
+     - When this happens, the fiber's state is refered to as _suspened_ or _parked_.
 
 ```zig
 const Ctx = struct {
@@ -203,10 +205,77 @@ Instead, the executing Fiber is suspended, and rescheduled for execution when ap
 | [Mutex](https://github.com/ziglang/zig/blob/master/lib/std/Thread/Mutex.zig)            | [Mutex](src/fiber/sync/mutex.zig)         |
 | [ResetEvent](https://github.com/ziglang/zig/blob/master/lib/std/Thread/ResetEvent.zig)  | [Event](src/fiber/sync/event.zig)         |
 | [WaitGroup](https://github.com/ziglang/zig/blob/master/lib/std/Thread/WaitGroup.zig)    | [WaitGroup](src/fiber/sync/waitGroup.zig) | 
-| n/a                                                                                     | [Barrier](src/fiber/sync/Barrier.zig)     |
+| n/a                                                                                     | [Barrier](src/fiber/sync/barrier.zig)     |
+| n/a                                                                                     | [Strand](src/fiber/sync/strand.zig)       |
 
-Channel
-- https://github.com/zxubian/zig-async/issues/2
+#### Channel & Select
+- Go-like [channel](https://gobyexample.com/channels) & [select](https://gobyexample.com/select) are supported.
+
+##### References
+- [Example](examples/fiber_channel_select.zig)
+- [Source]()
+
+<details>
+  <summary>
+    Example
+  </summary>
+
+```zig
+const Channel = zinc.Fiber.Channel;
+const select = zinc.Fiber.select;
+const Ctx = struct {
+    channel_usize: Channel(usize) = .{},
+    channel_string: Channel([]const u8) = .{},
+    wait_group: std.Thread.WaitGroup = .{},
+
+    pub fn sendString(ctx: *@This()) void {
+        ctx.channel_string.send("456");
+        ctx.wait_group.finish();
+    }
+
+    pub fn receiver(ctx: *@This()) void {
+        switch (select(
+            .{
+                .{ .receive, &ctx.channel_usize },
+                .{ .receive, &ctx.channel_string },
+            },
+        )) {
+            .@"0" => |_| {
+                unreachable;
+            },
+            .@"1" => |optional_result_string| {
+                // null indicates that channel was closed
+                if (optional_result_string) |result_string| {
+                    assert(std.mem.eql(u8, "456", result_string));
+                } else unreachable;
+            },
+        }
+        ctx.wait_group.finish();
+    }
+};
+
+var ctx: Ctx = .{};
+ctx.wait_group.startMany(2);
+
+try Fiber.go(
+    Ctx.receiver,
+    .{&ctx},
+    allocator,
+    executor,
+);
+
+try Fiber.go(
+    Ctx.sendString,
+    .{&ctx},
+    allocator,
+    executor,
+);
+
+// Synchronize Fibers running in a thread pool
+// with the launching (main) thread.
+ctx.wait_group.wait();
+```
+</details>
 
 ### Stackfull Coroutine - a function you can suspend & resume
 - [example](examples/coroutine.zig)
