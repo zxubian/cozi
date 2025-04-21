@@ -172,8 +172,10 @@ fn buildExamples(
                 break;
             }
         } else {
-            build_target_example.dependOn(&b.addFail("Unknown example name: ").step);
-            run_target_example.dependOn(&b.addFail("Unknown example name: ").step);
+            build_target_example.dependOn(
+                &b.addFail("Unknown example name").step,
+            );
+            run_target_example.dependOn(&b.addFail("Unknown example name").step);
         }
     } else {
         build_target_example.dependOn(&b.addFail("Missing required argument: -Dexample-name=...").step);
