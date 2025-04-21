@@ -55,11 +55,11 @@ zig fetch --save git+https://github.com/zxubian/zinc.git#main
 ### Executors & Schedulers
 
 #### [Executor](src/executors/executor.zig)
-- Executor is a type-erased interface representing an abstract task queue.
-- Executor allows users to submit `Runnable`s (an abstract representation a task) for eventual execution.
-    - Correct user programs cannot depend on the timing or order of execution of runnables, and cannot assumptions about which thread will execute the runnable.
-- It is to asynchronous task execution what [Allocator](https://github.com/ziglang/zig/blob/master/lib/std/mem/Allocator.zig) is to memory management.
-- `Executor` is a fundamental building block, and many other primitives of `zinc` depend on it (e.g. both `Future` and `Fibers` can run on any executor)
+- `Executor` is a type-erased interface representing an abstract task queue.
+- `Executor` allows users to submit [Runnable](src/core/runnable.zig)s (an abstract representation a task) for eventual execution.
+    - Correct user programs cannot depend on the timing or order of execution of runnables, and cannot make assumptions about which thread will execute the runnable.
+- `Executor` is to asynchronous task execution what [Allocator](https://github.com/ziglang/zig/blob/master/lib/std/mem/Allocator.zig) is to memory management.
+- `Executor` is a fundamental building block, and many other primitives of `zinc` depend on it (e.g. both `Future` and `Fiber` can run on any `Executor`)
 
 ##### Available Executors:
 ###### [Inline](src/executors/inline.zig)
@@ -148,14 +148,62 @@ assert(ctx.sum.load(.seq_cst) == task_count);
 
 
 ### Fibers - stackfull cooperatively-scheduled user-space threads
-- [x] Basic support
-- [x] Yield
 
-Synchronization primitives
-  - [x] Mutex
-  - [x] Event
-  - [x] Wait Group
-  - [x] Barrier 
+```zig
+const Ctx = struct {
+    sum: usize,
+    wait_group: std.Thread.WaitGroup = .{},
+    mutex: Fiber.Mutex = .{},
+    pub fn run(
+        self: *@This(),
+    ) void {
+        for (0..10) |_| {
+            {
+                // Fibers running on thread pool may access
+                // shared variable `sum` in parallel.
+                // Fiber.Mutex provides mutual exclusion without
+                // blocking underlying thread.
+                self.mutex.lock();
+                defer self.mutex.unlock();
+                self.sum += 1;
+            }
+            // Suspend execution here (allowing for other fibers to be run),
+            // and immediately reschedule self with the Executor.
+            Fiber.yield();
+        }
+        self.wait_group.finish();
+    }
+};
+var ctx: Ctx = .{ .sum = 0 };
+const fiber_count = 4;
+ctx.wait_group.startMany(fiber_count);
+
+// Run 4 fibers on 2 threads
+for (0..4) |fiber_id| {
+    try Fiber.goWithNameFmt(
+        Ctx.run,
+        .{&ctx},
+        allocator,
+        executor,
+        "Fiber #{}",
+        .{fiber_id},
+    );
+}
+// Synchronize Fibers running in a thread pool
+// with the launching (main) thread.
+ctx.wait_group.wait();
+```
+
+#### [Non-blocking synchronization primitives for Fibers](src/fiber/sync)
+All of the following synchronization primitives work like their Thread counterparts, but do not block the underlying Thread (neither through spinning nor using `futex`).
+Instead, the executing Fiber is suspended, and rescheduled for execution when appropriate for the primitive.
+
+| Zig stdlib (for Threads)                                                                | zinc (for Fibers)                         |
+| --------------------------------------------------------------------------------------- | ----------------------------------------- |
+| [Mutex](https://github.com/ziglang/zig/blob/master/lib/std/Thread/Mutex.zig)            | [Mutex](src/fiber/sync/mutex.zig)         |
+| [ResetEvent](https://github.com/ziglang/zig/blob/master/lib/std/Thread/ResetEvent.zig)  | [Event](src/fiber/sync/event.zig)         |
+| [WaitGroup](https://github.com/ziglang/zig/blob/master/lib/std/Thread/WaitGroup.zig)    | [WaitGroup](src/fiber/sync/waitGroup.zig) | 
+| n/a                                                                                     | [Barrier](src/fiber/sync/Barrier.zig)     |
 
 Channel
 - https://github.com/zxubian/zig-async/issues/2
