@@ -52,16 +52,6 @@ zig fetch --save git+https://github.com/zxubian/zinc.git#main
 
 ## Features & Roadmap
 
-### Stackfull Coroutine - a function you can suspend & resume
-- [x] Basic support 
-- Back-ends for machine context switch:
-  - [x] aarch64-macos
-  - [ ] x86-64
-    - [ ] Microsoft x64
-    - [ ] System V AMD64 ABI
-- [ ] ASAN support
-- [x] TSAN support
-
 ### Executors & Schedulers
 Thread pool
   - [x] "Compute" - single global queue
@@ -90,6 +80,33 @@ Synchronization primitives
 
 Channel
 - https://github.com/zxubian/zig-async/issues/2
+
+### Stackfull Coroutine - a function you can suspend & resume
+- [example](examples/coroutine.zig)
+- [source](src/coroutine/root.zig)
+- [roadmap](https://github.com/zxubian/zinc/issues?q=is%3Aissue%20state%3Aopen%20label%3ACoroutine%20label%3Afeature)
+```zig
+const zinc = @import("zinc");
+const Coroutine = zinc.Coroutine;
+// ... 
+const Ctx = struct {
+    pub fn run(ctx: *Coroutine) void {
+        log.debug("step 1", .{});
+        ctx.@"suspend"();
+        log.debug("step 2", .{});
+        ctx.@"suspend"();
+        log.debug("step 3", .{});
+    }
+};
+
+var coro: Coroutine.Managed = undefined;
+try coro.initInPlace(Ctx.run, .{&coro.coroutine}, gpa.allocator());
+defer coro.deinit();
+for (0..3) |_| {
+    coro.@"resume"();
+}
+assert(coro.isCompleted());
+```
 
 ### Futures & Promises
 - [ ] lazy
