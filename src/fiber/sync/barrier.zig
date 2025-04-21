@@ -4,7 +4,7 @@
 const std = @import("std");
 const Barrier = @This();
 
-const WaitGroup = @import("./wait_group.zig");
+const WaitGroup = @import("./waitGroup.zig");
 
 const Fiber = @import("../root.zig");
 

@@ -151,5 +151,5 @@ const WaitGroupAwaiter = struct {
 };
 
 test {
-    _ = @import("./wait_group/tests.zig");
+    _ = @import("./waitGroup/tests.zig");
 }
