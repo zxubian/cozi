@@ -45,7 +45,7 @@ zig fetch --save git+https://github.com/zxubian/zinc.git#main
 ```
 
 3. Import `zinc` and use:
-- [example](example/main.zig)
+- [examples](examples/)
 
 ### Stability Guarantees
 `zinc` is experimental and unstable. Expect `main` branch to occasionally break.
@@ -54,7 +54,7 @@ zig fetch --save git+https://github.com/zxubian/zinc.git#main
 
 ### Executors & Schedulers
 
-#### Executor
+#### [Executor](src/executors/executor.zig)
 - Executor is a type-erased interface representing an abstract task queue.
 - Executor allows users to submit `Runnable`s (an abstract representation a task) for eventual execution.
     - Correct user programs cannot depend on the timing or order of execution of runnables, and cannot assumptions about which thread will execute the runnable.
