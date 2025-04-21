@@ -54,9 +54,57 @@ zig fetch --save git+https://github.com/zxubian/zinc.git#main
 
 ### Executors & Schedulers
 
-#### Thread Pool
+#### Executor
+- Executor is a type-erased interface representing an abstract task queue.
+- Executor allows users to submit `Runnable`s (an abstract representation a task) for eventual execution.
+    - Correct user programs cannot depend on the timing or order of execution of runnables, and cannot assumptions about which thread will execute the runnable.
+- It is to asynchronous task execution what [Allocator](https://github.com/ziglang/zig/blob/master/lib/std/mem/Allocator.zig) is to memory management.
+- `Executor` is a fundamental building block, and many other primitives of `zinc` depend on it (e.g. both `Future` and `Fibers` can run on any executor)
+
+##### Available Executors:
+###### [Inline](src/executors/inline.zig)
 ```zig
-const zinc = @import("zinc");
+const inline_executor = zinc.executors.@"inline";
+const Ctx = struct {
+    done: bool,
+    pub fn run(self: *@This()) void {
+        self.done = true;
+    }
+};
+var ctx: Ctx = .{ .done = false };
+// on submit, Ctx.run(&ctx) is executed immediately
+try inline_executor.submit(Ctx.run, .{&ctx}, std.testing.allocator);
+try std.testing.expect(ctx.done);
+```
+###### [Manual](src/executors/manual.zig)
+-  Single-threaded manually-executed task queue
+```zig
+const ManualExecutor = zinc.executors.Manual;
+var manual = ManualExecutor{};
+const Ctx = struct {
+  step: usize,
+  pub fn run(self: *@This()) void {
+      self.step += 1;
+  }
+};
+var ctx: Ctx = .{.step = 0};
+const executor = manual.executor();
+// on `submit`, task is added to the queue,
+// but not executed yet
+for (0..4) |_| {
+    executor.submit(Step.run, .{&step}, allocator);
+}
+try testing.expectEqual(0, ctx.step);
+// users can manually control execution,
+// and specify how many tasks to run at a time 
+try expect(manual.runNext());
+try expectEqual(2, manual.runAtMost(2));
+try expectEqual(1, manual.drain());
+try expectEqual(4, ctx.step);
+```
+
+###### [Thread Pool](src/executors/threadPool/compute.zig)
+```zig
 const ThreadPool = zinc.executors.threadPools.Compute;
 // Create fixed number of "worker threads" at init time.
 var thread_pool = try ThreadPool.init(4, allocator);
@@ -97,21 +145,7 @@ assert(ctx.sum.load(.seq_cst) == task_count);
 - [source](src/executors/threadPool/compute.zig)
 - [roadmap](https://github.com/zxubian/zinc/issues?q=is%3Aissue%20state%3Aopen%20label%3Afeature%20label%3A%22Thread%20Pool%22)
 
-#### Executor
-Thread pool
-  - [x] "Compute" - single global queue
-    - [ ] Use lock-free queue
-  - [ ] "Fast" - similar to GoLang: per-thread local queues, work-stealing
-  - Optimizations:
-  - [ ] Option to "pin" thread pool worker threads to CPU core (core affinity)
-- [ ] Fiber pool
-  - reference: [Parallelizing the Naughty Dog Engine Using Fibers](https://www.youtube.com/watch?v=HIVBhKj7gQU&t=628s)
-  - [ ] Worker abstraction over fibers and threads?
-     
-Other considerations:
-- [ ] Separate "scheduler" from "executor"? (scheduler responsible for picking next task out of queue(s), executor actually runs it)
-- [ ] Scheduler "submit" hints (inline/lifo/queue-end etc)
-- [ ] Pass context with nursery etc. to all tasks submitted to executor/scheduler -> for structured concurrency 
+
 
 ### Fibers - stackfull cooperatively-scheduled user-space threads
 - [x] Basic support
