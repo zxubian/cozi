@@ -13,27 +13,21 @@ pub fn main() !void {
         }
     }
 
-    const iterations = 3;
     const Ctx = struct {
         pub fn run(ctx: *Coroutine) void {
-            log.debug("coroutine started", .{});
-            for (0..iterations) |_| {
-                log.debug("about to suspend", .{});
-                ctx.@"suspend"();
-                log.debug("resumed", .{});
-            }
+            log.debug("step 1", .{});
+            ctx.@"suspend"();
+            log.debug("step 2", .{});
+            ctx.@"suspend"();
+            log.debug("step 3", .{});
         }
     };
 
     var coro: Coroutine.Managed = undefined;
     try coro.initInPlace(Ctx.run, .{&coro.coroutine}, gpa.allocator());
     defer coro.deinit();
-    for (0..iterations) |_| {
-        log.debug("about to resume", .{});
+    for (0..3) |_| {
         coro.@"resume"();
-        log.debug("suspended", .{});
     }
-    assert(!coro.isCompleted());
-    coro.@"resume"();
     assert(coro.isCompleted());
 }
