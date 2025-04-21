@@ -62,7 +62,7 @@ pub fn build(b: *std.Build) void {
     const fault_injection_builtin = b.addOptions();
     fault_injection_builtin.addOption(
         Fault.BuildVariant,
-        "build-variant",
+        "build_variant",
         fault_build_variant,
     );
 
