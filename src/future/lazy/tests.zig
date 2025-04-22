@@ -614,3 +614,118 @@ test "lazy future - first - b first" {
     );
     try testing.expectEqual(1, manual.drain());
 }
+
+test "lazy future - pipline - threadpool - all" {
+    if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
+    const allocator = testing.allocator;
+    var tp: ThreadPool = try .init(1, allocator);
+    defer tp.deinit();
+    try tp.start();
+    defer tp.stop();
+    const executor = tp.executor();
+
+    const future_a, const promise_a = try future.contractManaged(usize, std.testing.allocator);
+    const future_b, const promise_b = try future.contractManaged(u32, std.testing.allocator);
+
+    const Ctx = struct {
+        thread_pool: *ThreadPool,
+        const A_and_B = future.All(@TypeOf(.{ future_a, future_b })).ValueType;
+        fn map(
+            ctx: ?*anyopaque,
+            input: A_and_B,
+        ) !A_and_B {
+            const self: *@This() = @alignCast(@ptrCast(ctx));
+            try std.testing.expectEqual(ThreadPool.current(), self.thread_pool);
+            return input;
+        }
+    };
+    var ctx: Ctx = .{ .thread_pool = &tp };
+    const pipeline = future.pipeline(
+        .{
+            future.all(
+                .{
+                    future_a,
+                    future_b,
+                },
+            ),
+            future.via(executor),
+            future.map(
+                Ctx.map,
+                &ctx,
+            ),
+        },
+    );
+    executor.submit(
+        @TypeOf(promise_b).resolve,
+        .{ &promise_b, @as(u32, 2) },
+        allocator,
+    );
+    executor.submit(
+        @TypeOf(promise_a).resolve,
+        .{ &promise_a, @as(usize, 1) },
+        allocator,
+    );
+    const result: std.meta.Tuple(&[_]type{ usize, u32 }) = try future.get(pipeline);
+    const a, const b = result;
+    try testing.expectEqual(1, a);
+    try testing.expectEqual(2, b);
+}
+
+test "lazy future - pipline - threadpool - first" {
+    if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
+    const allocator = testing.allocator;
+    var tp: ThreadPool = try .init(1, allocator);
+    defer tp.deinit();
+    try tp.start();
+    defer tp.stop();
+    const executor = tp.executor();
+
+    const future_a, const promise_a = try future.contractManaged(usize, std.testing.allocator);
+    const future_b, const promise_b = try future.contractManaged(u32, std.testing.allocator);
+
+    const Ctx = struct {
+        thread_pool: *ThreadPool,
+
+        const FirstResultType = future.First(@TypeOf(.{ future_a, future_b })).ValueType;
+        fn map(
+            ctx: ?*anyopaque,
+            input: FirstResultType,
+        ) !FirstResultType {
+            const self: *@This() = @alignCast(@ptrCast(ctx));
+            try std.testing.expectEqual(ThreadPool.current(), self.thread_pool);
+            return input;
+        }
+    };
+    var ctx: Ctx = .{ .thread_pool = &tp };
+    const pipeline = future.pipeline(
+        .{
+            future.first(
+                .{
+                    future_a,
+                    future_b,
+                },
+            ),
+            future.via(executor),
+            future.map(
+                Ctx.map,
+                &ctx,
+            ),
+        },
+    );
+    executor.submit(
+        @TypeOf(promise_b).resolve,
+        .{ &promise_b, @as(u32, 2) },
+        allocator,
+    );
+    switch (try future.get(pipeline)) {
+        .@"1" => |value_u32| {
+            try std.testing.expectEqual(2, value_u32);
+        },
+        else => unreachable,
+    }
+    promise_a.resolve(1);
+}
