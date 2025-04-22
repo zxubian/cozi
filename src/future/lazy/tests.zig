@@ -537,3 +537,27 @@ test "lazy future - contract - detach - future first" {
     promise_.resolve({});
     try testing.expect(ctx.done);
 }
+
+test "lazy future - all" {
+    const allocator = testing.allocator;
+    var manual: executors.Manual = .{};
+    const executor = manual.executor();
+    const future_a, const promise_a = try future.contractManaged(usize, std.testing.allocator);
+    const future_b, const promise_b = try future.contractManaged(u32, std.testing.allocator);
+    const all = future.all(.{ future_a, future_b });
+    executor.submit(
+        @TypeOf(promise_a).resolve,
+        .{ &promise_a, @as(usize, 1) },
+        allocator,
+    );
+    executor.submit(
+        @TypeOf(promise_b).resolve,
+        .{ &promise_b, @as(u32, 2) },
+        allocator,
+    );
+    try testing.expectEqual(2, manual.drain());
+    const result: std.meta.Tuple(&[_]type{ usize, u32 }) = future.get(all);
+    const a, const b = result;
+    try testing.expectEqual(1, a);
+    try testing.expectEqual(2, b);
+}

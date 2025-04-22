@@ -15,13 +15,15 @@ pub const Impl = struct {
     pub const Value = make.value.Future;
     pub const value = make.value.value;
     pub const contractManaged = make.contract.contractManaged;
-    // --- combinators ---
+    // --- sequential combinators ---
     pub const via = combinators.via.via;
     pub const map = combinators.map.map;
     pub const mapOk = combinators.mapOk.mapOk;
     pub const andThen = combinators.andThen.andThen;
     pub const orElse = combinators.orElse.orElse;
     pub const flatten = combinators.flatten.flatten;
+    // --- parallel combinators ---
+    pub const all = combinators.all.all;
     // --- terminators ---
     pub const get = terminators.get;
     pub const detach = terminators.detach;
