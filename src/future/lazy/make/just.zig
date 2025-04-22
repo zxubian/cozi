@@ -37,7 +37,7 @@ pub fn materialize(
     };
 }
 
-///Future that instantly returns void
+/// A Future that instantly returns nothing
 pub fn just() Just {
     return .{};
 }

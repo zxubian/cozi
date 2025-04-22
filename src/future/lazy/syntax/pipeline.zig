@@ -52,6 +52,17 @@ fn argsCount(Args: type) usize {
     return args_count;
 }
 
+/// Accepts:
+/// * a tuple of the following stucture:
+///         `.{ generator, combinator_0, combinator_1, ... combinator_n }`
+/// where:
+/// * `generator` is any future from `future/lazy/make` (e.g. `just`)
+/// * `combinator_0` thru `n` are any future combinator from `future/lazy/combinators`
+/// Behavior:
+/// * Successively produces futures by piping each previous future
+/// * into the succeeding combinator (calling the combinator's `pipe` method).
+/// Returns:
+/// * a future representing the combination of chained operations the inputs.
 pub inline fn pipeline(args: anytype) Result(@TypeOf(args)) {
     const Args = @TypeOf(args);
     const args_count = comptime argsCount(Args);

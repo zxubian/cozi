@@ -165,7 +165,6 @@ pub fn MapOk(MapOkFn: type) type {
             };
         }
 
-        /// F<V> -> F<map(V)>
         pub fn pipe(
             self: @This(),
             f: anytype,
@@ -179,6 +178,7 @@ pub fn MapOk(MapOkFn: type) type {
     };
 }
 
+/// F<V> -> F<map(V)>
 pub fn mapOk(
     map_fn: anytype,
     ctx: ?*anyopaque,

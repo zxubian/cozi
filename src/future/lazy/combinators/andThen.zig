@@ -160,7 +160,6 @@ pub fn AndThen(AndThenFn: type) type {
             };
         }
 
-        /// F<V> -> F<map(V)>
         pub fn pipe(
             self: @This(),
             f: anytype,
@@ -174,6 +173,10 @@ pub fn AndThen(AndThenFn: type) type {
     };
 }
 
+/// This Future applies map_fn to the result of its piped input,
+/// but only if the result is not an Error.
+/// Future<E!T> -> F<E!map_fn(T)>
+/// `map_fn` is executed on the Executor set earlier in the pipeline.
 pub fn andThen(
     map_fn: anytype,
     ctx: ?*anyopaque,

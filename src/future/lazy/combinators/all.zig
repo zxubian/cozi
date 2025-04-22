@@ -146,6 +146,13 @@ pub fn All(Inputs: type) type {
     };
 }
 
+/// A Future that is resolved when ALL
+/// of the input futures are resolved.
+/// The resolved value is a Tuple containing
+/// the result values of each supplied Future,
+/// in the same order as the input Futures.
+/// `all` resets the Executor of the pipeline
+///  to @"inline" for succeeding Futures.
 pub fn all(
     inputs: anytype,
 ) All(@TypeOf(inputs)) {

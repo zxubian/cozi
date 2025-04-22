@@ -107,11 +107,15 @@ pub fn Contract(V: type) type {
     };
 }
 
+// TODO: add noalloc variant
+/// Create a connected Future-Promise pair.
+/// Returns tuple containing [Future, Promise].
 pub fn contractManaged(
     V: type,
     allocator: std.mem.Allocator,
 ) !Contract(V).Tuple {
     const ContractType = Contract(V);
+    // alloction is required as lifetimes of Promise & Future are unknown
     const shared_state = try allocator.create(ContractType.SharedState);
     shared_state.* = .{ .allocator = allocator };
     return .{

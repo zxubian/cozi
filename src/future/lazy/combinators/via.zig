@@ -76,7 +76,9 @@ pub fn pipe(
     };
 }
 
-///Make the Future following Via to be executed on `executor`
+/// Sets the Executor for Futures succeeding in the pipeline.
+/// Forwards the resolved value of the previous future as-is.
+/// Cannot be the first Future in a pipeline (must follow some other Future).
 pub fn via(executor: Executor) Via {
     return .{
         .next_executor = executor,
