@@ -7,3 +7,4 @@ pub const orElse = @import("./orElse.zig");
 pub const flatten = @import("./flatten.zig");
 pub const all = @import("./all.zig");
 pub const first = @import("./first.zig");
+pub const box = @import("./box.zig");

@@ -729,3 +729,47 @@ test "lazy future - pipline - threadpool - first" {
     }
     promise_a.resolve(1);
 }
+
+test "lazy future - box" {
+    const allocator = testing.allocator;
+
+    const AsyncReaderInterface = struct {
+        const ReaderError = error{
+            some_error,
+        };
+        const Vtable = struct {
+            read: *const fn (self: *anyopaque) future.Boxed(ReaderError!u8),
+        };
+        ptr: *anyopaque,
+        vtable: Vtable,
+
+        pub inline fn read(self: @This()) future.Boxed(ReaderError!u8) {
+            return self.vtable.read(self.ptr);
+        }
+    };
+
+    const AsyncReader = struct {
+        allocator: std.mem.Allocator,
+        pub fn read(self: *@This()) future.Boxed(AsyncReaderInterface.ReaderError!u8) {
+            return future.pipeline(
+                .{
+                    future.value(@as(u8, 1)),
+                    future.box(self.allocator),
+                },
+            );
+        }
+
+        pub fn eraseType(self: *@This()) AsyncReaderInterface {
+            return .{
+                .ptr = self,
+                .vtable = .{
+                    .read = @ptrCast(&read),
+                },
+            };
+        }
+    };
+    var reader: AsyncReader = .{ .allocator = allocator };
+    const async_reader = reader.eraseType();
+    const result: u32 = try future.get(async_reader.read());
+    try testing.expectEqual(1, result);
+}

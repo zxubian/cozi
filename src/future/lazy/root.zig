@@ -22,6 +22,8 @@ pub const Impl = struct {
     pub const andThen = combinators.andThen.andThen;
     pub const orElse = combinators.orElse.orElse;
     pub const flatten = combinators.flatten.flatten;
+    pub const box = combinators.box.box;
+    pub const Boxed = combinators.box.Future;
     // --- parallel combinators ---
     pub const all = combinators.all.all;
     pub const All = combinators.all.All;
