@@ -561,3 +561,56 @@ test "lazy future - all" {
     try testing.expectEqual(1, a);
     try testing.expectEqual(2, b);
 }
+
+test "lazy future - first - a first" {
+    const allocator = testing.allocator;
+    var manual: executors.Manual = .{};
+    const executor = manual.executor();
+    const future_a, const promise_a = try future.contractManaged(usize, std.testing.allocator);
+    const future_b, const promise_b = try future.contractManaged(u32, std.testing.allocator);
+    const first = future.first(.{ future_a, future_b });
+    executor.submit(
+        @TypeOf(promise_a).resolve,
+        .{ &promise_a, @as(usize, 1) },
+        allocator,
+    );
+    executor.submit(
+        @TypeOf(promise_b).resolve,
+        .{ &promise_b, @as(u32, 2) },
+        allocator,
+    );
+    try testing.expectEqual(2, manual.drain());
+    switch (future.get(first)) {
+        .@"0" => |value_usize| {
+            try std.testing.expectEqual(1, value_usize);
+        },
+        else => unreachable,
+    }
+}
+
+test "lazy future - first - b first" {
+    const allocator = testing.allocator;
+    var manual: executors.Manual = .{};
+    const executor = manual.executor();
+    const future_a, const promise_a = try future.contractManaged(usize, std.testing.allocator);
+    const future_b, const promise_b = try future.contractManaged(u32, std.testing.allocator);
+    const first = future.first(.{ future_a, future_b });
+    executor.submit(
+        @TypeOf(promise_b).resolve,
+        .{ &promise_b, @as(u32, 2) },
+        allocator,
+    );
+    try testing.expectEqual(1, manual.drain());
+    switch (future.get(first)) {
+        .@"1" => |value_u32| {
+            try std.testing.expectEqual(2, value_u32);
+        },
+        else => unreachable,
+    }
+    executor.submit(
+        @TypeOf(promise_a).resolve,
+        .{ &promise_a, @as(usize, 1) },
+        allocator,
+    );
+    try testing.expectEqual(1, manual.drain());
+}

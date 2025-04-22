@@ -24,6 +24,7 @@ pub const Impl = struct {
     pub const flatten = combinators.flatten.flatten;
     // --- parallel combinators ---
     pub const all = combinators.all.all;
+    pub const first = combinators.first.first;
     // --- terminators ---
     pub const get = terminators.get;
     pub const detach = terminators.detach;
