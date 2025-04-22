@@ -305,34 +305,13 @@ assert(coro.isCompleted());
 ```
 
 ### Futures & Promises
-- [ ] lazy
-- [ ] eager ? (consider if this should be removed & only "lazy" should be kept)
+- [source](src/future/lazy/root.zig)
+> [!NOTE]  
+> documentation WIP
 
-
-### Structured Concurrency
-- [ ] cancellation token/source
-- [ ] nursery?
-
-### Testing
-- [x] basic random fault injection for unit tests
-- [ ] study [Twist](https://gitlab.com/Lipovsky/twist)
-
-### Core
-- [x] spin lock
-- [x] intrusive foward list/queue/stack (not thread-safe)
-- [ ] [Michael & Scott lock-free queue](https://dl.acm.org/doi/pdf/10.1145/248052.248106)
-- [ ] hazard pointers
-
-### Performance
-- [ ] integrate with Tracy etc.
-- [ ] optimize memory orders
-
-### IO
-- [ ] Play around with self-hosted IO dispatch
-- [ ] Consider integration with [libxev](https://github.com/mitchellh/libxev)
 
 ### Long-term initiatives
-- [ ] integration with Zig async/await
+#### integration with Zig async/await
   - It is currently unclear what direction Zig will go with for language support of async/await. 
   - Once the Zig Language direction is decided, we will consider the best way to integrate it with the library.
 
