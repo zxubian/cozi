@@ -19,13 +19,13 @@ pub fn All(Inputs: type) type {
     return struct {
         inputs: Inputs,
 
-        pub const ValueType = OutputTupleType();
+        pub const ValueType = OutputTupleType;
 
         pub fn Computation(Continuation: type) type {
             return struct {
                 const ComputationType = @This();
 
-                input_computations: InputComputations(),
+                input_computations: InputComputations,
                 value: ValueType = undefined,
                 rendezvous_state: std.atomic.Value(usize),
                 next: Continuation,
@@ -46,7 +46,7 @@ pub fn All(Inputs: type) type {
                         ) void {
                             const computation: *F.Computation(@This()) = @alignCast(@fieldParentPtr("next", self));
                             const computation_field_name_in_tuple = std.fmt.comptimePrint("{}", .{index});
-                            const input_computations: *InputComputations() = @alignCast(
+                            const input_computations: *InputComputations = @alignCast(
                                 @fieldParentPtr(
                                     computation_field_name_in_tuple,
                                     computation,
@@ -68,10 +68,10 @@ pub fn All(Inputs: type) type {
                     };
                 }
 
-                fn InputComputations() type {
-                    comptime assert(inputs_type_info.@"struct".is_tuple);
+                const InputComputations = blk: {
+                    assert(inputs_type_info.@"struct".is_tuple);
                     var output_fields: [inputs_count]std.builtin.Type.StructField = undefined;
-                    inline for (
+                    for (
                         inputs_type_info.@"struct".fields,
                         &output_fields,
                         0..,
@@ -93,15 +93,15 @@ pub fn All(Inputs: type) type {
                             .is_tuple = true,
                         },
                     };
-                    return @Type(result_type_info);
-                }
+                    break :blk @Type(result_type_info);
+                };
             };
         }
 
-        fn OutputTupleType() type {
-            comptime assert(inputs_type_info.@"struct".is_tuple);
+        const OutputTupleType = blk: {
+            assert(inputs_type_info.@"struct".is_tuple);
             var output_fields: [inputs_count]std.builtin.Type.StructField = undefined;
-            inline for (
+            for (
                 inputs_type_info.@"struct".fields,
                 &output_fields,
                 0..,
@@ -122,8 +122,8 @@ pub fn All(Inputs: type) type {
                     .is_tuple = true,
                 },
             };
-            return @Type(result_type_info);
-        }
+            break :blk @Type(result_type_info);
+        };
 
         pub fn materialize(
             self: @This(),
