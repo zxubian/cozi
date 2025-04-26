@@ -16,50 +16,79 @@ pub fn Future(InputFuture: type) type {
     const InnerFuture = InputFuture.ValueType;
     const FlattenedValue = InnerFuture.ValueType;
     return struct {
-        input_future: OuterFuture,
+        outer_future: OuterFuture,
         pub const ValueType = FlattenedValue;
 
         pub fn Computation(Continuation: type) type {
             return struct {
-                input_computation: OuterFuture.Computation(OuterFutureContinuation),
+                outer_computation: OuterComputation,
+                inner_computation: InnerComputation = undefined,
+                next: Continuation,
+
+                const Impl = @This();
+                const OuterComputation = OuterFuture.Computation(OuterFutureContinuation);
+                const InnerComputation = InnerFuture.Computation(InnerFutureContinuation);
 
                 pub fn start(self: *@This()) void {
-                    self.input_computation.start();
+                    self.outer_computation.start();
+                }
+
+                fn runOuter(ctx: *anyopaque) void {
+                    const outer_continuation: *OuterFutureContinuation = @alignCast(@ptrCast(ctx));
+                    const outer_computation: *OuterComputation = @fieldParentPtr("next", outer_continuation);
+                    const self: *Impl = @fieldParentPtr("outer_computation", outer_computation);
+                    const inner_future = &outer_continuation.value;
+                    self.inner_computation = inner_future.materialize(
+                        InnerFutureContinuation{},
+                    );
+                    self.inner_computation.start();
+                }
+
+                fn runInner(ctx: *anyopaque) void {
+                    const inner_continuation: *InnerFutureContinuation = @alignCast(@ptrCast(ctx));
+                    const inner_computation: *InnerComputation = @fieldParentPtr("next", inner_continuation);
+                    const self: *Impl = @fieldParentPtr("inner_computation", inner_computation);
+                    self.next.@"continue"(inner_continuation.value, inner_continuation.state);
                 }
 
                 pub const OuterFutureContinuation = struct {
-                    inner_future: InnerFuture = undefined,
+                    value: InnerFuture = undefined,
                     state: State = undefined,
                     runnable: Runnable = undefined,
-                    inner_future_computation: InnerFuture.Computation(InnerFutureContinuation) = undefined,
-                    next: Continuation,
 
                     pub fn @"continue"(
                         self: *@This(),
                         value: InnerFuture,
                         state: State,
                     ) void {
-                        self.inner_future = value;
+                        self.value = value;
                         self.state = state;
-                        self.inner_future_computation = self.inner_future.materialize(
-                            InnerFutureContinuation{
-                                .next_ptr = &self.next,
-                            },
-                        );
-                        self.inner_future_computation.start();
+                        self.runnable = .{
+                            .runFn = runOuter,
+                            .ptr = self,
+                        };
+                        state.executor.submitRunnable(&self.runnable);
                     }
+                };
 
-                    pub const InnerFutureContinuation = struct {
-                        next_ptr: *Continuation,
+                pub const InnerFutureContinuation = struct {
+                    value: FlattenedValue = undefined,
+                    state: State = undefined,
+                    runnable: Runnable = undefined,
 
-                        pub fn @"continue"(
-                            self: *@This(),
-                            value: FlattenedValue,
-                            state: State,
-                        ) void {
-                            self.next_ptr.@"continue"(value, state);
-                        }
-                    };
+                    pub fn @"continue"(
+                        self: *@This(),
+                        value: FlattenedValue,
+                        state: State,
+                    ) void {
+                        self.value = value;
+                        self.state = state;
+                        self.runnable = .{
+                            .runFn = runInner,
+                            .ptr = self,
+                        };
+                        state.executor.submitRunnable(&self.runnable);
+                    }
                 };
             };
         }
@@ -71,11 +100,10 @@ pub fn Future(InputFuture: type) type {
             const Result = Computation(@TypeOf(continuation));
             const InputContinuation = Result.OuterFutureContinuation;
             return .{
-                .input_computation = self.input_future.materialize(
-                    InputContinuation{
-                        .next = continuation,
-                    },
+                .outer_computation = self.outer_future.materialize(
+                    InputContinuation{},
                 ),
+                .next = continuation,
             };
         }
     };
@@ -86,7 +114,7 @@ pub fn pipe(
     f: anytype,
 ) Future(@TypeOf(f)) {
     return .{
-        .input_future = f,
+        .outer_future = f,
     };
 }
 

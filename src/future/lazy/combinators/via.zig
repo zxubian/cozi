@@ -22,26 +22,49 @@ pub fn Future(InputFuture: type) type {
 
         pub fn Computation(Continuation: type) type {
             return struct {
-                input_computation: InputFuture.Computation(ContinuationForInputFuture),
+                input_computation: InputFuture.Computation(InputContinuation),
+                next: Continuation,
+                next_executor: Executor,
+
+                const Impl = @This();
 
                 pub fn start(self: *@This()) void {
                     self.input_computation.start();
                 }
 
-                pub const ContinuationForInputFuture = struct {
-                    next_executor: Executor,
-                    next: Continuation,
+                pub fn run(ctx: *anyopaque) void {
+                    const input_continuation: *InputContinuation = @alignCast(@ptrCast(ctx));
+                    const input_computation: *InputFuture.Computation(InputContinuation) = @fieldParentPtr(
+                        "next",
+                        input_continuation,
+                    );
+                    const self: *Impl = @fieldParentPtr(
+                        "input_computation",
+                        input_computation,
+                    );
+                    self.next.@"continue"(
+                        input_continuation.value,
+                        .{
+                            .executor = self.next_executor,
+                        },
+                    );
+                }
+
+                pub const InputContinuation = struct {
+                    runnable: Runnable = undefined,
+                    value: InputFuture.ValueType = undefined,
+
                     pub fn @"continue"(
                         self: *@This(),
                         value: InputFuture.ValueType,
-                        _: State,
+                        state: State,
                     ) void {
-                        self.next.@"continue"(
-                            value,
-                            .{
-                                .executor = self.next_executor,
-                            },
-                        );
+                        self.value = value;
+                        self.runnable = Runnable{
+                            .runFn = run,
+                            .ptr = self,
+                        };
+                        state.executor.submitRunnable(&self.runnable);
                     }
                 };
             };
@@ -52,14 +75,13 @@ pub fn Future(InputFuture: type) type {
             continuation: anytype,
         ) Computation(@TypeOf(continuation)) {
             const Result = Computation(@TypeOf(continuation));
-            const InputContinuation = Result.ContinuationForInputFuture;
+            const InputContinuation = Result.InputContinuation;
             return .{
                 .input_computation = self.input_future.materialize(
-                    InputContinuation{
-                        .next_executor = self.next_executor,
-                        .next = continuation,
-                    },
+                    InputContinuation{},
                 ),
+                .next_executor = self.next_executor,
+                .next = continuation,
             };
         }
     };

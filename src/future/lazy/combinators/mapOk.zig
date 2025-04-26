@@ -85,17 +85,18 @@ pub fn MapOk(MapOkFn: type) type {
 
                 pub fn Computation(Continuation: type) type {
                     return struct {
-                        input_computation: InputFuture.Computation(ContinuationForInputFuture),
+                        input_computation: InputComputation,
+                        map_fn: *const MapOkFn,
+                        map_ctx: ?*anyopaque,
+                        next: Continuation,
 
-                        const Self = @This();
+                        const ComputationImpl = @This();
+                        const InputComputation = InputFuture.Computation(InputContinuation);
 
-                        pub const ContinuationForInputFuture = struct {
+                        pub const InputContinuation = struct {
                             value: InputFuture.ValueType = undefined,
                             state: State = undefined,
                             runnable: Runnable = undefined,
-                            map_fn: *const MapOkFn,
-                            map_ctx: ?*anyopaque,
-                            next: Continuation,
 
                             pub fn @"continue"(
                                 self: *@This(),
@@ -104,21 +105,26 @@ pub fn MapOk(MapOkFn: type) type {
                             ) void {
                                 self.value = value;
                                 self.state = state;
-                                if (std.meta.isError(value)) {
-                                    self.next.@"continue"(value, state);
-                                } else {
-                                    self.runnable = .{
-                                        .runFn = run,
-                                        .ptr = self,
-                                    };
-                                    state.executor.submitRunnable(&self.runnable);
-                                }
+                                self.runnable = .{
+                                    .runFn = run,
+                                    .ptr = self,
+                                };
+                                state.executor.submitRunnable(&self.runnable);
                             }
                         };
 
                         pub fn run(ctx_: *anyopaque) void {
-                            const self: *ContinuationForInputFuture = @alignCast(@ptrCast(ctx_));
-                            const input_value = &self.value;
+                            const input_continuation: *InputContinuation = @alignCast(@ptrCast(ctx_));
+                            const input_computation: *InputComputation = @fieldParentPtr("next", input_continuation);
+                            const self: *ComputationImpl = @fieldParentPtr("input_computation", input_computation);
+                            if (std.meta.isError(input_continuation.value)) {
+                                self.next.@"continue"(
+                                    input_continuation.value,
+                                    input_continuation.state,
+                                );
+                                return;
+                            }
+                            const input_value = &input_continuation.value;
                             const output: OutputValueType = blk: {
                                 if (map_fn_has_args) {
                                     break :blk @call(
@@ -137,7 +143,10 @@ pub fn MapOk(MapOkFn: type) type {
                                     );
                                 }
                             };
-                            self.next.@"continue"(output, self.state);
+                            self.next.@"continue"(
+                                output,
+                                input_continuation.state,
+                            );
                         }
 
                         pub fn start(self: *@This()) void {
@@ -151,15 +160,14 @@ pub fn MapOk(MapOkFn: type) type {
                     continuation: anytype,
                 ) Computation(@TypeOf(continuation)) {
                     const Result = Computation(@TypeOf(continuation));
-                    const InputContinuation = Result.ContinuationForInputFuture;
+                    const InputContinuation = Result.InputContinuation;
                     return .{
                         .input_computation = self.input_future.materialize(
-                            InputContinuation{
-                                .map_fn = self.map_fn,
-                                .map_ctx = self.map_ctx,
-                                .next = continuation,
-                            },
+                            InputContinuation{},
                         ),
+                        .map_fn = self.map_fn,
+                        .map_ctx = self.map_ctx,
+                        .next = continuation,
                     };
                 }
             };

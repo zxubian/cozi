@@ -46,20 +46,52 @@ pub fn Map(MapFn: type) type {
 
                 pub fn Computation(Continuation: type) type {
                     return struct {
-                        input_computation: InputFuture.Computation(ContinuationForInputFuture),
-                        const Computation_ = @This();
+                        input_computation: InputComputation,
+                        map_fn: *const MapFn,
+                        map_ctx: ?*anyopaque,
+                        runnable: Runnable = undefined,
+                        next: Continuation,
 
-                        pub fn start(self: *Computation_) void {
+                        const Impl = @This();
+                        const InputComputation = InputFuture.Computation(InputContinuation);
+
+                        pub fn start(self: *Impl) void {
                             self.input_computation.start();
                         }
 
-                        pub const ContinuationForInputFuture = struct {
-                            map_fn: *const MapFn,
-                            map_ctx: ?*anyopaque,
+                        pub fn run(ctx_: *anyopaque) void {
+                            const input_continuation: *InputContinuation = @alignCast(@ptrCast(ctx_));
+                            const input_computation: *InputComputation = @fieldParentPtr("next", input_continuation);
+                            const self: *Impl = @fieldParentPtr("input_computation", input_computation);
+                            const input_value = &input_continuation.value;
+                            const output: OutputValueType = blk: {
+                                if (map_fn_has_args) {
+                                    break :blk @call(
+                                        .auto,
+                                        self.map_fn,
+                                        .{
+                                            self.map_ctx,
+                                            input_value.*,
+                                        },
+                                    );
+                                } else {
+                                    break :blk @call(
+                                        .auto,
+                                        self.map_fn,
+                                        .{self.map_ctx},
+                                    );
+                                }
+                            };
+                            self.next.@"continue"(
+                                output,
+                                input_continuation.state,
+                            );
+                        }
+
+                        pub const InputContinuation = struct {
                             value: InputFuture.ValueType = undefined,
                             state: State = undefined,
                             runnable: Runnable = undefined,
-                            next: Continuation,
 
                             pub fn @"continue"(
                                 self: *@This(),
@@ -74,30 +106,6 @@ pub fn Map(MapFn: type) type {
                                 };
                                 state.executor.submitRunnable(&self.runnable);
                             }
-
-                            pub fn run(ctx_: *anyopaque) void {
-                                const self: *ContinuationForInputFuture = @alignCast(@ptrCast(ctx_));
-                                const input_value = &self.value;
-                                const output: OutputValueType = blk: {
-                                    if (map_fn_has_args) {
-                                        break :blk @call(
-                                            .auto,
-                                            self.map_fn,
-                                            .{
-                                                self.map_ctx,
-                                                input_value.*,
-                                            },
-                                        );
-                                    } else {
-                                        break :blk @call(
-                                            .auto,
-                                            self.map_fn,
-                                            .{self.map_ctx},
-                                        );
-                                    }
-                                };
-                                self.next.@"continue"(output, self.state);
-                            }
                         };
                     };
                 }
@@ -107,15 +115,15 @@ pub fn Map(MapFn: type) type {
                     continuation: anytype,
                 ) Computation(@TypeOf(continuation)) {
                     const Result = Computation(@TypeOf(continuation));
-                    const InputContinuation = Result.ContinuationForInputFuture;
+                    const InputContinuation = Result.InputContinuation;
                     return .{
                         .input_computation = self.input_future.materialize(
-                            InputContinuation{
-                                .map_fn = self.map_fn,
-                                .map_ctx = self.map_ctx,
-                                .next = continuation,
-                            },
+                            InputContinuation{},
                         ),
+
+                        .map_fn = self.map_fn,
+                        .map_ctx = self.map_ctx,
+                        .next = continuation,
                     };
                 }
             };
