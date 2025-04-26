@@ -44,11 +44,20 @@ zig fetch --save git+https://github.com/zxubian/zinc.git#main
     exe.root_module.addImport("zinc", zinc.module("root"));
 ```
 
-3. Import `zinc` and use:
+3. Import  and use:
 - [examples](examples/)
 
 ### Stability Guarantees
 `zinc` is experimental and unstable. Expect `main` branch to occasionally break.
+
+## [Examples](examples/)
+
+```bash
+# get list of available examples
+zig build example-run
+# build & run specific example
+zig build example-run -Dexample-name="some_example"
+```
 
 ## Features & Roadmap
 
