@@ -57,9 +57,18 @@ zig fetch --save git+https://github.com/zxubian/zinc.git#main
 #### [Executor](src/executors/executor.zig)
 - `Executor` is a type-erased interface representing an abstract task queue.
 - `Executor` allows users to submit [Runnable](src/core/runnable.zig)s (an abstract representation a task) for eventual execution.
-    - Correct user programs cannot depend on the timing or order of execution of runnables, and cannot make assumptions about which thread will execute the runnable.
+
+```zig
+const executor = thread_pool.executor();
+executor.submit(some_function, .{args}, allocator);
+// eventually, some_function(args) will be called.
+// exact timing depends on the specific Executor implementation
+```
+
 - `Executor` is to asynchronous task execution what [Allocator](https://github.com/ziglang/zig/blob/master/lib/std/mem/Allocator.zig) is to memory management.
-- `Executor` is a fundamental building block, and many other primitives of `zinc` depend on it (e.g. both `Future` and `Fiber` can run on any `Executor`)
+- `Executor` is a fundamental building block, and many other primitives of this library expose APIs compatible with Executor 
+    - both `Future` and `Fiber` can run on any `Executor`
+- this abstraction allows us to separate _what_ is being executed (tasks, futures, fibers, etc. ) from _how_ it is run
 
 ##### Available Executors:
 ###### [Inline](src/executors/inline.zig)
