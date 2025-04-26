@@ -573,7 +573,12 @@ test "lazy future - first - a first" {
     const executor = manual.executor();
     const future_a, const promise_a = try future.contractManaged(usize, std.testing.allocator);
     const future_b, const promise_b = try future.contractManaged(u32, std.testing.allocator);
-    const first = future.first(.{ future_a, future_b });
+    const first = future.pipeline(
+        .{
+            future.just(),
+            future.first(.{ future_a, future_b }),
+        },
+    );
     executor.submit(
         @TypeOf(promise_a).resolve,
         .{ &promise_a, @as(usize, 1) },
@@ -599,7 +604,12 @@ test "lazy future - first - b first" {
     const executor = manual.executor();
     const future_a, const promise_a = try future.contractManaged(usize, std.testing.allocator);
     const future_b, const promise_b = try future.contractManaged(u32, std.testing.allocator);
-    const first = future.first(.{ future_a, future_b });
+    const first = future.pipeline(
+        .{
+            future.just(),
+            future.first(.{ future_a, future_b }),
+        },
+    );
     executor.submit(
         @TypeOf(promise_b).resolve,
         .{ &promise_b, @as(u32, 2) },
@@ -697,7 +707,7 @@ test "lazy future - pipline - threadpool - first" {
     const Ctx = struct {
         thread_pool: *ThreadPool,
 
-        const FirstResultType = future.First(@TypeOf(.{ future_a, future_b })).ValueType;
+        const FirstResultType = future.First(@TypeOf(.{ future_a, future_b })).OutputUnionType;
         fn map(
             ctx: ?*anyopaque,
             input: FirstResultType,
@@ -710,6 +720,8 @@ test "lazy future - pipline - threadpool - first" {
     var ctx: Ctx = .{ .thread_pool = &tp };
     const pipeline = future.pipeline(
         .{
+            future.just(),
+            future.via(executor),
             future.first(
                 .{
                     future_a,
