@@ -66,9 +66,9 @@ executor.submit(some_function, .{args}, allocator);
 ```
 
 - `Executor` is to asynchronous task execution what [Allocator](https://github.com/ziglang/zig/blob/master/lib/std/mem/Allocator.zig) is to memory management.
-- `Executor` is a fundamental building block, and many other primitives of this library expose APIs compatible with Executor 
+- `Executor` is a fundamental building block, and many other primitives of this library expose APIs compatible with it 
     - both `Future` and `Fiber` can run on any `Executor`
-- this abstraction allows us to separate _what_ is being executed (tasks, futures, fibers, etc. ) from _how_ it is run
+- this abstraction allows us to orthogonally separate _what_ is being executed (tasks, futures, fibers, etc. ) from _how_ it is run (in a single-threaded manual event loop, a thread pool, etc.)
 
 ##### Available Executors:
 ###### [Inline](src/executors/inline.zig)
