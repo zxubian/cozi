@@ -146,10 +146,16 @@ assert(ctx.sum.load(.seq_cst) == task_count);
 - [roadmap](https://github.com/zxubian/zinc/issues?q=is%3Aissue%20state%3Aopen%20label%3Afeature%20label%3A%22Thread%20Pool%22)
 
 ### [Fibers](src/fiber/root.zig) - stackfull cooperatively-scheduled user-space threads
-- **Stackful**: user must allocate memory for each fiber's execution stack
+- **threads**: like OS threads, fibers represents a "thread" of execution, i.e. an independent sequence of instructions together with its execution context (stack space)
+- 
+- **stackful**: user must allocate memory for each fiber's execution stack (in contrast to e.g. stackless coroutines)
 - **cooperatively-scheduled**: fibers are not pre-empted by the system or the `zinc` runtime
      - Instead, each fiber itself is responsible for releasing control of the underlying thread and allow other fibers to run
-     - When this happens, the fiber's state is refered to as _suspened_ or _parked_.
+     - When in this state, the fiber is refered to as being _suspended_ or _parked_.
+
+#### Comparison to other languages
+- Fibers are an example of [Green Threads](https://en.wikipedia.org/wiki/Green_thread)
+- Fibers are similar to [goroutines](https://go.dev/tour/concurrency/1) in GoLang, and [coroutines](https://kotlinlang.org/docs/coroutines-guide.html) in Kotlin
 
 ```zig
 const Ctx = struct {
