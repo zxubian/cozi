@@ -157,34 +157,21 @@ const Examples = @import("./examples/root.zig");
 fn buildExamples(
     b: *std.Build,
     examples: type,
-    sample_step: *std.Build.Step,
+    example_step: *std.Build.Step,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
     zinc_root: *std.Build.Module,
 ) void {
-    const maybe_example_name = b.option([]const u8, "example-name", "Name of the example");
+    const Example = std.meta.FieldEnum(examples);
+    const maybe_example_name = b.option(Example, "example-name", "Name of the example");
     const examples_decls = comptime std.meta.declarations(examples);
     const build_target_example = b.step("example", "Build specific example");
     const run_target_example = b.step("example-run", "Build and run specific example");
-    if (maybe_example_name) |target_example| {
-        for (examples_decls) |example_decl| {
-            if (std.mem.eql(u8, target_example, example_decl.name)) {
-                break;
-            }
-        } else {
-            build_target_example.dependOn(
-                &b.addFail("Unknown example name").step,
-            );
-            run_target_example.dependOn(&b.addFail("Unknown example name").step);
-        }
-    } else {
-        build_target_example.dependOn(&b.addFail("Missing required argument: -Dexample-name=...").step);
-        run_target_example.dependOn(&b.addFail("Missing required argument: -Dexample-name=...").step);
-    }
 
     inline for (examples_decls) |example_decl| {
-        const example_name = example_decl.name;
-        const exe_main = comptime @field(examples, example_name);
+        const example_name_string = example_decl.name;
+        const example_name = std.meta.stringToEnum(Example, example_name_string);
+        const exe_main = comptime @field(examples, example_name_string);
 
         const exe_mod = b.createModule(.{
             .root_source_file = b.path(b.pathJoin(&[_][]const u8{ "examples", exe_main })),
@@ -195,7 +182,7 @@ fn buildExamples(
 
         const exe = b.addExecutable(
             .{
-                .name = example_name,
+                .name = example_name_string,
                 .root_module = exe_mod,
             },
         );
@@ -205,12 +192,32 @@ fn buildExamples(
 
         const run_exe = b.addRunArtifact(exe);
         run_exe.step.dependOn(&install_exe_step.step);
-        if (maybe_example_name) |target_sample_name| {
-            if (std.mem.eql(u8, example_name, target_sample_name)) {
+        if (maybe_example_name) |target_example_name| {
+            if (example_name == target_example_name) {
                 build_target_example.dependOn(&install_exe_step.step);
                 run_target_example.dependOn(&run_exe.step);
             }
         }
-        sample_step.dependOn(&install_exe_step.step);
+        example_step.dependOn(&install_exe_step.step);
+    }
+
+    if (maybe_example_name == null) {
+        const examples_names = comptime blk: {
+            const decls = std.meta.declarations(examples);
+            var name: [:0]const u8 = "";
+            for (decls, 0..) |decl, i| {
+                name = name ++ "\"" ++ decl.name ++ "\"";
+                if (i < decls.len - 1) {
+                    name = name ++ " | ";
+                }
+            }
+            break :blk name;
+        };
+        build_target_example.dependOn(&b.addFail(
+            std.fmt.comptimePrint("Missing required argument: -Dexample-name={s}", .{examples_names}),
+        ).step);
+        run_target_example.dependOn(&b.addFail(
+            std.fmt.comptimePrint("Missing required argument: -Dexample-name={s}", .{examples_names}),
+        ).step);
     }
 }
