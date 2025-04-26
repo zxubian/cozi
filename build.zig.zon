@@ -1,7 +1,7 @@
 .{
     .name = .cozi,
     .version = "0.0.1",
-    .fingerprint = 0x4d051980d494e470,
+    .fingerprint = 0xaae2436c6f73c03f,
     .minimum_zig_version = "0.15.0-dev.337+4e700fdf8",
     .dependencies = .{},
     .paths = .{
