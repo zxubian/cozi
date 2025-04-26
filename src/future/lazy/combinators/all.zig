@@ -51,7 +51,7 @@ pub fn All(Inputs: type) type {
                 @compileError("Future preceeding `all` in the pipeline must have a value type of void");
             }
             return struct {
-                input_future: PipeInputFuture,
+                pipe_input_future: PipeInputFuture,
                 inputs: Inputs,
 
                 pub const ValueType = OutputTupleType;
@@ -125,7 +125,10 @@ pub fn All(Inputs: type) type {
                             );
                         }
 
-                        fn InputContinuation(F: type, comptime computation_index: usize) type {
+                        fn InputContinuation(
+                            F: type,
+                            comptime computation_index: usize,
+                        ) type {
                             return struct {
                                 const index: usize = computation_index;
                                 runnable: Runnable = undefined,
@@ -202,7 +205,7 @@ pub fn All(Inputs: type) type {
                         const F = comptime getFutureType(i);
                         computation.* = self.inputs[i].materialize(Result.InputContinuation(F, i){});
                     }
-                    result.pipe_input_computation = self.input_future.materialize(
+                    result.pipe_input_computation = self.pipe_input_future.materialize(
                         Result.PipeContinuation{},
                     );
                     return result;
@@ -214,13 +217,12 @@ pub fn All(Inputs: type) type {
             };
         }
 
-        /// F<V> -> F<V>
         pub fn pipe(
-            self: *const @This(),
+            self: @This(),
             f: anytype,
         ) Future(@TypeOf(f)) {
             return .{
-                .input_future = f,
+                .pipe_input_future = f,
                 .inputs = self.inputs,
             };
         }
@@ -229,6 +231,8 @@ pub fn All(Inputs: type) type {
 
 /// A Future that is resolved when ALL
 /// of the input futures are resolved.
+/// The Computation of each Future from `inputs` is
+/// executed on last Executor set in the pipeline.
 /// The resolved value is a Tuple containing
 /// the result values of each supplied Future,
 /// in the same order as the input Futures.
