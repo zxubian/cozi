@@ -544,7 +544,12 @@ test "lazy future - all" {
     const executor = manual.executor();
     const future_a, const promise_a = try future.contractManaged(usize, std.testing.allocator);
     const future_b, const promise_b = try future.contractManaged(u32, std.testing.allocator);
-    const all = future.all(.{ future_a, future_b });
+    const all = future.pipeline(
+        .{
+            future.just(),
+            future.all(.{ future_a, future_b }),
+        },
+    );
     executor.submit(
         @TypeOf(promise_a).resolve,
         .{ &promise_a, @as(usize, 1) },
@@ -631,7 +636,7 @@ test "lazy future - pipline - threadpool - all" {
 
     const Ctx = struct {
         thread_pool: *ThreadPool,
-        const A_and_B = future.All(@TypeOf(.{ future_a, future_b })).ValueType;
+        const A_and_B = future.All(@TypeOf(.{ future_a, future_b })).OutputTupleType;
         fn map(
             ctx: ?*anyopaque,
             input: A_and_B,
@@ -644,6 +649,8 @@ test "lazy future - pipline - threadpool - all" {
     var ctx: Ctx = .{ .thread_pool = &tp };
     const pipeline = future.pipeline(
         .{
+            future.just(),
+            future.via(executor),
             future.all(
                 .{
                     future_a,
