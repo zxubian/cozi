@@ -11,73 +11,131 @@ allocator: std.mem.Allocator,
 
 const Box = @This();
 
-const BoxedComputation = struct {
-    computation_ptr: *anyopaque,
-    vtable: Vtable,
-    allocator: std.mem.Allocator,
+fn BoxedComputation(V: type) type {
+    return struct {
+        const Impl = @This();
+        allocator: std.mem.Allocator,
+        contents: *Contents,
+        vtable: Vtable,
+        const Contents = struct {
+            const Computation = struct {
+                raw_bytes: []u8,
+                alignment: u29,
 
-    const Vtable = struct {
-        start: *const fn (self: *anyopaque) void,
-    };
+                inline fn ptr(self: @This()) *anyopaque {
+                    return @alignCast(@ptrCast(self.raw_bytes.ptr));
+                }
 
-    pub fn init(f: anytype, allocator: std.mem.Allocator) !@This() {
-        const InputFuture = @TypeOf(f);
-        const OutputValue = InputFuture.ValueType;
-        const InputContinuation = Future(OutputValue).InputContinuation;
-        const InputComputation = InputFuture.Computation(InputContinuation);
-        const input_computation = try allocator.create(InputComputation);
-        const boxed: @This() = .{
-            .computation_ptr = input_computation,
-            .vtable = .{
-                .start = @ptrCast(&InputComputation.start),
-            },
-            .allocator = allocator,
+                pub fn deinit(self: @This(), allocator: std.mem.Allocator) void {
+                    allocator.rawFree(
+                        self.raw_bytes,
+                        std.mem.Alignment.fromByteUnits(self.alignment),
+                        @returnAddress(),
+                    );
+                }
+            };
+            input_computation: Computation,
+            continuation: future.Continuation(V) = undefined,
+
+            pub fn init(allocator: std.mem.Allocator, InputComputation: type) !*@This() {
+                const computation_ptr = try allocator.create(InputComputation);
+                const raw_bytes = std.mem.asBytes(computation_ptr);
+                const ptr = try allocator.create(@This());
+                ptr.* = .{
+                    .input_computation = Computation{
+                        .raw_bytes = raw_bytes,
+                        .alignment = @alignOf(InputComputation),
+                    },
+                };
+                return ptr;
+            }
+
+            pub fn inputComputation(self: @This(), ComputationType: type) *ComputationType {
+                return std.mem.bytesAsValue(
+                    ComputationType,
+                    @as(
+                        []align(@alignOf(ComputationType)) u8,
+                        @alignCast(
+                            @ptrCast(
+                                self.input_computation.raw_bytes,
+                            ),
+                        ),
+                    ),
+                );
+            }
+
+            pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+                self.input_computation.deinit(allocator);
+                allocator.destroy(self);
+            }
         };
-        input_computation.* = f.materialize(
-            InputContinuation{
-                .boxed_input_computation = boxed,
-            },
-        );
-        return boxed;
-    }
 
-    pub inline fn start(self: @This()) void {
-        self.vtable.start(self.computation_ptr);
-    }
+        const Vtable = struct {
+            start: *const fn (self: *anyopaque) void,
+        };
 
-    pub inline fn deinit(self: @This()) void {
-        self.allocator.destroy(self.computation_ptr);
-    }
-};
+        pub fn init(f: anytype, allocator: std.mem.Allocator) !@This() {
+            const InputFuture = @TypeOf(f);
+            const OutputValue = InputFuture.ValueType;
+            comptime assert(OutputValue == V);
+            const InputContinuation = BoxedFuture(OutputValue).InputContinuation;
+            const InputComputation = InputFuture.Computation(InputContinuation);
+            const boxed: Impl = .{
+                .allocator = allocator,
+                .contents = try Contents.init(allocator, InputComputation),
+                .vtable = .{
+                    .start = @ptrCast(&InputComputation.start),
+                },
+            };
+            const input_computation = boxed.contents.inputComputation(InputComputation);
+            input_computation.* = f.materialize(
+                InputContinuation{
+                    .boxed_input_computation = boxed,
+                },
+            );
+            return boxed;
+        }
 
-pub fn Future(V: type) type {
+        pub inline fn start(self: @This()) void {
+            self.vtable.start(self.contents.input_computation.ptr());
+        }
+
+        pub inline fn deinit(self: @This()) void {
+            self.contents.deinit(self.allocator);
+        }
+    };
+}
+
+pub fn BoxedFuture(V: type) type {
     return struct {
         pub const ValueType = V;
         const BoxedFutureType = @This();
-        boxed_input_computation: BoxedComputation,
+        boxed_input_computation: BoxedComputation(V),
 
         pub fn Computation(Continuation: type) type {
             return struct {
                 const ComputationType = @This();
 
-                boxed_input_computation: BoxedComputation,
+                boxed_input_computation: BoxedComputation(V),
                 next: Continuation,
 
                 pub fn start(self: *@This()) void {
+                    self.boxed_input_computation.contents.continuation = future
+                        .Continuation(ValueType)
+                        .eraseType(&self.next);
                     self.boxed_input_computation.start();
                 }
             };
         }
 
         pub const InputContinuation = struct {
-            boxed_input_computation: BoxedComputation,
+            boxed_input_computation: BoxedComputation(V),
             pub fn @"continue"(
                 self: *@This(),
                 value: V,
                 state: State,
             ) void {
-                _ = value;
-                _ = state;
+                self.boxed_input_computation.contents.continuation.@"continue"(value, state);
                 self.boxed_input_computation.deinit();
             }
         };
@@ -94,17 +152,23 @@ pub fn Future(V: type) type {
     };
 }
 
-/// F<V> -> BoxedFuture<V>
+// used for piping
+pub fn Future(F: type) type {
+    return BoxedFuture(F.ValueType);
+}
+
 pub fn pipe(
     self: *const Box,
     f: anytype,
-) Future(@TypeOf(f).ValueType) {
+) Future(@TypeOf(f)) {
     const InputFuture = @TypeOf(f);
-    const OutputValue = InputFuture.ValueType;
-    const boxed_input_computation = BoxedComputation.init(f, self.allocator) catch unreachable;
-    return Future(OutputValue){ .boxed_input_computation = boxed_input_computation };
+    const boxed_input_computation = BoxedComputation(InputFuture.ValueType).init(f, self.allocator) catch unreachable;
+    return Future(InputFuture){
+        .boxed_input_computation = boxed_input_computation,
+    };
 }
 
+/// F<V> -> BoxedFuture<V>
 pub fn box(allocator: std.mem.Allocator) Box {
     return .{ .allocator = allocator };
 }

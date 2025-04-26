@@ -23,7 +23,8 @@ pub const Impl = struct {
     pub const orElse = combinators.orElse.orElse;
     pub const flatten = combinators.flatten.flatten;
     pub const box = combinators.box.box;
-    pub const Boxed = combinators.box.Future;
+    pub const Boxed = combinators.box.BoxedFuture;
+    pub const Box = combinators.box.Future;
     // --- parallel combinators ---
     pub const all = combinators.all.all;
     pub const All = combinators.all.All;
@@ -63,7 +64,7 @@ pub fn Continuation(V: type) type {
             self.vtable.@"continue"(self.ptr, value, state);
         }
 
-        pub fn fromType(ptr: anytype) @This() {
+        pub fn eraseType(ptr: anytype) @This() {
             const Ptr = @TypeOf(ptr);
             const ptr_info: std.builtin.Type.Pointer = @typeInfo(Ptr).pointer;
             const T = ptr_info.child;

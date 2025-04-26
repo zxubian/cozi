@@ -753,7 +753,7 @@ test "lazy future - box" {
         pub fn read(self: *@This()) future.Boxed(AsyncReaderInterface.ReaderError!u8) {
             return future.pipeline(
                 .{
-                    future.value(@as(u8, 1)),
+                    future.value(@as(AsyncReaderInterface.ReaderError!u8, 1)),
                     future.box(self.allocator),
                 },
             );

@@ -21,7 +21,7 @@ pub fn Contract(V: type) type {
 
                     pub fn start(self: *@This()) void {
                         self.shared_state.onFutureArrived(
-                            future.Continuation(V).fromType(&self.next),
+                            future.Continuation(V).eraseType(&self.next),
                         );
                     }
                 };
