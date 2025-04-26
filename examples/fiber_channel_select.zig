@@ -1,11 +1,11 @@
 const std = @import("std");
 const assert = std.debug.assert;
 
-const zinc = @import("zinc");
-const ThreadPool = zinc.executors.threadPools.Compute;
-const Fiber = zinc.Fiber;
-const Channel = zinc.Fiber.Channel;
-const select = zinc.Fiber.select;
+const cozi = @import("cozi");
+const ThreadPool = cozi.executors.threadPools.Compute;
+const Fiber = cozi.Fiber;
+const Channel = cozi.Fiber.Channel;
+const select = cozi.Fiber.select;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};

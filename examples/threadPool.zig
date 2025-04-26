@@ -1,6 +1,6 @@
 const std = @import("std");
-const zinc = @import("zinc");
-const ThreadPool = zinc.executors.threadPools.Compute;
+const cozi = @import("cozi");
+const ThreadPool = cozi.executors.threadPools.Compute;
 const assert = std.debug.assert;
 
 pub fn main() !void {

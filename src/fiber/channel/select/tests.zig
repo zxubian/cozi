@@ -1,7 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const testing = std.testing;
-const fault_injection_builtin = @import("zinc_fault_injection");
+const fault_injection_builtin = @import("cozi_fault_injection");
 
 const Fiber = @import("../../root.zig");
 const select = Fiber.select;

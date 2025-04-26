@@ -1,4 +1,4 @@
-# **zinc** - concurrency primitives for Zig
+# **cozi** - concurrency primitives for Zig
 _Fibers, thread pools, futures - all in userland Zig. Oh My!_
 
 ## Goals
@@ -22,33 +22,33 @@ _Fibers, thread pools, futures - all in userland Zig. Oh My!_
 
 1. Install package:
 ```bash
-zig fetch --save git+https://github.com/zxubian/zinc.git#main
+zig fetch --save git+https://github.com/zxubian/cozi.git#main
 ```
 
-2. Add `zinc` module to your executable:
+2. Add `cozi` module to your executable:
 ```zig
 // build.zig
     const fault_inject_variant = b.option(
         []const u8,
-        "zinc_fault_inject",
+        "cozi_fault_inject",
         "Which fault injection build type to use",
     );
-    const zinc = blk: {
+    const cozi = blk: {
         if (fault_inject_variant) |user_input| {
-            break :blk b.dependency("zinc", .{
+            break :blk b.dependency("cozi", .{
                 .fault_inject = user_input,
             });
         }
-        break :blk b.dependency("zinc", .{});
+        break :blk b.dependency("cozi", .{});
     };
-    exe.root_module.addImport("zinc", zinc.module("root"));
+    exe.root_module.addImport("cozi", cozi.module("root"));
 ```
 
 3. Import  and use:
 - [examples](examples/)
 
 ### Stability Guarantees
-`zinc` is experimental and unstable. Expect `main` branch to occasionally break.
+`cozi` is experimental and unstable. Expect `main` branch to occasionally break.
 
 ## [Examples](examples/)
 
@@ -82,7 +82,7 @@ executor.submit(some_function, .{args}, allocator);
 ##### Available Executors:
 ###### [Inline](src/executors/inline.zig)
 ```zig
-const inline_executor = zinc.executors.@"inline";
+const inline_executor = cozi.executors.@"inline";
 const Ctx = struct {
     done: bool,
     pub fn run(self: *@This()) void {
@@ -97,7 +97,7 @@ try std.testing.expect(ctx.done);
 ###### [Manual](src/executors/manual.zig)
 -  Single-threaded manually-executed task queue
 ```zig
-const ManualExecutor = zinc.executors.Manual;
+const ManualExecutor = cozi.executors.Manual;
 var manual = ManualExecutor{};
 const Ctx = struct {
   step: usize,
@@ -123,7 +123,7 @@ try expectEqual(4, ctx.step);
 
 ###### [Thread Pool](src/executors/threadPool/compute.zig)
 ```zig
-const ThreadPool = zinc.executors.threadPools.Compute;
+const ThreadPool = cozi.executors.threadPools.Compute;
 // Create fixed number of "worker threads" at init time.
 var thread_pool = try ThreadPool.init(4, allocator);
 defer thread_pool.deinit();
@@ -161,13 +161,13 @@ assert(ctx.sum.load(.seq_cst) == task_count);
 #### References:
 - [example](examples/threadPool.zig)
 - [source](src/executors/threadPool/compute.zig)
-- [roadmap](https://github.com/zxubian/zinc/issues?q=is%3Aissue%20state%3Aopen%20label%3Afeature%20label%3A%22Thread%20Pool%22)
+- [roadmap](https://github.com/zxubian/cozi/issues?q=is%3Aissue%20state%3Aopen%20label%3Afeature%20label%3A%22Thread%20Pool%22)
 
 ### [Fibers](src/fiber/root.zig) - stackfull cooperatively-scheduled user-space threads
 - **threads**: like OS threads, fibers represents a "thread" of execution, i.e. an independent sequence of instructions together with its execution context (stack space)
 - 
 - **stackful**: user must allocate memory for each fiber's execution stack (in contrast to e.g. stackless coroutines)
-- **cooperatively-scheduled**: fibers are not pre-empted by the system or the `zinc` runtime
+- **cooperatively-scheduled**: fibers are not pre-empted by the system or the `cozi` runtime
      - Instead, each fiber itself is responsible for releasing control of the underlying thread and allow other fibers to run
      - When in this state, the fiber is refered to as being _suspended_ or _parked_.
 
@@ -224,7 +224,7 @@ ctx.wait_group.wait();
 All of the following synchronization primitives work like their Thread counterparts, but do not block the underlying Thread (neither through spinning nor using `futex`).
 Instead, the executing Fiber is suspended, and rescheduled for execution when appropriate for the primitive.
 
-| Zig stdlib (for Threads)                                                                | zinc (for Fibers)                         |
+| Zig stdlib (for Threads)                                                                | cozi (for Fibers)                         |
 | --------------------------------------------------------------------------------------- | ----------------------------------------- |
 | [Mutex](https://github.com/ziglang/zig/blob/master/lib/std/Thread/Mutex.zig)            | [Mutex](src/fiber/sync/mutex.zig)         |
 | [ResetEvent](https://github.com/ziglang/zig/blob/master/lib/std/Thread/ResetEvent.zig)  | [Event](src/fiber/sync/event.zig)         |
@@ -245,8 +245,8 @@ Instead, the executing Fiber is suspended, and rescheduled for execution when ap
   </summary>
 
 ```zig
-const Channel = zinc.Fiber.Channel;
-const select = zinc.Fiber.select;
+const Channel = cozi.Fiber.Channel;
+const select = cozi.Fiber.select;
 const Ctx = struct {
     channel_usize: Channel(usize) = .{},
     channel_string: Channel([]const u8) = .{},
@@ -304,10 +304,10 @@ ctx.wait_group.wait();
 ### Stackfull Coroutine - a function you can suspend & resume
 - [example](examples/coroutine.zig)
 - [source](src/coroutine/root.zig)
-- [roadmap](https://github.com/zxubian/zinc/issues?q=is%3Aissue%20state%3Aopen%20label%3ACoroutine%20label%3Afeature)
+- [roadmap](https://github.com/zxubian/cozi/issues?q=is%3Aissue%20state%3Aopen%20label%3ACoroutine%20label%3Afeature)
 ```zig
-const zinc = @import("zinc");
-const Coroutine = zinc.Coroutine;
+const cozi = @import("cozi");
+const Coroutine = cozi.Coroutine;
 // ... 
 const Ctx = struct {
     pub fn run(ctx: *Coroutine) void {
@@ -345,7 +345,7 @@ assert(coro.isCompleted());
   - regardless of memory management approach chosen by the user, library must minimize number of runtime allocations
 
 # Acknowledgements
-The design of **zinc** is heavily based on prior work, especialy the [concurrency course](https://www.youtube.com/watch?v=zw6V3SDsXDk&list=PL4_hYwCyhAva37lNnoMuBcKRELso5nvBm) taught by [Roman Lipovsky](https://gitlab.com/Lipovsky) at MIPT. The author would like to express his deepest gratitude to Roman for all of the knowledge that he shares publicly, and for his dedication to education in technology. This library began as a fun exercise to go along with the course, and would not exist without it.
+The design of **cozi** is heavily based on prior work, especialy the [concurrency course](https://www.youtube.com/watch?v=zw6V3SDsXDk&list=PL4_hYwCyhAva37lNnoMuBcKRELso5nvBm) taught by [Roman Lipovsky](https://gitlab.com/Lipovsky) at MIPT. The author would like to express his deepest gratitude to Roman for all of the knowledge that he shares publicly, and for his dedication to education in technology. This library began as a fun exercise to go along with the course, and would not exist without it.
 
 **Honourable mentions:**
 - [YACLib](https://github.com/YACLib/YACLib)

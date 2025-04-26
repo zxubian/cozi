@@ -66,7 +66,7 @@ pub fn build(b: *std.Build) void {
         fault_build_variant,
     );
 
-    root.addOptions("zinc_fault_injection", fault_injection_builtin);
+    root.addOptions("cozi_fault_injection", fault_injection_builtin);
 
     addAssemblyForMachineContext(b, root, &target);
 
@@ -115,7 +115,7 @@ pub fn build(b: *std.Build) void {
     );
 
     unit_tests.root_module.addOptions(
-        "zinc_fault_injection",
+        "cozi_fault_injection",
         fault_injection_builtin,
     );
 
@@ -129,7 +129,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&install_test_step.step);
 
     const doc_test = b.addObject(.{
-        .name = "zinc",
+        .name = "cozi",
         .root_module = root,
     });
 
@@ -160,7 +160,7 @@ fn buildExamples(
     example_step: *std.Build.Step,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
-    zinc_root: *std.Build.Module,
+    cozi_root: *std.Build.Module,
 ) void {
     const Example = std.meta.FieldEnum(examples);
     const maybe_example_name = b.option(Example, "example-name", "Name of the example");
@@ -178,7 +178,7 @@ fn buildExamples(
             .target = target,
             .optimize = optimize,
         });
-        exe_mod.addImport("zinc", zinc_root);
+        exe_mod.addImport("cozi", cozi_root);
 
         const exe = b.addExecutable(
             .{

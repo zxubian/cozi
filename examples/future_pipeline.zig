@@ -1,7 +1,7 @@
 const std = @import("std");
-const zinc = @import("zinc");
-const ThreadPool = zinc.executors.ThreadPools.Compute;
-const future = zinc.future.lazy;
+const cozi = @import("cozi");
+const ThreadPool = cozi.executors.ThreadPools.Compute;
+const future = cozi.future.lazy;
 const assert = std.debug.assert;
 
 pub fn main() !void {

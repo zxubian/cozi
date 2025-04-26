@@ -1,5 +1,5 @@
 .{
-    .name = .zinc,
+    .name = .cozi,
     .version = "0.0.1",
     .fingerprint = 0x4d051980d494e470,
     .minimum_zig_version = "0.15.0-dev.337+4e700fdf8",

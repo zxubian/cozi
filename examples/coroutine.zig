@@ -1,6 +1,6 @@
 const std = @import("std");
-const zinc = @import("zinc");
-const Coroutine = zinc.Coroutine;
+const cozi = @import("cozi");
+const Coroutine = cozi.Coroutine;
 const assert = std.debug.assert;
 
 pub fn main() !void {

@@ -1,7 +1,7 @@
 const std = @import("std");
-const zinc = @import("zinc");
-const ThreadPool = zinc.executors.threadPools.Compute;
-const Fiber = zinc.Fiber;
+const cozi = @import("cozi");
+const ThreadPool = cozi.executors.threadPools.Compute;
+const Fiber = cozi.Fiber;
 const assert = std.debug.assert;
 
 pub fn main() !void {
