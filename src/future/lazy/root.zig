@@ -14,7 +14,9 @@ pub const Impl = struct {
     pub const constValue = make.constValue.constValue;
     pub const Value = make.value.Future;
     pub const value = make.value.value;
-    pub const contractManaged = make.contract.contractManaged;
+    pub const contract = make.contract.contract;
+    pub const contractNoAlloc = make.contract.contractNoAlloc;
+    pub const Contract = make.contract.Contract;
     // --- sequential combinators ---
     pub const via = combinators.via.via;
     pub const map = combinators.map.map;

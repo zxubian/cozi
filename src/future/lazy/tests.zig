@@ -421,6 +421,14 @@ test "lazy future - flatten" {
     try testing.expectEqual(7, result);
 }
 
+test "lazy future - contract - noalloc" {
+    var shared_state: future.Contract(u32).SharedState = .{};
+    const future_, const promise_ = future.contractNoAlloc(u32, &shared_state);
+    promise_.resolve(3);
+    const result = future.get(future_);
+    try testing.expectEqual(3, result);
+}
+
 test "lazy future - contract - thread pool" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
@@ -431,7 +439,7 @@ test "lazy future - contract - thread pool" {
     try tp.start();
     defer tp.stop();
 
-    const future_, const promise_ = try future.contractManaged(usize, std.testing.allocator);
+    const future_, const promise_ = try future.contract(usize, std.testing.allocator);
     const transform = future.pipeline(.{
         future_,
         future.map(
@@ -480,7 +488,7 @@ test "lazy future - detach" {
 
 test "lazy future - contract - detach - promise first" {
     const allocator = testing.allocator;
-    const future_, const promise_ = try future.contractManaged(void, std.testing.allocator);
+    const future_, const promise_ = try future.contract(void, std.testing.allocator);
     const Ctx = struct {
         done: bool,
         pub fn run(
@@ -510,7 +518,7 @@ test "lazy future - contract - detach - promise first" {
 
 test "lazy future - contract - detach - future first" {
     const allocator = testing.allocator;
-    const future_, const promise_ = try future.contractManaged(void, std.testing.allocator);
+    const future_, const promise_ = try future.contract(void, std.testing.allocator);
     const Ctx = struct {
         done: bool,
         pub fn run(
@@ -542,8 +550,8 @@ test "lazy future - all" {
     const allocator = testing.allocator;
     var manual: executors.Manual = .{};
     const executor = manual.executor();
-    const future_a, const promise_a = try future.contractManaged(usize, std.testing.allocator);
-    const future_b, const promise_b = try future.contractManaged(u32, std.testing.allocator);
+    const future_a, const promise_a = try future.contract(usize, std.testing.allocator);
+    const future_b, const promise_b = try future.contract(u32, std.testing.allocator);
     const all = future.pipeline(
         .{
             future.just(),
@@ -571,8 +579,8 @@ test "lazy future - first - a first" {
     const allocator = testing.allocator;
     var manual: executors.Manual = .{};
     const executor = manual.executor();
-    const future_a, const promise_a = try future.contractManaged(usize, std.testing.allocator);
-    const future_b, const promise_b = try future.contractManaged(u32, std.testing.allocator);
+    const future_a, const promise_a = try future.contract(usize, std.testing.allocator);
+    const future_b, const promise_b = try future.contract(u32, std.testing.allocator);
     const first = future.pipeline(
         .{
             future.just(),
@@ -602,8 +610,8 @@ test "lazy future - first - b first" {
     const allocator = testing.allocator;
     var manual: executors.Manual = .{};
     const executor = manual.executor();
-    const future_a, const promise_a = try future.contractManaged(usize, std.testing.allocator);
-    const future_b, const promise_b = try future.contractManaged(u32, std.testing.allocator);
+    const future_a, const promise_a = try future.contract(usize, std.testing.allocator);
+    const future_b, const promise_b = try future.contract(u32, std.testing.allocator);
     const first = future.pipeline(
         .{
             future.just(),
@@ -641,8 +649,8 @@ test "lazy future - pipline - threadpool - all" {
     defer tp.stop();
     const executor = tp.executor();
 
-    const future_a, const promise_a = try future.contractManaged(usize, std.testing.allocator);
-    const future_b, const promise_b = try future.contractManaged(u32, std.testing.allocator);
+    const future_a, const promise_a = try future.contract(usize, std.testing.allocator);
+    const future_b, const promise_b = try future.contract(u32, std.testing.allocator);
 
     const Ctx = struct {
         thread_pool: *ThreadPool,
@@ -701,8 +709,8 @@ test "lazy future - pipline - threadpool - first" {
     defer tp.stop();
     const executor = tp.executor();
 
-    const future_a, const promise_a = try future.contractManaged(usize, std.testing.allocator);
-    const future_b, const promise_b = try future.contractManaged(u32, std.testing.allocator);
+    const future_a, const promise_a = try future.contract(usize, std.testing.allocator);
+    const future_b, const promise_b = try future.contract(u32, std.testing.allocator);
 
     const Ctx = struct {
         thread_pool: *ThreadPool,
