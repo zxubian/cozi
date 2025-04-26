@@ -15,7 +15,7 @@ pub fn Submit(_: *anyopaque, runnable: *Runnable) void {
 }
 
 test "executors - inline" {
-    const inline_executor = InlineExecutor.Executor;
+    const inline_executor = InlineExecutor.executor;
     const Ctx = struct {
         done: bool,
         pub fn run(self: *@This()) void {
@@ -24,6 +24,6 @@ test "executors - inline" {
     };
     var ctx: Ctx = .{ .done = false };
     // on submit, Ctx.run(&ctx) is executed immediately
-    try inline_executor.submit(Ctx.run, .{&ctx}, std.testing.allocator);
+    inline_executor.submit(Ctx.run, .{&ctx}, std.testing.allocator);
     try std.testing.expect(ctx.done);
 }
