@@ -114,10 +114,10 @@ pub fn BoxedFuture(V: type) type {
 
         pub fn Computation(Continuation: type) type {
             return struct {
-                const ComputationType = @This();
-
                 boxed_input_computation: BoxedComputation(V),
                 next: Continuation,
+
+                const Impl = @This();
 
                 pub fn start(self: *@This()) void {
                     self.boxed_input_computation.contents.continuation = future
@@ -130,12 +130,30 @@ pub fn BoxedFuture(V: type) type {
 
         pub const InputContinuation = struct {
             boxed_input_computation: BoxedComputation(V),
+            value: V = undefined,
+            state: State = undefined,
+            runnable: Runnable = undefined,
+
             pub fn @"continue"(
                 self: *@This(),
                 value: V,
                 state: State,
             ) void {
-                self.boxed_input_computation.contents.continuation.@"continue"(value, state);
+                self.value = value;
+                self.state = state;
+                self.runnable = .{
+                    .runFn = runContinue,
+                    .ptr = self,
+                };
+                state.executor.submitRunnable(&self.runnable);
+            }
+
+            pub fn runContinue(ctx: *anyopaque) void {
+                const self: *@This() = @alignCast(@ptrCast(ctx));
+                self.boxed_input_computation.contents.continuation.@"continue"(
+                    self.value,
+                    self.state,
+                );
                 self.boxed_input_computation.deinit();
             }
         };
