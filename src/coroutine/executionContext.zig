@@ -3,7 +3,7 @@ const log = std.log.scoped(.execution_context);
 const MachineContext = @import("./context/machineContext.zig");
 const SanitizerContext = @import("./context/sanitizerContext.zig");
 const cozi = @import("../root.zig");
-const build_options = cozi.build_options;
+const build_options = cozi.build_options.options;
 
 const Core = @import("../core/root.zig");
 const Stack = Core.Stack;
@@ -33,7 +33,7 @@ pub fn switchTo(self: *ExecutionContext, other: *ExecutionContext) void {
 }
 
 pub fn exitTo(self: *ExecutionContext, other: *ExecutionContext) noreturn {
-    if (build_options.sanitizer.variant != .none) {
+    if (build_options.sanitizer_variant != .none) {
         self.sanitizer_context.beforeExit(&other.sanitizer_context);
     }
     self.machine_context.switchTo(&other.machine_context);

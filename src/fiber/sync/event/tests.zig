@@ -2,7 +2,7 @@ const builtin = @import("builtin");
 const std = @import("std");
 
 const cozi = @import("../../../root.zig");
-const build_options = cozi.build_options;
+const build_options = cozi.build_options.options;
 const testing = std.testing;
 const fault = cozi.fault;
 const stdlike = fault.stdlike;
@@ -54,7 +54,7 @@ test "basic - single waiter" {
 }
 
 test "event - basic - multiple waiters" {
-    if (build_options.sanitizer.variant == .thread) {
+    if (build_options.sanitizer_variant == .thread) {
         return error.SkipZigTest;
     }
     var event: Event = .{};
@@ -153,7 +153,7 @@ test "event - threadpool - stress" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
-    if (build_options.sanitizer.variant == .thread) {
+    if (build_options.sanitizer_variant == .thread) {
         return error.SkipZigTest;
     }
     var tp = try ThreadPool.init(4, testing.allocator);

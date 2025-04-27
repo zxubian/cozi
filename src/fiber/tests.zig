@@ -1,7 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const cozi = @import("../root.zig");
-const build_options = cozi.build_options;
+const build_options = cozi.build_options.options;
 
 const assert = std.debug.assert;
 const testing = std.testing;
@@ -149,7 +149,7 @@ test "fiber - two pools" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
-    if (build_options.sanitizer.variant == .thread) {
+    if (build_options.sanitizer_variant == .thread) {
         // crash in tsan_rtl.h:791
         //   thr->shadow_stack_pos[0] = pc;
         // --------------------------------

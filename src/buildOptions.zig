@@ -9,65 +9,61 @@
 //!     buildOptions.fault.Variant,
 //!     "fault-inject",
 //!     "Which variant of fault injection to use.",
-//! ) orelse .default();
+//! );
 //! //...
 //! const cozi = b.dependency("cozi", .{
-//!    .fault_variant = fault_variant,
+//!    .fault_variant = fault_variant orelse {},
 //! //...
 //! });
 //! ```
+pub const BuildOptions = struct {
+    fault_variant: fault.Variant = .none,
+    sanitizer_variant: sanitizer.Variant = .none,
+    log: bool = false,
 
-fault_variant: fault.Variant,
-sanitizer_variant: sanitizer.Variant,
-
-const BuildOptions = @This();
-
-pub const fault = struct {
-    pub const Variant = enum {
-        none,
-        thread_sleep,
-        thread_yield,
-        fiber,
-
-        pub fn default() Variant {
-            return .none;
-        }
+    pub const fault = struct {
+        pub const Variant = enum {
+            none,
+            thread_sleep,
+            thread_yield,
+            fiber,
+        };
     };
 
-    pub const variant: Variant = impl.fault_variant;
-};
-
-pub const sanitizer = struct {
-    pub const Variant = enum {
-        none,
-        address,
-        thread,
-
-        pub fn default() Variant {
-            return .none;
-        }
+    pub const sanitizer = struct {
+        pub const Variant = enum {
+            none,
+            address,
+            thread,
+        };
     };
-
-    pub const variant: Variant = impl.sanitizer_variant;
 };
 
-const impl: BuildOptions = blk: {
-    var result: BuildOptions = undefined;
+pub const options: BuildOptions = blk: {
+    // init with default values
+    var result: BuildOptions = .{};
     for (std.meta.fields(BuildOptions)) |field| {
-        @field(result, field.name) = getEnumFromBuildOptions(field.name, field.type);
+        switch (@typeInfo(field.type)) {
+            .@"enum" => {
+                if (@hasField(impl_, field.name)) {
+                    @field(result, field.name) = @enumFromInt(@intFromEnum(@field(impl_, field.name)));
+                }
+            },
+            .bool => {
+                if (@hasDecl(impl_, field.name)) {
+                    @field(result, field.name) = @field(impl_, field.name);
+                }
+            },
+            else => @compileError(
+                std.fmt.comptimePrint(
+                    "TODO: unsupported BuildOption field type `{}` for field `{s}`",
+                    .{ field.type, field.name },
+                ),
+            ),
+        }
     }
     break :blk result;
 };
 
-fn getEnumFromBuildOptions(
-    option_name: []const u8,
-    Enum: type,
-) Enum {
-    const impl_ = @import("cozi_build_options");
-    if (std.meta.fieldIndex(impl_, option_name)) |_| {
-        return @enumFromInt(@intFromEnum(@field(impl_, option_name)));
-    }
-    return .default();
-}
-
 const std = @import("std");
+const impl_ = @import("cozi_build_options");

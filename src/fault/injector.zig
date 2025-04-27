@@ -2,8 +2,8 @@ const std = @import("std");
 
 const cozi = @import("../root.zig");
 const Fiber = cozi.Fiber;
-const build_options = cozi.build_options;
-const fault_variant = build_options.fault.variant;
+const build_options = cozi.build_options.options;
+const fault_variant = build_options.fault_variant;
 
 const Injector = @This();
 

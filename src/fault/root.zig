@@ -4,8 +4,8 @@ pub const stdlike = @import("./stdlike/root.zig");
 
 const cozi = @import("../root.zig");
 const Injector = @import("./injector.zig");
-const build_options = cozi.build_options;
-const fault_variant = build_options.fault.variant;
+const build_options = cozi.build_options.options;
+const fault_variant = build_options.fault_variant;
 
 var injector: Injector =
     switch (fault_variant) {

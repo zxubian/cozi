@@ -2,7 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 const cozi = @import("../../../root.zig");
-const build_options = cozi.build_options;
+const build_options = cozi.build_options.options;
 const testing = std.testing;
 const fault = cozi.fault;
 const stdlike = fault.stdlike;

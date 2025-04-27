@@ -3,7 +3,7 @@ const testing = std.testing;
 const builtin = @import("builtin");
 
 const cozi = @import("../../../root.zig");
-const build_options = cozi.build_options;
+const build_options = cozi.build_options.options;
 const Fiber = cozi.Fiber;
 const Mutex = Fiber.Mutex;
 const executors = cozi.executors;
@@ -101,7 +101,7 @@ test "TryLock" {
 }
 
 test "inner counter" {
-    if (build_options.sanitizer.variant == .thread) {
+    if (build_options.sanitizer_variant == .thread) {
         return error.SkipZigTest;
     }
     var mutex: Mutex = .{};

@@ -3,7 +3,7 @@ const testing = std.testing;
 const builtin = @import("builtin");
 
 const cozi = @import("../../../root.zig");
-const build_options = cozi.build_options;
+const build_options = cozi.build_options.options;
 const fault = cozi.fault;
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
@@ -19,7 +19,7 @@ const WaitGroup = std.Thread.WaitGroup;
 const Fiber = cozi.Fiber;
 
 test "stack - basic" {
-    if (build_options.sanitizer.variant == .thread) {
+    if (build_options.sanitizer_variant == .thread) {
         return error.SkipZigTest;
     }
     const Node = struct {
@@ -45,7 +45,7 @@ test "stack - basic" {
 }
 
 test "stack - multiple producers - manual" {
-    if (build_options.sanitizer.variant == .thread) {
+    if (build_options.sanitizer_variant == .thread) {
         return error.SkipZigTest;
     }
     var manual_executor: ManualExecutor = .{};
@@ -99,11 +99,11 @@ test "stack - stress" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
-    if (build_options.sanitizer.variant == .thread) {
+    if (build_options.sanitizer_variant == .thread) {
         return error.SkipZigTest;
     }
     const cpu_count = try std.Thread.getCpuCount();
-    const worker_count = if (build_options.sanitizer.variant == .none) cpu_count else 4;
+    const worker_count = if (build_options.sanitizer_variant == .none) cpu_count else 4;
     var tp = try ThreadPool.init(worker_count, testing.allocator);
     defer tp.deinit();
     try tp.start();
@@ -268,7 +268,7 @@ test "stack - stress" {
 }
 
 test "queue - basic" {
-    if (build_options.sanitizer.variant == .thread) {
+    if (build_options.sanitizer_variant == .thread) {
         return error.SkipZigTest;
     }
     const Node = struct {
@@ -290,7 +290,7 @@ test "queue - basic" {
 }
 
 test "queue - multiple producers - manual" {
-    if (build_options.sanitizer.variant == .thread) {
+    if (build_options.sanitizer_variant == .thread) {
         return error.SkipZigTest;
     }
     var manual_executor: ManualExecutor = .{};
@@ -344,7 +344,7 @@ test "queue - stress" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
-    if (build_options.sanitizer.variant == .thread) {
+    if (build_options.sanitizer_variant == .thread) {
         return error.SkipZigTest;
     }
 

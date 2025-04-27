@@ -1,11 +1,11 @@
 const std = @import("std");
 const cozi = @import("../../root.zig");
-const build_options = cozi.build_options;
+const build_options = cozi.build_options.options;
 const injectFault = cozi.fault.injectFault;
 const AtomicOrder = std.builtin.AtomicOrder;
 
 pub fn Value(comptime T: type) type {
-    return comptime switch (build_options.fault.variant) {
+    return comptime switch (build_options.fault_variant) {
         .none => std.atomic.Value(T),
         else => FaultyAtomic(T),
     };

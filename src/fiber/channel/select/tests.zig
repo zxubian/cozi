@@ -13,10 +13,10 @@ const ThreadPool = executors.threadPools.Compute;
 
 const fault = cozi.fault;
 const Atomic = fault.stdlike.atomic;
-const build_options = cozi.build_options;
+const build_options = cozi.build_options.options;
 
 test "Select - heterogenous types" {
-    if (cozi.build_options.fault.variant == .fiber) {
+    if (cozi.build_options.options.fault_variant == .fiber) {
         return error.SkipZigTest;
     }
     var manual: ManualExecutor = .{};
@@ -109,7 +109,7 @@ test "Select - heterogenous types" {
 }
 
 test "Select - send then select receive" {
-    if (cozi.build_options.fault.variant == .fiber) {
+    if (cozi.build_options.options.fault_variant == .fiber) {
         return error.SkipZigTest;
     }
     var manual: ManualExecutor = .{};
@@ -165,7 +165,7 @@ test "Select - send then select receive" {
 }
 
 test "Select - send multiple then select receive" {
-    if (cozi.build_options.fault.variant == .fiber) {
+    if (cozi.build_options.options.fault_variant == .fiber) {
         return error.SkipZigTest;
     }
     var manual: ManualExecutor = .{};
@@ -245,7 +245,7 @@ test "Select - send multiple then select receive" {
 }
 
 test "Select - select receive then send" {
-    if (cozi.build_options.fault.variant == .fiber) {
+    if (cozi.build_options.options.fault_variant == .fiber) {
         return error.SkipZigTest;
     }
     var manual: ManualExecutor = .{};

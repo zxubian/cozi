@@ -3,7 +3,7 @@ const builtin = @import("builtin");
 const testing = std.testing;
 
 const cozi = @import("../../../root.zig");
-const build_options = cozi.build_options;
+const build_options = cozi.build_options.options;
 const fault = cozi.fault;
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
@@ -49,7 +49,7 @@ test "strand - counter" {
 }
 
 test "strand - many fibers" {
-    if (build_options.sanitizer.variant == .thread) {
+    if (build_options.sanitizer_variant == .thread) {
         return error.SkipZigTest;
     }
     var strand: Strand = .{};
@@ -217,7 +217,7 @@ test "strand - stress" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
-    if (build_options.sanitizer.variant == .thread) {
+    if (build_options.sanitizer_variant == .thread) {
         return error.SkipZigTest;
     }
 

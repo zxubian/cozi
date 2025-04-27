@@ -1,7 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const cozi = @import("../../../root.zig");
-const build_options = cozi.build_options;
+const build_options = cozi.build_options.options;
 
 const testing = std.testing;
 const fault = cozi.fault;
@@ -17,7 +17,7 @@ const ThreadPool = executors.threadPools.Compute;
 const ThreadWaitGroup = std.Thread.WaitGroup;
 
 test "counter - single thread" {
-    if (build_options.sanitizer.variant == .thread) {
+    if (build_options.sanitizer_variant == .thread) {
         return error.SkipZigTest;
     }
     var manual_executor = ManualExecutor{};
@@ -64,7 +64,7 @@ test "counter - multi-thread" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
-    if (build_options.sanitizer.variant == .thread) {
+    if (build_options.sanitizer_variant == .thread) {
         return error.SkipZigTest;
     }
     var tp = try ThreadPool.init(4, testing.allocator);
