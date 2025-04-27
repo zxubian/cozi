@@ -1,10 +1,11 @@
 const std = @import("std");
 const assert = std.debug.assert;
-const executors = @import("../../../root.zig").executors;
+const cozi = @import("../../../root.zig");
+const executors = cozi.executors;
 const Executor = executors.Executor;
-const core = @import("../../../root.zig").core;
+const core = cozi.core;
 const Runnable = core.Runnable;
-const future = @import("../root.zig");
+const future = cozi.future.lazy;
 const State = future.State;
 
 allocator: std.mem.Allocator,
@@ -165,6 +166,12 @@ pub fn BoxedFuture(V: type) type {
             return .{
                 .next = continuation,
                 .boxed_input_computation = self.boxed_input_computation,
+            };
+        }
+
+        pub fn awaitable(self: @This()) future.Awaitable(@This()) {
+            return .{
+                .future = self,
             };
         }
     };

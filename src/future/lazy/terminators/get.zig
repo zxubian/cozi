@@ -1,7 +1,6 @@
 const std = @import("std");
-const future_ = @import("../root.zig");
-const State = future_.State;
-const GetStorageType = future_.Storage;
+const cozi = @import("../../../root.zig");
+const State = cozi.future.lazy.State;
 
 const Get = @This();
 

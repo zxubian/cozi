@@ -176,6 +176,12 @@ pub fn OrElse(OrElseFn: type) type {
                         .next = continuation,
                     };
                 }
+
+                pub fn awaitable(self: @This()) future.Impl.Awaitable(@This()) {
+                    return .{
+                        .future = self,
+                    };
+                }
             };
         }
 

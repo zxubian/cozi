@@ -1,9 +1,14 @@
 const std = @import("std");
 const assert = std.debug.assert;
-const future = @import("../root.zig");
-const model = future.model;
-const meta = future.meta;
-const executors = @import("../../../root.zig").executors;
+
+const cozi = @import("../../../root.zig");
+const executors = cozi.executors;
+const InlineExecutor = executors.@"inline";
+const Executor = executors.Executor;
+const core = cozi.core;
+const Runnable = core.Runnable;
+const future = cozi.future.lazy;
+const atomic = cozi.fault.stdlike.atomic;
 
 pub fn Contract(V: type) type {
     return struct {
@@ -36,6 +41,12 @@ pub fn Contract(V: type) type {
                     .next = continuation,
                 };
             }
+
+            pub fn awaitable(self: @This()) future.Awaitable(@This()) {
+                return .{
+                    .future = self,
+                };
+            }
         };
 
         pub const Promise = struct {
@@ -54,7 +65,7 @@ pub fn Contract(V: type) type {
         fn SharedStateImpl(managed: bool) type {
             return struct {
                 continuation: future.Continuation(V) = undefined,
-                state: std.atomic.Value(u8) = .init(@intFromEnum(State.init)),
+                state: atomic.Value(u8) = .init(@intFromEnum(State.init)),
                 value: V = undefined,
                 allocator: blk: {
                     if (managed) {
@@ -92,7 +103,7 @@ pub fn Contract(V: type) type {
                             continuation.@"continue"(
                                 self.value,
                                 future.State{
-                                    .executor = executors.@"inline",
+                                    .executor = InlineExecutor,
                                 },
                             );
                             if (managed) {

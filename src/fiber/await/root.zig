@@ -2,13 +2,16 @@ const std = @import("std");
 
 const cozi = @import("../../root.zig");
 pub const Awaiter = @import("./awaiter.zig");
-// TODO: eliminate dependency on fiber here
 const Fiber = cozi.Fiber;
 const log = cozi.core.log.scoped(.@"await");
 
 /// Generic await algorithm
 /// https://lewissbaker.github.io/2017/11/17/understanding-operator-co-await
-pub fn @"await"(awaitable: anytype) awaitReturnType(@TypeOf(awaitable.*)) {
+pub fn @"await"(expr_ptr: anytype) awaitReturnType(getAwaitableType(@TypeOf(expr_ptr.*))) {
+    const Expr = @TypeOf(expr_ptr.*);
+    const Awaitable = getAwaitableType(Expr);
+
+    const awaitable: *Awaitable = getAwaitable(expr_ptr);
     // for awaitables that always return false,
     // want to resolve optimize this branch out,
     // so rely on duck-typing here
@@ -27,8 +30,25 @@ pub fn @"await"(awaitable: anytype) awaitReturnType(@TypeOf(awaitable.*)) {
     return awaitable.awaitResume(false);
 }
 
-fn awaitReturnType(awaitable_type: type) type {
-    switch (@typeInfo(@TypeOf(awaitable_type.awaitResume))) {
+fn getAwaitableType(Expr: type) type {
+    if (@hasDecl(Expr, "awaitable")) {
+        const type_info: std.builtin.Type.Fn = @typeInfo(@TypeOf(Expr.awaitable)).@"fn";
+        return type_info.return_type.?;
+    }
+    return Expr;
+}
+
+inline fn getAwaitable(expr_ptr: anytype) *getAwaitableType(@TypeOf(expr_ptr.*)) {
+    const Expr = @TypeOf(expr_ptr.*);
+    if (@hasDecl(Expr, "awaitable")) {
+        var awaitable = expr_ptr.awaitable();
+        return &awaitable;
+    }
+    return expr_ptr;
+}
+
+fn awaitReturnType(Awaitable: type) type {
+    switch (@typeInfo(@TypeOf(Awaitable.awaitResume))) {
         .@"fn" => |f| {
             return f.return_type.?;
         },
@@ -40,5 +60,5 @@ fn getHandle() *Fiber {
     if (Fiber.current()) |curr| {
         return curr;
     }
-    std.debug.panic("TODO: support thread handles", .{});
+    std.debug.panic("`await` is only supported in Fiber context", .{});
 }

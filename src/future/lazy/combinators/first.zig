@@ -1,10 +1,12 @@
 const std = @import("std");
 const assert = std.debug.assert;
-const executors = @import("../../../root.zig").executors;
+
+const cozi = @import("../../../root.zig");
+const executors = cozi.executors;
 const Executor = executors.Executor;
-const core = @import("../../../root.zig").core;
+const core = cozi.core;
 const Runnable = core.Runnable;
-const future = @import("../root.zig");
+const future = cozi.future.lazy;
 const State = future.State;
 
 pub fn First(Inputs: type) type {
@@ -75,7 +77,7 @@ pub fn First(Inputs: type) type {
                     return struct {
                         pipe_input_computation: PipeInputComputation,
                         input_computations: InputComputations,
-                        completed: std.atomic.Value(bool),
+                        completed: cozi.fault.stdlike.atomic.Value(bool),
                         next: Continuation,
                         value: OutputUnionType = undefined,
                         input_computation_runnables: [inputs_count]Runnable = undefined,
@@ -245,6 +247,12 @@ pub fn First(Inputs: type) type {
 
                 fn getFutureType(comptime index: usize) type {
                     return inputs_type_info.@"struct".fields[index].type;
+                }
+
+                pub fn awaitable(self: @This()) future.Awaitable(@This()) {
+                    return .{
+                        .future = self,
+                    };
                 }
             };
         }

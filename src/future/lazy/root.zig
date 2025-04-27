@@ -6,6 +6,8 @@ const Executor = executors.Executor;
 const core = @import("../../root.zig").core;
 const Runnable = core.Runnable;
 
+const Lazy = @This();
+
 /// Lazily-evaluated futures
 // --- external re-exports ---
 pub const Impl = struct {
@@ -37,8 +39,12 @@ pub const Impl = struct {
     // --- terminators ---
     pub const get = terminators.get;
     pub const detach = terminators.detach;
+    pub const Awaitable = terminators.@"await".Awaitable;
     // --- syntax ---
     pub const pipeline = syntax.pipeline.pipeline;
+    // --- other ---
+    pub const State = Lazy.State;
+    pub const Continuation = Lazy.Continuation;
 };
 
 // --- internal implementation ---

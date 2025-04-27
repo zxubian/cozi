@@ -19,6 +19,7 @@ const Stack = cozi.core.Stack;
 
 test {
     _ = @import("./sync.zig");
+    _ = @import("./future/tests.zig");
 }
 
 test "fiber - basic" {

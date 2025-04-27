@@ -6,7 +6,6 @@ const core = @import("../../../root.zig").core;
 const Runnable = core.Runnable;
 const future = @import("../root.zig");
 const State = future.State;
-const model = future.model;
 const meta = future.meta;
 
 pub fn MapOk(MapOkFn: type) type {
@@ -168,6 +167,12 @@ pub fn MapOk(MapOkFn: type) type {
                         .map_fn = self.map_fn,
                         .map_ctx = self.map_ctx,
                         .next = continuation,
+                    };
+                }
+
+                pub fn awaitable(self: @This()) future.Impl.Awaitable(@This()) {
+                    return .{
+                        .future = self,
                     };
                 }
             };

@@ -1,11 +1,13 @@
 const std = @import("std");
 const assert = std.debug.assert;
-const executors = @import("../../../root.zig").executors;
+
+const cozi = @import("../../../root.zig");
+const executors = cozi.executors;
 const InlineExecutor = executors.@"inline";
 const Executor = executors.Executor;
-const core = @import("../../../root.zig").core;
+const core = cozi.core;
 const Runnable = core.Runnable;
-const future = @import("../root.zig");
+const future = cozi.future;
 const State = future.State;
 const model = future.model;
 const meta = future.meta;
@@ -43,4 +45,8 @@ pub fn materialize(
 /// Equivalent to `constValue({})`
 pub fn just() Just {
     return .{};
+}
+
+pub fn awaitable(self: Just) future.lazy.Awaitable(Just) {
+    return .{ .future = self };
 }
