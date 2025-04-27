@@ -37,18 +37,18 @@ exe.root_module.addImport("cozi", cozi.module("root"));
 
 ### Build Configuration Options
 You can modify the behavior of `cozi` by overriding [build options](src/buildOptions.zig) at import timing.
+1. For convenience, copy the [build scipt](buildScripts/cozi_build.zig) into your repository
+2. Register the build options, and forward the results to `cozi` when registering it as a dependency:
 ```zig
 //build.zig
-const fault_variant: BuildOptions.fault.Variant = b.option(
-   BuildOptions.fault.Variant,
-    "fault-inject",
-    "Which variant of fault injection to use.",
-) orelse .default();
-//...
-const cozi = b.dependency("cozi", .{
-   .fault_variant = fault_variant,
-//...
-});
+const exe_mod = b.createModule(.{...});
+// import cozi's build script
+const cozi_build = @import("./cozi_build.zig");
+// register cozi's build options & gather results
+const cozi_build_options = cozi_build.parseBuildOptions(b);
+// pass the parsed results to the cozi dependency
+const cozi = b.dependency("cozi", cozi_build_options);
+exe_mod.addImport("cozi", cozi.module("root"));
 ```
 For each option that is not overridden, `cozi` will use the default defined in [BuildOptions](src/buildOptions.zig).
 

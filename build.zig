@@ -28,13 +28,13 @@ pub fn build(b: *std.Build) void {
 
     const sanitizer_variant: ?SanitizerVariant = b.option(
         SanitizerVariant,
-        "sanitize",
+        "sanitizer_variant",
         "Whether to use ASan, TSan, or neither",
     );
 
     const fault_build_variant: ?FaultVariant = b.option(
         FaultVariant,
-        "fault-inject",
+        "fault_variant",
         "Which variant of fault injection to use.",
     );
 
@@ -51,6 +51,17 @@ pub fn build(b: *std.Build) void {
             SanitizerVariant,
             "sanitizer_variant",
             variant,
+        );
+    }
+    if (b.option(
+        bool,
+        "log",
+        "Enable verbose logging from inside the cozi library",
+    )) |log| {
+        cozi_build_options.addOption(
+            bool,
+            "log",
+            log,
         );
     }
 

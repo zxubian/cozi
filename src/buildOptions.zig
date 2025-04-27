@@ -1,21 +1,5 @@
 //! `cozi` build options
-//! When using `cozi` as a module, you may provide values for
-//! each of these options via your build script.
-//!
-//! # Example:
-//! ```zig
-//! //build.zig
-//! const fault_variant: BuildOptions.fault.Variant = b.option(
-//!     buildOptions.fault.Variant,
-//!     "fault-inject",
-//!     "Which variant of fault injection to use.",
-//! );
-//! //...
-//! const cozi = b.dependency("cozi", .{
-//!    .fault_variant = fault_variant orelse {},
-//! //...
-//! });
-//! ```
+//! This file must be kept in sync with `buildScripts/cozi_build.zig`.
 pub const BuildOptions = struct {
     fault_variant: fault.Variant = .none,
     sanitizer_variant: sanitizer.Variant = .none,
