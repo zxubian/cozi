@@ -1,23 +1,25 @@
 const std = @import("std");
-const log = std.log.scoped(.fiber_channel);
 const assert = std.debug.assert;
 
-const sync = @import("../../sync/root.zig");
+const cozi = @import("../../root.zig");
+const log = cozi.core.log.scoped(.fiber_channel);
+
+const sync = cozi.sync;
 const Spinlock = sync.Spinlock;
 
-const fault = @import("../../fault/root.zig");
+const fault = cozi.fault;
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
 
-const GenericAwait = @import("../../await/root.zig");
+const GenericAwait = cozi.Await;
 const Awaiter = GenericAwait.Awaiter;
 const Await = GenericAwait.@"await";
 
-const containers = @import("../../containers/root.zig");
+const containers = cozi.containers;
 const Queue = containers.intrusive.ForwardList;
 const Node = containers.intrusive.Node;
 
-const Fiber = @import("../root.zig");
+const Fiber = cozi.Fiber;
 
 const select_ = @import("./select/root.zig");
 pub const select = select_.select;

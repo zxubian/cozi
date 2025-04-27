@@ -1,9 +1,12 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const assert = std.debug.assert;
-const log = std.log.scoped(.coroutine_machine_context);
 
-const Stack = @import("../../core/root.zig").Stack;
+const cozi = @import("../../root.zig");
+const core = cozi.core;
+const log = core.log.scoped(.coroutine_machine_context);
+
+const Stack = core.Stack;
 const Trampoline = @import("./trampoline.zig");
 
 const MachineContext = @This();

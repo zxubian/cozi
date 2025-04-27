@@ -2,9 +2,13 @@
 //! according to target architecture requirements.
 const std = @import("std");
 const builtin = @import("builtin");
-const Stack = @This();
 const Allocator = std.mem.Allocator;
 const FixedBufferAllocator = std.heap.FixedBufferAllocator;
+
+const cozi = @import("../root.zig");
+const log = cozi.core.log.scoped(.stack);
+
+const Stack = @This();
 
 const PtrType = [*]align(ALIGNMENT_BYTES) u8;
 
@@ -64,7 +68,6 @@ pub const Managed = struct {
     allocator: Allocator,
 
     const Self = @This();
-    const log = std.log.scoped(.stack);
 
     pub fn init(allocator: Allocator) !Self {
         return initOptions(allocator, .{});

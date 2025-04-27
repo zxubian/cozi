@@ -1,8 +1,10 @@
 const std = @import("std");
+
+const cozi = @import("../root.zig");
 pub const Awaiter = @import("./awaiter.zig");
 // TODO: eliminate dependency on fiber here
-const Fiber = @import("../fiber/root.zig");
-const log = std.log.scoped(.@"await");
+const Fiber = cozi.Fiber;
+const log = cozi.core.log.scoped(.@"await");
 
 /// Generic await algorithm
 /// https://lewissbaker.github.io/2017/11/17/understanding-operator-co-await

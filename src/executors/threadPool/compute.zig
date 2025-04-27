@@ -1,15 +1,17 @@
 //! Compute thread pool, suitable for small number of independent tasks.
 //! For fiber workloads, consider using work-stealing thread pool.
 const std = @import("std");
-const log = std.log.scoped(.thread_pool);
 const Thread = std.Thread;
 const builtin = @import("builtin");
 const assert = std.debug.assert;
-const fault = @import("../../fault/root.zig");
+
+const cozi = @import("../../root.zig");
+const log = cozi.core.log.scoped(.thread_pool);
+const fault = cozi.fault;
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
 const Allocator = std.mem.Allocator;
-const ThreadExt = @import("../../sync/root.zig").Thread;
+const ThreadExt = cozi.sync.Thread;
 
 const Core = @import("../../core/root.zig");
 const Runnable = Core.Runnable;

@@ -5,7 +5,7 @@ const assert = std.debug.assert;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const log = std.log.scoped(.example);
+    const log = cozi.core.log.scoped(.example);
 
     defer {
         if (gpa.detectLeaks()) {

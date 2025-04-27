@@ -6,21 +6,21 @@
 const std = @import("std");
 const assert = std.debug.assert;
 
-const fault = @import("../../fault/root.zig");
+const cozi = @import("../../root.zig");
+const fault = cozi.fault;
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
+const log = cozi.core.log.scoped(.fiber_mutex);
 
-const Mutex = @This();
-
-const Fiber = @import("../../fiber/root.zig");
-const GenericAwait = @import("../../await/root.zig");
+const Fiber = cozi.Fiber;
+const GenericAwait = cozi.Await;
 const Await = GenericAwait.@"await";
 const Awaiter = GenericAwait.Awaiter;
 
-const containers = @import("../../containers/root.zig");
+const containers = cozi.containers;
 const Queue = containers.intrusive.lock_free.MpscQueue;
 
-const log = std.log.scoped(.fiber_mutex);
+const Mutex = @This();
 
 state: Atomic(State) align(std.atomic.cache_line) = .init(.unlocked),
 

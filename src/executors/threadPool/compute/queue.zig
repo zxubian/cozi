@@ -1,9 +1,11 @@
 const std = @import("std");
-const log = std.log.scoped(.queue);
+const assert = std.debug.assert;
 const Mutex = std.Thread.Mutex;
 const CondVar = std.Thread.Condition;
-const assert = std.debug.assert;
-const Queue = @import("../../../containers/intrusive/forwardList.zig").IntrusiveForwardList;
+
+const cozi = @import("../../../root.zig");
+const Queue = cozi.containers.intrusive.ForwardList;
+const log = cozi.core.log.scoped(.queue);
 
 pub fn UnboundedBlockingQueue(comptime T: type) type {
     const BackingQueue = Queue(T);

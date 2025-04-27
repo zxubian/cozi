@@ -1,5 +1,5 @@
 const std = @import("std");
-const log = std.log.scoped(.fiber_buffered_channel);
+const log = cozi.core.log.scoped(.fiber_buffered_channel);
 const assert = std.debug.assert;
 const fault = @import("../../../fault/root.zig");
 const stdlike = fault.stdlike;

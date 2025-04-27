@@ -2,21 +2,22 @@
 //! Waiting on a WaitGroup does not block the underlying thread -
 //! instead, the fiber is parked until the WaitGroup counter reaches 0.
 const std = @import("std");
-const WaitGroup = @This();
 
-const fault = @import("../../fault/root.zig");
+const cozi = @import("../../root.zig");
+const fault = cozi.fault;
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
+const log = cozi.core.log.scoped(.fiber_waitgroup);
 
-const containers = @import("../../containers/root.zig");
+const containers = cozi.containers;
 const Queue = containers.intrusive.lock_free.MpscQueue;
 
-const Fiber = @import("../../fiber/root.zig");
-const GenericAwait = @import("../../await/root.zig");
+const Fiber = cozi.Fiber;
+const GenericAwait = cozi.Await;
 const Await = GenericAwait.@"await";
 const Awaiter = GenericAwait.Awaiter;
 
-const log = std.log.scoped(.fiber_waitgroup);
+const WaitGroup = @This();
 
 const Node = struct {
     fiber: *Fiber,

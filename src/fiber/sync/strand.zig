@@ -20,7 +20,7 @@ const Stack = intrusive.lock_free.MpscStack;
 
 const Strand = @This();
 
-const log = std.log.scoped(.fiber_strand);
+const log = cozi.core.log.scoped(.fiber_strand);
 
 tasks: Queue(TaskNode) = .{},
 count: Atomic(usize) = .init(0),

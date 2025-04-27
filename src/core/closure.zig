@@ -1,10 +1,12 @@
 //! Container for function pointer + heap-allocated arguments
 const std = @import("std");
-const log = std.log.scoped(.closure);
 const Allocator = std.mem.Allocator;
 const assert = std.debug.assert;
 
-const Runnable = @import("./runnable.zig");
+const cozi = @import("../root.zig");
+const log = cozi.core.log.scoped(.closure);
+
+const Runnable = cozi.core.Runnable;
 
 pub fn Closure(
     comptime routine: anytype,

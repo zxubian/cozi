@@ -2,14 +2,15 @@
 /// https://dl.acm.org/doi/10.1016/0020-0190%2893%2990083-L
 const std = @import("std");
 const builtin = @import("builtin");
-const Spinlock = @This();
-const fault = @import("../fault/root.zig");
+const assert = std.debug.assert;
+
+const cozi = @import("../root.zig");
+const fault = cozi.fault;
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
-const assert = std.debug.assert;
-const DeadlockDetector = @import("./deadlock_detector/root.zig");
-const log = std.log.scoped(.spinlock);
-const Fiber = @import("../fiber/root.zig");
+const log = cozi.core.log.scoped(.spinlock);
+
+const Spinlock = @This();
 
 tail: Atomic(?*Node) = .init(null),
 

@@ -1,16 +1,18 @@
 //! Stackfull coroutine
 const std = @import("std");
-const log = std.log.scoped(.coroutine);
 const Allocator = std.mem.Allocator;
 const assert = std.debug.assert;
 
-const Core = @import("../core/root.zig");
-const Runnable = Core.Runnable;
-const Closure = Core.Closure;
+const cozi = @import("../root.zig");
+const log = cozi.core.log.scoped(.coroutine);
+
+const core = cozi.core;
+const Runnable = core.Runnable;
+const Closure = core.Closure;
 const ExecutionContext = @import("./executionContext.zig");
 const Trampoline = ExecutionContext.Trampoline;
 
-pub const Stack = Core.Stack;
+pub const Stack = core.Stack;
 
 const Coroutine = @This();
 

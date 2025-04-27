@@ -3,7 +3,7 @@ const DeadlockDetector = @This();
 const Thread = std.Thread;
 const ThreadExt = @import("../thread.zig");
 const assert = std.debug.assert;
-const log = std.log.scoped(.deadlock_detector);
+const log = cozi.core.log.scoped(.deadlock_detector);
 
 var mutex_: Thread.Mutex = .{};
 var gpa_: std.heap.GeneralPurposeAllocator(.{}) = .{};

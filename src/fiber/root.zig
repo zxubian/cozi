@@ -5,24 +5,26 @@ const std = @import("std");
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
 
-const fault = @import("../fault/root.zig");
+const cozi = @import("../root.zig");
+const fault = cozi.fault;
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
 
-const Coroutine = @import("../coroutine/root.zig");
-const executors = @import("../executors/root.zig");
+const Coroutine = cozi.Coroutine;
+const executors = cozi.executors;
 const Executor = executors.Executor;
-const Core = @import("../core/root.zig");
-const Closure = Core.Closure;
-const Runnable = Core.Runnable;
-const Stack = Core.Stack;
-const GenericAwait = @import("../await/root.zig");
+const core = cozi.core;
+const Closure = core.Closure;
+const Runnable = core.Runnable;
+const Stack = core.Stack;
+const GenericAwait = cozi.Await;
 const Await = GenericAwait.@"await";
 const Awaiter = GenericAwait.Awaiter;
 
 const Sync = @import("./sync.zig");
-pub const Barrier = Sync.Barrier;
 const Channel_ = @import("./channel/root.zig");
+
+pub const Barrier = Sync.Barrier;
 pub const Channel = Channel_.Channel;
 pub const select = Channel_.select;
 pub const Event = Sync.Event;
@@ -30,7 +32,7 @@ pub const Mutex = Sync.Mutex;
 pub const Strand = Sync.Strand;
 pub const WaitGroup = Sync.WaitGroup;
 
-const log = std.log.scoped(.fiber);
+const log = core.log.scoped(.fiber);
 
 threadlocal var current_fiber: ?*Fiber = null;
 coroutine: *Coroutine,

@@ -1,5 +1,5 @@
 const std = @import("std");
-const log = std.log.scoped(.execution_context);
+const log = cozi.core.log.scoped(.execution_context);
 const MachineContext = @import("./context/machineContext.zig");
 const SanitizerContext = @import("./context/sanitizerContext.zig");
 const cozi = @import("../root.zig");
