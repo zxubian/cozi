@@ -5,6 +5,7 @@ const core = @import("../root.zig").core;
 const Runnable = core.Runnable;
 const InlineExecutor = @This();
 
+/// Inline Executor immediately executes submitted `Runnable`
 pub const executor: Executor = .{
     .vtable = .{ .submit = InlineExecutor.Submit },
     .ptr = undefined,
