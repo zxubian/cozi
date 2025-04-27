@@ -50,6 +50,12 @@ const cozi_build_options = cozi_build.parseBuildOptions(b);
 const cozi = b.dependency("cozi", cozi_build_options);
 exe_mod.addImport("cozi", cozi.module("root"));
 ```
+3. You can then check the list of available build options:
+```bash
+zig build -h
+# > -Dcozi_log=[bool]            Enable verbose logging from inside the cozi library
+# ...
+```
 For each option that is not overridden, `cozi` will use the default defined in [BuildOptions](src/buildOptions.zig).
 
 ### Stability Guarantees
