@@ -63,6 +63,15 @@ zig build example-run
 # build & run specific example
 zig build example-run -Dexample-name="some_example"
 ```
+## Docs
+```bash
+# build documentation
+zig build docs
+# host docs on local http server
+python3 -m http.server 8000 -d ./zig-out/docs
+# open in browser
+http://localhost:8000/index.html
+```
 
 ## Features & Roadmap
 
