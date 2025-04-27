@@ -1,20 +1,21 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const build_config = @import("build_config");
+const cozi = @import("../root.zig");
+const build_options = cozi.build_options;
 
 const assert = std.debug.assert;
 const testing = std.testing;
 const alloc = testing.allocator;
-const fault = @import("../fault/root.zig");
+const fault = cozi.fault;
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
 const WaitGroup = std.Thread.WaitGroup;
 
-const Fiber = @import("./root.zig");
-const executors = @import("../executors/root.zig");
+const Fiber = cozi.Fiber;
+const executors = cozi.executors;
 const ManualExecutor = executors.Manual;
 const ThreadPool = executors.threadPools.Compute;
-const Stack = @import("../core/root.zig").Stack;
+const Stack = cozi.core.Stack;
 
 test {
     _ = @import("./sync.zig");
@@ -148,7 +149,7 @@ test "fiber - two pools" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
-    if (build_config.sanitize == .thread) {
+    if (build_options.sanitizer.variant == .thread) {
         // crash in tsan_rtl.h:791
         //   thr->shadow_stack_pos[0] = pc;
         // --------------------------------

@@ -1,16 +1,16 @@
 const std = @import("std");
 const testing = std.testing;
 const builtin = @import("builtin");
-const build_config = @import("build_config");
 
-const Fiber = @import("../../root.zig");
+const cozi = @import("../../../root.zig");
+const build_options = cozi.build_options;
+const Fiber = cozi.Fiber;
 const Mutex = Fiber.Mutex;
-
-const executors = @import("../../../executors/root.zig");
+const executors = cozi.executors;
 const ManualExecutor = executors.Manual;
 const ThreadPool = executors.threadPools.Compute;
 const WaitGroup = std.Thread.WaitGroup;
-const TimeLimit = @import("../../../testing/TimeLimit.zig");
+const TimeLimit = cozi.testing.TimeLimit;
 
 test "counter" {
     var mutex: Mutex = .{};
@@ -101,7 +101,7 @@ test "TryLock" {
 }
 
 test "inner counter" {
-    if (build_config.sanitize == .thread) {
+    if (build_options.sanitizer.variant == .thread) {
         return error.SkipZigTest;
     }
     var mutex: Mutex = .{};

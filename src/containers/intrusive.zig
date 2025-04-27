@@ -1,7 +1,7 @@
 /// Intrusive singly-linked list.
 /// Can be used as either a stack or a queue.
 pub const ForwardList = @import("./intrusive/forwardList.zig").IntrusiveForwardList;
-pub const LockFree = @import("./intrusive/lockFree.zig");
+pub const lock_free = @import("./intrusive/lockFree.zig");
 
 /// Intrusive Node for singly-linked list-based data structures.
 /// When embedding in another struct,
@@ -17,5 +17,5 @@ pub const Node = struct {
 
 test {
     _ = ForwardList;
-    _ = LockFree;
+    _ = lock_free;
 }

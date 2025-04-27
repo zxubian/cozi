@@ -1,7 +1,11 @@
 const std = @import("std");
+
+const cozi = @import("../root.zig");
+const Fiber = cozi.Fiber;
+const build_options = cozi.build_options;
+const fault_variant = build_options.fault.variant;
+
 const Injector = @This();
-const fault_injection_builtin = @import("cozi_fault_injection");
-const Fiber = @import("../fiber/root.zig");
 
 const inject_frequency = 9;
 const sleep_time_ns = 1000;
@@ -25,14 +29,14 @@ inline fn maybeInit(self: *Injector) void {
 }
 
 pub fn injectFault() void {
-    switch (fault_injection_builtin.build_variant) {
+    switch (fault_variant) {
         .none => {},
         .thread_yield, .fiber => Impl.yield(),
         .thread_sleep => Impl.sleep(sleep_time_ns),
     }
 }
 
-const Impl = switch (fault_injection_builtin.build_variant) {
+const Impl = switch (fault_variant) {
     .none => {},
     .thread_yield, .thread_sleep => ThreadImpl,
     .fiber => FiberImpl,

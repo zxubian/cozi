@@ -1,21 +1,20 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const testing = std.testing;
-const build_config = @import("build_config");
 
-const fault = @import("../../../fault/root.zig");
+const cozi = @import("../../../root.zig");
+const build_options = cozi.build_options;
+const fault = cozi.fault;
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
-
-const Fiber = @import("../../root.zig");
+const Fiber = cozi.Fiber;
 const Strand = Fiber.Strand;
 const Event = Fiber.Event;
-
-const executors = @import("../../../executors/root.zig");
+const executors = cozi.executors;
 const ManualExecutor = executors.Manual;
 const ThreadPool = executors.threadPools.Compute;
 const WaitGroup = std.Thread.WaitGroup;
-const TimeLimit = @import("../../../testing/TimeLimit.zig");
+const TimeLimit = cozi.testing.TimeLimit;
 
 test "strand - counter" {
     var strand: Strand = .{};
@@ -50,7 +49,7 @@ test "strand - counter" {
 }
 
 test "strand - many fibers" {
-    if (build_config.sanitize == .thread) {
+    if (build_options.sanitizer.variant == .thread) {
         return error.SkipZigTest;
     }
     var strand: Strand = .{};
@@ -218,7 +217,7 @@ test "strand - stress" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
-    if (build_config.sanitize == .thread) {
+    if (build_options.sanitizer.variant == .thread) {
         return error.SkipZigTest;
     }
 

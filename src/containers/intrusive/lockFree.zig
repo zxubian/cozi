@@ -1,9 +1,10 @@
 const std = @import("std");
-const fault = @import("../../fault/root.zig");
+const cozi = @import("../../root.zig");
+const fault = cozi.fault;
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
 const LockFreeQueue = @This();
-const Node = @import("../intrusive.zig").Node;
+const Node = cozi.containers.intrusive.Node;
 
 // TODO: add Michael-Scott Queue
 

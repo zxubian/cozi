@@ -1,10 +1,11 @@
 const std = @import("std");
-const fault_injection_builtin = @import("cozi_fault_injection");
-const injectFault = @import("../root.zig").injectFault;
+const cozi = @import("../../root.zig");
+const build_options = cozi.build_options;
+const injectFault = cozi.fault.injectFault;
 const AtomicOrder = std.builtin.AtomicOrder;
 
 pub fn Value(comptime T: type) type {
-    return comptime switch (fault_injection_builtin.build_variant) {
+    return comptime switch (build_options.fault.variant) {
         .none => std.atomic.Value(T),
         else => FaultyAtomic(T),
     };

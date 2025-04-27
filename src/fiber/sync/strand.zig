@@ -2,22 +2,23 @@ const std = @import("std");
 const assert = std.debug.assert;
 const builtin = @import("builtin");
 
-const fault = @import("../../fault/root.zig");
+const cozi = @import("../../root.zig");
+const fault = cozi.fault;
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
-const Strand = @This();
+const core = cozi.core;
+const Runnable = core.Runnable;
+const Closure = core.Closure;
+const Fiber = cozi.Fiber;
+const generic_await = cozi.Await;
+const Await = generic_await.@"await";
+const Awaiter = generic_await.Awaiter;
+const containers = cozi.containers;
+const intrusive = containers.intrusive;
+const Queue = intrusive.lock_free.MpscQueue;
+const Stack = intrusive.lock_free.MpscStack;
 
-const Core = @import("../../core/root.zig");
-const Runnable = Core.Runnable;
-const Closure = Core.Closure;
-const Fiber = @import("../../fiber/root.zig");
-const GenericAwait = @import("../../await/root.zig");
-const Await = GenericAwait.@"await";
-const Awaiter = GenericAwait.Awaiter;
-const Containers = @import("../../containers/root.zig");
-const Intrusive = Containers.Intrusive;
-const Queue = Intrusive.LockFree.MpscQueue;
-const Stack = Intrusive.LockFree.MpscStack;
+const Strand = @This();
 
 const log = std.log.scoped(.fiber_strand);
 
@@ -31,14 +32,14 @@ const State = enum(usize) {
 };
 
 const TaskNode = struct {
-    intrusive_list_node: Intrusive.Node = .{},
+    intrusive_list_node: intrusive.Node = .{},
     submitting_fiber: *Fiber,
     critical_section_runnable: *Runnable,
     const Self = @This();
 };
 
 const OwnerNode = struct {
-    intrusive_list_node: Intrusive.Node = .{},
+    intrusive_list_node: intrusive.Node = .{},
     fiber: *Fiber,
     const Self = @This();
 

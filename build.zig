@@ -1,6 +1,5 @@
 const std = @import("std");
-const SanitizerOption = @import("./src/sanitizerOption.zig").SanitizerOption;
-const Fault = @import("./src/fault/root.zig");
+const build_options = @import("./src/buildOptions.zig");
 
 fn addAssemblyForMachineContext(
     b: *std.Build,
@@ -21,17 +20,20 @@ fn addAssemblyForMachineContext(
 }
 
 pub fn build(b: *std.Build) void {
+    const FaultVariant = build_options.fault.Variant;
+    const SanitizerVariant = build_options.sanitizer.Variant;
+
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const sanitize = b.option(
-        SanitizerOption,
+    const sanitizer_variant: SanitizerVariant = b.option(
+        SanitizerVariant,
         "sanitize",
         "Whether to use ASan, TSan, or neither",
-    ) orelse SanitizerOption.none;
+    ) orelse .default();
 
-    const sanitize_thread = sanitize == .thread;
-    const link_libcpp = sanitize != .none;
+    const sanitize_thread = sanitizer_variant == .thread;
+    const link_libcpp = sanitizer_variant != .none;
 
     const root = b.addModule("root", .{
         .root_source_file = b.path("src/root.zig"),
@@ -41,39 +43,24 @@ pub fn build(b: *std.Build) void {
         .link_libcpp = link_libcpp,
     });
 
-    const fault_build_variant: Fault.BuildVariant = blk: {
-        const user_input = b.option(
-            []const u8,
-            "fault-inject",
-            "Which variant of fault injection to use.",
-        );
-        if (user_input) |string| {
-            if (std.meta.stringToEnum(Fault.BuildVariant, string)) |parsed| {
-                break :blk parsed;
-            }
-            std.debug.panic(
-                "{s} is not a valid {s}",
-                .{ string, @typeName(Fault.BuildVariant) },
-            );
-        }
-        break :blk Fault.BuildVariant.none;
-    };
+    const fault_build_variant: FaultVariant = b.option(
+        FaultVariant,
+        "fault-inject",
+        "Which variant of fault injection to use.",
+    ) orelse .default();
 
-    const fault_injection_builtin = b.addOptions();
-    fault_injection_builtin.addOption(
-        Fault.BuildVariant,
-        "build_variant",
+    const cozi_build_options = b.addOptions();
+    cozi_build_options.addOption(
+        FaultVariant,
+        "fault_variant",
         fault_build_variant,
     );
 
-    root.addOptions("cozi_fault_injection", fault_injection_builtin);
+    root.addOptions("cozi_build_options", cozi_build_options);
 
     addAssemblyForMachineContext(b, root, &target);
 
-    const options = b.addOptions();
-
-    options.addOption(SanitizerOption, "sanitize", sanitize);
-    root.addOptions("build_config", options);
+    cozi_build_options.addOption(SanitizerVariant, "sanitizer_variant", sanitizer_variant);
 
     const test_filter_option = b.option([]const []const u8, "test-filter", "Test filter");
     const unit_tests = b.addTest(.{
@@ -81,10 +68,10 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .filters = if (test_filter_option) |o| o else &.{},
-        .sanitize_thread = sanitize == .thread,
+        .sanitize_thread = sanitizer_variant == .thread,
     });
 
-    switch (sanitize) {
+    switch (sanitizer_variant) {
         .address => {
             unit_tests.linkLibCpp();
             unit_tests.pie = true;
@@ -110,13 +97,8 @@ pub fn build(b: *std.Build) void {
     addAssemblyForMachineContext(b, unit_tests, &target);
 
     unit_tests.root_module.addOptions(
-        "build_config",
-        options,
-    );
-
-    unit_tests.root_module.addOptions(
-        "cozi_fault_injection",
-        fault_injection_builtin,
+        "cozi_build_options",
+        cozi_build_options,
     );
 
     const run_exe_unit_tests = b.addRunArtifact(unit_tests);

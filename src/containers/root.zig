@@ -1,5 +1,5 @@
-pub const Intrusive = @import("./intrusive.zig");
+pub const intrusive = @import("./intrusive.zig");
 
 test {
-    _ = Intrusive;
+    _ = intrusive;
 }

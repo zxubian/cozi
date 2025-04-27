@@ -1,21 +1,22 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const testing = std.testing;
-const fault_injection_builtin = @import("cozi_fault_injection");
 
-const Fiber = @import("../../root.zig");
+const cozi = @import("../../../root.zig");
+const Fiber = cozi.Fiber;
 const select = Fiber.select;
 const Channel = Fiber.Channel;
 
-const executors = @import("../../../executors/root.zig");
+const executors = cozi.executors;
 const ManualExecutor = executors.Manual;
 const ThreadPool = executors.threadPools.Compute;
 
-const fault = @import("../../../fault/root.zig");
+const fault = cozi.fault;
 const Atomic = fault.stdlike.atomic;
+const build_options = cozi.build_options;
 
 test "Select - heterogenous types" {
-    if (fault_injection_builtin.build_variant == .fiber) {
+    if (cozi.build_options.fault.variant == .fiber) {
         return error.SkipZigTest;
     }
     var manual: ManualExecutor = .{};
@@ -108,7 +109,7 @@ test "Select - heterogenous types" {
 }
 
 test "Select - send then select receive" {
-    if (fault_injection_builtin.build_variant == .fiber) {
+    if (cozi.build_options.fault.variant == .fiber) {
         return error.SkipZigTest;
     }
     var manual: ManualExecutor = .{};
@@ -164,7 +165,7 @@ test "Select - send then select receive" {
 }
 
 test "Select - send multiple then select receive" {
-    if (fault_injection_builtin.build_variant == .fiber) {
+    if (cozi.build_options.fault.variant == .fiber) {
         return error.SkipZigTest;
     }
     var manual: ManualExecutor = .{};
@@ -244,7 +245,7 @@ test "Select - send multiple then select receive" {
 }
 
 test "Select - select receive then send" {
-    if (fault_injection_builtin.build_variant == .fiber) {
+    if (cozi.build_options.fault.variant == .fiber) {
         return error.SkipZigTest;
     }
     var manual: ManualExecutor = .{};

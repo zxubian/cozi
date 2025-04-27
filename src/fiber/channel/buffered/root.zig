@@ -9,9 +9,9 @@ const GenericAwait = @import("../../../await/root.zig");
 const Awaiter = GenericAwait.Awaiter;
 const Await = GenericAwait.@"await";
 
-const Containers = @import("../../../containers/root.zig");
-const Queue = Containers.Intrusive.ForwardList;
-const Node = Containers.Intrusive.Node;
+const containers = @import("../../../containers/root.zig");
+const Queue = containers.intrusive.ForwardList;
+const Node = containers.intrusive.Node;
 
 const Spinlock = @import("../../../sync/root.zig").Spinlock;
 const Fiber = @import("../../root.zig");

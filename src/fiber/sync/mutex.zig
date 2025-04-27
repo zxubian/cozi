@@ -17,8 +17,8 @@ const GenericAwait = @import("../../await/root.zig");
 const Await = GenericAwait.@"await";
 const Awaiter = GenericAwait.Awaiter;
 
-const Containers = @import("../../containers/root.zig");
-const Queue = Containers.Intrusive.LockFree.MpscQueue;
+const containers = @import("../../containers/root.zig");
+const Queue = containers.intrusive.lock_free.MpscQueue;
 
 const log = std.log.scoped(.fiber_mutex);
 
@@ -37,7 +37,7 @@ fn StateFromNodePtr(node: *Node) State {
 }
 
 fn NodePtrFromState(state: State) *Node {
-    const intrusive_list_node: *Containers.Intrusive.Node =
+    const intrusive_list_node: *containers.intrusive.Node =
         @ptrFromInt(@intFromEnum(state));
 
     return intrusive_list_node.parentPtr(Node);
@@ -45,7 +45,7 @@ fn NodePtrFromState(state: State) *Node {
 
 const Node = struct {
     fiber: *Fiber,
-    intrusive_list_node: Containers.Intrusive.Node = .{},
+    intrusive_list_node: containers.intrusive.Node = .{},
 
     pub fn getNext(self: *Node) ?*Node {
         if (self.intrusive_list_node.next) |next_intrusive_ptr| {

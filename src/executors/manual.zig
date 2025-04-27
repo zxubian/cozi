@@ -3,7 +3,7 @@ const std = @import("std");
 const Core = @import("../core/root.zig");
 const Executor = @import("../executors/root.zig").Executor;
 const Runnable = Core.Runnable;
-const Queue = @import("../containers/root.zig").Intrusive.ForwardList(Runnable);
+const Queue = @import("../containers/root.zig").intrusive.ForwardList(Runnable);
 const Allocator = std.mem.Allocator;
 
 const ManualExecutor = @This();

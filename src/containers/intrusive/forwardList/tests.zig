@@ -2,9 +2,9 @@ const std = @import("std");
 const testing = std.testing;
 const alloc = testing.allocator;
 
-const Containers = @import("../../../containers/root.zig");
-const List = Containers.Intrusive.ForwardList;
-const Node = Containers.Intrusive.Node;
+const containers = @import("../../../containers/root.zig");
+const List = containers.intrusive.ForwardList;
+const Node = containers.intrusive.Node;
 
 test "Queue - Basic" {
     const Data = struct {
@@ -34,7 +34,7 @@ test "Queue - Basic" {
 
 test "Stack - Basic" {
     const Data = struct {
-        intrusive_list_node: Containers.Intrusive.Node,
+        intrusive_list_node: containers.intrusive.Node,
         value: usize,
     };
     const Stack = List(Data);

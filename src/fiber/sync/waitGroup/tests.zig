@@ -1,22 +1,23 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const build_config = @import("build_config");
+const cozi = @import("../../../root.zig");
+const build_options = cozi.build_options;
 
 const testing = std.testing;
-const fault = @import("../../../fault/root.zig");
+const fault = cozi.fault;
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
 
-const Fiber = @import("../../root.zig");
+const Fiber = cozi.Fiber;
 const WaitGroup = Fiber.WaitGroup;
 
-const executors = @import("../../../executors/root.zig");
+const executors = cozi.executors;
 const ManualExecutor = executors.Manual;
 const ThreadPool = executors.threadPools.Compute;
 const ThreadWaitGroup = std.Thread.WaitGroup;
 
 test "counter - single thread" {
-    if (build_config.sanitize == .thread) {
+    if (build_options.sanitizer.variant == .thread) {
         return error.SkipZigTest;
     }
     var manual_executor = ManualExecutor{};
@@ -63,7 +64,7 @@ test "counter - multi-thread" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
-    if (build_config.sanitize == .thread) {
+    if (build_options.sanitizer.variant == .thread) {
         return error.SkipZigTest;
     }
     var tp = try ThreadPool.init(4, testing.allocator);

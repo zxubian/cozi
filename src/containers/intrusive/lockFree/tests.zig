@@ -1,27 +1,29 @@
 const std = @import("std");
 const testing = std.testing;
 const builtin = @import("builtin");
-const build_config = @import("build_config");
-const fault = @import("../../../fault/root.zig");
+
+const cozi = @import("../../../root.zig");
+const build_options = cozi.build_options;
+const fault = cozi.fault;
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
 
-const Containers = @import("../../root.zig");
-const LockFree = Containers.Intrusive.LockFree;
-const Stack = LockFree.MpscStack;
-const Queue = LockFree.MpscQueue;
-const executors = @import("../../../executors/root.zig");
+const containers = cozi.containers;
+const lock_free = containers.intrusive.lock_free;
+const Stack = lock_free.MpscStack;
+const Queue = lock_free.MpscQueue;
+const executors = cozi.executors;
 const ManualExecutor = executors.Manual;
 const ThreadPool = executors.threadPools.Compute;
 const WaitGroup = std.Thread.WaitGroup;
-const Fiber = @import("../../../fiber/root.zig");
+const Fiber = cozi.Fiber;
 
 test "stack - basic" {
-    if (build_config.sanitize == .thread) {
+    if (build_options.sanitizer.variant == .thread) {
         return error.SkipZigTest;
     }
     const Node = struct {
-        intrusive_list_node: Containers.Intrusive.Node = .{},
+        intrusive_list_node: containers.intrusive.Node = .{},
         data: usize = 0,
     };
     const node_count = 100;
@@ -43,12 +45,12 @@ test "stack - basic" {
 }
 
 test "stack - multiple producers - manual" {
-    if (build_config.sanitize == .thread) {
+    if (build_options.sanitizer.variant == .thread) {
         return error.SkipZigTest;
     }
     var manual_executor: ManualExecutor = .{};
     const Node = struct {
-        intrusive_list_node: Containers.Intrusive.Node = .{},
+        intrusive_list_node: containers.intrusive.Node = .{},
         data: usize = 0,
     };
     const fiber_count = 100;
@@ -97,18 +99,18 @@ test "stack - stress" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
-    if (build_config.sanitize == .thread) {
+    if (build_options.sanitizer.variant == .thread) {
         return error.SkipZigTest;
     }
     const cpu_count = try std.Thread.getCpuCount();
-    const worker_count = if (@import("build_config").sanitize == .none) cpu_count else 4;
+    const worker_count = if (build_options.sanitizer.variant == .none) cpu_count else 4;
     var tp = try ThreadPool.init(worker_count, testing.allocator);
     defer tp.deinit();
     try tp.start();
     defer tp.stop();
 
     const Node = struct {
-        intrusive_list_node: Containers.Intrusive.Node = .{},
+        intrusive_list_node: containers.intrusive.Node = .{},
         local_order: usize = 0,
         producer_idx: usize = 0,
         touched_by_producer: Atomic(bool) = .init(false),
@@ -266,11 +268,11 @@ test "stack - stress" {
 }
 
 test "queue - basic" {
-    if (build_config.sanitize == .thread) {
+    if (build_options.sanitizer.variant == .thread) {
         return error.SkipZigTest;
     }
     const Node = struct {
-        intrusive_list_node: Containers.Intrusive.Node = .{},
+        intrusive_list_node: containers.intrusive.Node = .{},
         data: usize = 0,
     };
     const node_count = 100;
@@ -288,12 +290,12 @@ test "queue - basic" {
 }
 
 test "queue - multiple producers - manual" {
-    if (build_config.sanitize == .thread) {
+    if (build_options.sanitizer.variant == .thread) {
         return error.SkipZigTest;
     }
     var manual_executor: ManualExecutor = .{};
     const Node = struct {
-        intrusive_list_node: Containers.Intrusive.Node = .{},
+        intrusive_list_node: containers.intrusive.Node = .{},
         data: usize = 0,
     };
     const fiber_count = 100;
@@ -342,7 +344,7 @@ test "queue - stress" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
-    if (build_config.sanitize == .thread) {
+    if (build_options.sanitizer.variant == .thread) {
         return error.SkipZigTest;
     }
 
@@ -354,7 +356,7 @@ test "queue - stress" {
     defer tp.stop();
 
     const Node = struct {
-        intrusive_list_node: Containers.Intrusive.Node = .{},
+        intrusive_list_node: containers.intrusive.Node = .{},
         producer_idx: usize = 0,
         local_order: usize = 0,
         touched_by_producer: Atomic(bool) = .init(false),

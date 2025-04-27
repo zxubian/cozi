@@ -8,8 +8,8 @@ const fault = @import("../../fault/root.zig");
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
 
-const Containers = @import("../../containers/root.zig");
-const Queue = Containers.Intrusive.LockFree.MpscQueue;
+const containers = @import("../../containers/root.zig");
+const Queue = containers.intrusive.lock_free.MpscQueue;
 
 const Fiber = @import("../../fiber/root.zig");
 const GenericAwait = @import("../../await/root.zig");
@@ -20,7 +20,7 @@ const log = std.log.scoped(.fiber_event);
 
 const Node = struct {
     fiber: *Fiber,
-    intrusive_list_node: Containers.Intrusive.Node = .{},
+    intrusive_list_node: containers.intrusive.Node = .{},
 };
 const State = enum(u8) { init, fired };
 

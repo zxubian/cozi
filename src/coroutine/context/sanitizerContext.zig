@@ -1,5 +1,6 @@
 const builtin = @import("builtin");
-const build_config = @import("build_config");
+const cozi = @import("../../root.zig");
+const build_options = cozi.build_options;
 const ThreadSanitizerContext = @import("./sanitizer/threadSanitizerContext.zig");
 const AddressSanitizerContext = @import("./sanitizer/AddressSanitizerContext.zig");
 const Stack = @import("../../core/root.zig").Stack;
@@ -8,7 +9,7 @@ pub const Context = @This();
 
 impl: Impl = .{},
 
-const Impl = switch (build_config.sanitize) {
+const Impl = switch (build_options.sanitizer.variant) {
     .none => NoopContext,
     .address => AddressSanitizerContext,
     .thread => ThreadSanitizerContext,

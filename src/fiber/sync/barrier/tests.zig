@@ -1,17 +1,19 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const build_config = @import("build_config");
+
+const cozi = @import("../../../root.zig");
+const build_options = cozi.build_options;
 const testing = std.testing;
-const fault = @import("../../../fault/root.zig");
+const fault = cozi.fault;
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
 const Allocator = std.mem.Allocator;
 const WaitGroup = std.Thread.WaitGroup;
 
-const Fiber = @import("../../../fiber/root.zig");
+const Fiber = cozi.Fiber;
 const Barrier = Fiber.Barrier;
 const Mutex = Fiber.Mutex;
-const executors = @import("../../../executors/root.zig");
+const executors = cozi.executors;
 const ManualExecutor = executors.Manual;
 const ThreadPool = executors.threadPools.Compute;
 const Executor = executors.Executor;
