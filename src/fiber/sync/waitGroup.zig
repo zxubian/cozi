@@ -14,7 +14,7 @@ const containers = cozi.containers;
 const Queue = containers.intrusive.lock_free.MpscQueue;
 
 const Fiber = cozi.Fiber;
-const GenericAwait = cozi.Await;
+const GenericAwait = Fiber.@"await";
 const Await = GenericAwait.@"await";
 const Awaiter = GenericAwait.Awaiter;
 

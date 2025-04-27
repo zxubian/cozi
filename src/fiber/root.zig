@@ -17,9 +17,8 @@ const core = cozi.core;
 const Closure = core.Closure;
 const Runnable = core.Runnable;
 const Stack = core.Stack;
-const GenericAwait = cozi.Await;
-const Await = GenericAwait.@"await";
-const Awaiter = GenericAwait.Awaiter;
+const Await = @"await".@"await";
+const Awaiter = @"await".Awaiter;
 
 const Sync = @import("./sync.zig");
 const Channel_ = @import("./channel/root.zig");
@@ -31,6 +30,7 @@ pub const Event = Sync.Event;
 pub const Mutex = Sync.Mutex;
 pub const Strand = Sync.Strand;
 pub const WaitGroup = Sync.WaitGroup;
+pub const @"await" = @import("./await/root.zig");
 
 const log = core.log.scoped(.fiber);
 

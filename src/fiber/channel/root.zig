@@ -11,7 +11,7 @@ const fault = cozi.fault;
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
 
-const GenericAwait = cozi.Await;
+const GenericAwait = Fiber.@"await";
 const Awaiter = GenericAwait.Awaiter;
 const Await = GenericAwait.@"await";
 

@@ -14,7 +14,7 @@ const Atomic = stdlike.atomic.Value;
 const log = cozi.core.log.scoped(.fiber_mutex);
 
 const Fiber = cozi.Fiber;
-const GenericAwait = cozi.Await;
+const GenericAwait = Fiber.@"await";
 const Await = GenericAwait.@"await";
 const Awaiter = GenericAwait.Awaiter;
 

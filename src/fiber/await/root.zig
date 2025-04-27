@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const cozi = @import("../root.zig");
+const cozi = @import("../../root.zig");
 pub const Awaiter = @import("./awaiter.zig");
 // TODO: eliminate dependency on fiber here
 const Fiber = cozi.Fiber;

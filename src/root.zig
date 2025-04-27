@@ -1,4 +1,3 @@
-pub const Await = @import("./await/root.zig");
 pub const containers = @import("./containers/root.zig");
 pub const core = @import("./core/root.zig");
 pub const Coroutine = @import("./coroutine/root.zig");
