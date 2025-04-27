@@ -3,6 +3,7 @@
 //! even for the contended case.
 //! Instead, the contending fiber will be parked
 //! until the mutex is unlocked.
+//! Similar to `std.Thread.Mutex`
 const std = @import("std");
 const assert = std.debug.assert;
 

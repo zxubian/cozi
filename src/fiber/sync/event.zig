@@ -1,6 +1,7 @@
 //! One-shot event for fibers.
-//! Waiting on event does not block the underlying thread -
-//! instead, the fiber is parked until the event is fired.
+//! Waiting on `Event` does not block the underlying thread -
+//! instead, the `Fiber` is parked until the event is fired.
+//! Similar to `std.Thread.ResetEvent`
 const std = @import("std");
 
 const cozi = @import("../../root.zig");

@@ -1,6 +1,7 @@
-//! Wait Group for Fibers.
-//! Waiting on a WaitGroup does not block the underlying thread -
-//! instead, the fiber is parked until the WaitGroup counter reaches 0.
+//! `WaitGroup` for Fibers.
+//! Waiting on a `WaitGroup` does not block the underlying thread -
+//! instead, the `Fiber` is parked until the WaitGroup counter reaches 0.
+//! Similar to: `std.Thread.WaitGroup`
 const std = @import("std");
 
 const cozi = @import("../../root.zig");
