@@ -28,24 +28,29 @@ zig fetch --save git+https://github.com/zxubian/cozi.git#main
 2. Add `cozi` module to your executable:
 ```zig
 // build.zig
-    const fault_inject_variant = b.option(
-        []const u8,
-        "cozi_fault_inject",
-        "Which fault injection build type to use",
-    );
-    const cozi = blk: {
-        if (fault_inject_variant) |user_input| {
-            break :blk b.dependency("cozi", .{
-                .fault_inject = user_input,
-            });
-        }
-        break :blk b.dependency("cozi", .{});
-    };
+    const cozi = b.dependency("cozi", .{});
     exe.root_module.addImport("cozi", cozi.module("root"));
 ```
 
 3. Import  and use:
 - [examples](examples/)
+
+### Build Configuration Options
+You can modify the behavior of `cozi` by overriding [build options](src/buildOptions.zig) at import timing.
+```zig
+//build.zig
+const fault_variant: BuildOptions.fault.Variant = b.option(
+   buildOptions.fault.Variant,
+    "fault-inject",
+    "Which variant of fault injection to use.",
+) orelse .default();
+//...
+const cozi = b.dependency("cozi", .{
+   .fault_variant = fault_variant,
+//...
+});
+```
+For each option that is not overridden, `cozi` will use the default defined in [BuildOptions](src/buildOptions.zig).
 
 ### Stability Guarantees
 `cozi` is experimental and unstable. Expect `main` branch to occasionally break.
