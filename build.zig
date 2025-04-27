@@ -153,7 +153,7 @@ fn buildExamples(
     optimize: std.builtin.OptimizeMode,
     cozi_root: *std.Build.Module,
 ) void {
-    const Example = std.meta.FieldEnum(examples);
+    const Example = std.meta.DeclEnum(examples);
     const maybe_example_name = b.option(Example, "example-name", "Name of the example");
     const examples_decls = comptime std.meta.declarations(examples);
     const build_target_example = b.step("example", "Build specific example");
