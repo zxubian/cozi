@@ -43,7 +43,8 @@ pub fn Future(V: type) type {
     };
 }
 
-///Future that instantly returns runtime-known value `v`
+///`Future` that instantly returns runtime-known value `v`
+/// * -> Future<V>
 pub fn value(v: anytype) Future(@TypeOf(v)) {
     return .{ .value = v };
 }

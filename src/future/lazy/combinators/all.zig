@@ -229,15 +229,18 @@ pub fn All(Inputs: type) type {
     };
 }
 
-/// A Future that is resolved when ALL
-/// of the input futures are resolved.
-/// The Computation of each Future from `inputs` is
-/// executed on last Executor set in the pipeline.
-/// The resolved value is a Tuple containing
-/// the result values of each supplied Future,
-/// in the same order as the input Futures.
-/// `all` resets the Executor of the pipeline
-///  to @"inline" for succeeding Futures.
+/// A Future that is resolved when ALL of the input futures are
+/// resolved.
+///
+/// * The computation of each Future from `inputs` is executed on
+/// the last `Executor` set earlier in the pipeline.
+///
+/// * The resolved value is a `std.meta.Tuple` containing the result
+/// values of each supplied Future, in the same order as the input
+/// Futures.
+///
+/// * `all` resets the Executor of the pipeline to `executors.@"inline"`
+/// for succeeding Futures.
 pub fn all(
     inputs: anytype,
 ) All(@TypeOf(inputs)) {

@@ -43,6 +43,7 @@ fn ConstValue(comptime v: anytype) type {
 }
 
 /// Future that instantly returns comptime-known value `v`
+/// * -> Future<V>
 pub fn constValue(comptime v: anytype) ConstValue(v) {
     return .{};
 }

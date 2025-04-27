@@ -263,13 +263,16 @@ pub fn First(Inputs: type) type {
 
 /// A Future that is resolved when THE FIRST
 /// provided future is resolved.
-/// The Computation of each Future from `inputs` is
-/// executed on last Executor set in the pipeline.
+///
+/// The computation of each Future from `inputs` is
+/// executed on last `Executor` set in the pipeline.
+///
 /// The resulting value is a Union whose fields
 /// are result values of each supplied Future,
 /// in the same order as the input Futures.
-/// `first` resets the Executor of the pipeline
-///  to @"inline" for succeeding Futures.
+///
+/// `first` resets the `Executor` of the pipeline
+///  to `executors.@"inline"`` for succeeding Futures.
 pub fn first(
     inputs: anytype,
 ) First(@TypeOf(inputs)) {

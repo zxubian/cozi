@@ -194,8 +194,10 @@ pub fn OrElse(OrElseFn: type) type {
 
 /// This Future applies map_fn to the result of its piped input,
 /// but only if the result is an Error.
-/// Future<E!T> -> F<E!map_fn(E)>
+/// * Future<E!T> -> F<E!map_fn(E)>
+///
 /// `map_fn` is executed on the Executor set earlier in the pipeline.
+///
 pub fn orElse(
     map_fn: anytype,
     ctx: ?*anyopaque,

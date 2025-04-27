@@ -20,9 +20,9 @@ pub fn Future(map_fn: anytype) type {
     }));
 }
 
-/// Submit lambda to executor
-/// Returns a Future that is resolved when
-/// the submitted lambda function returns.
+/// Returns a Future that submits `lambda` to `executor`,
+/// and resolves when the submitted lambda function returns.
+/// * -> Future<lambda(ctx)>
 pub inline fn submit(
     executor: Executor,
     lambda: anytype,

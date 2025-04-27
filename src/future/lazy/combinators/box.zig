@@ -187,9 +187,11 @@ pub fn pipe(
 }
 
 /// Use allocator to create a container for storing the piped future's computation.
+/// * F<V> -> BoxedFuture<V>
+///
 /// The container is self-destructed when the future is resolved (e.g. via `get`).
+///
 /// The type of piped future is erased to a BoxedFuture<V> interface.
-/// F<V> -> BoxedFuture<V>
 pub fn box(allocator: std.mem.Allocator) Box {
     return .{ .allocator = allocator };
 }

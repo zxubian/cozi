@@ -163,8 +163,8 @@ pub fn Contract(V: type) type {
 }
 
 /// Create a connected Future-Promise pair.
-/// Returns tuple containing [Future, Promise].
-/// Memory necessary for SharedState is automatically
+/// Returns a `std.meta.Tuple` of the type .{Future, Promise}.
+/// The memory necessary for SharedState is automatically
 /// allocated on creation and deallocated on rendezvous
 /// using the provided `allocator`.
 pub fn contract(
@@ -187,7 +187,7 @@ pub fn contract(
 }
 
 /// Create a connected Future-Promise pair.
-/// Returns tuple containing [Future, Promise].
+/// Returns a `std.meta.Tuple` of the type .{Future, Promise}.
 /// Callee owns shared_state memory.
 pub fn contractNoAlloc(
     V: type,

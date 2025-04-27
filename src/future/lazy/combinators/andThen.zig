@@ -194,8 +194,9 @@ pub fn AndThen(AndThenFn: type) type {
 
 /// This Future applies map_fn to the result of its piped input,
 /// but only if the result is not an Error.
-/// Future<E!T> -> F<E!map_fn(T)>
-/// `map_fn` is executed on the Executor set earlier in the pipeline.
+/// * Future<E!T> -> F<E!map_fn(ctx, T)>
+///
+/// `map_fn` is executed on the last Executor set earlier in the pipeline.
 pub fn andThen(
     map_fn: anytype,
     ctx: ?*anyopaque,

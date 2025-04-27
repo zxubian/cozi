@@ -186,7 +186,11 @@ pub fn MapOk(MapOkFn: type) type {
     };
 }
 
-/// F<V> -> F<map(V)>
+/// This Future applies map_fn to the result of its piped input,
+/// but only if the result is not an Error.
+/// * Future<V> -> F<map(V)>
+///
+/// map_fn is executed on the Executor set earlier in the pipeline.
 pub fn mapOk(
     map_fn: anytype,
     ctx: ?*anyopaque,

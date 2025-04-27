@@ -144,7 +144,8 @@ pub fn Map(MapFn: type) type {
 }
 
 /// This Future applies map_fn to the result of its piped input.
-/// Future<T> -> Future<map_fn(T)>
+/// * Future<T> -> Future<map_fn(T)>
+///
 /// `map_fn` is executed on the Executor set earlier in the pipeline.
 pub fn map(
     map_fn: anytype,

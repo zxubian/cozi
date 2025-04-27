@@ -1,3 +1,4 @@
+//! Lazily-evaluated futures
 const std = @import("std");
 const assert = std.debug.assert;
 const executors = @import("../../root.zig").executors;
@@ -5,14 +6,15 @@ const Executor = executors.Executor;
 const core = @import("../../root.zig").core;
 const Runnable = core.Runnable;
 
-/// --- external re-exports ---
+/// Lazily-evaluated futures
+// --- external re-exports ---
 pub const Impl = struct {
     // --- generators ---
     pub const submit = make.submit.submit;
     pub const Submit = make.submit.Future;
     pub const just = make.just.just;
     pub const constValue = make.constValue.constValue;
-    pub const Value = make.value.Future;
+    pub const Value = make.value.vture;
     pub const value = make.value.value;
     pub const contract = make.contract.contract;
     pub const contractNoAlloc = make.contract.contractNoAlloc;

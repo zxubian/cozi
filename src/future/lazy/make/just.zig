@@ -38,6 +38,9 @@ pub fn materialize(
 }
 
 /// A Future that instantly returns nothing
+/// * -> Future<void>
+///
+/// Equivalent to `constValue({})`
 pub fn just() Just {
     return .{};
 }

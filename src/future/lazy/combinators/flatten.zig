@@ -118,7 +118,8 @@ pub fn pipe(
     };
 }
 
-/// Future<Future<T>> -> Future<T>
+/// Unwrap nested future
+/// * Future<Future<T>> -> Future<T>
 pub fn flatten() Flatten {
     return .{};
 }
