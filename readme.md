@@ -28,8 +28,8 @@ zig fetch --save git+https://github.com/zxubian/cozi.git#main
 2. Add `cozi` module to your executable:
 ```zig
 // build.zig
-    const cozi = b.dependency("cozi", .{});
-    exe.root_module.addImport("cozi", cozi.module("root"));
+const cozi = b.dependency("cozi", .{});
+exe.root_module.addImport("cozi", cozi.module("root"));
 ```
 
 3. Import  and use:
@@ -40,7 +40,7 @@ You can modify the behavior of `cozi` by overriding [build options](src/buildOpt
 ```zig
 //build.zig
 const fault_variant: BuildOptions.fault.Variant = b.option(
-   buildOptions.fault.Variant,
+   BuildOptions.fault.Variant,
     "fault-inject",
     "Which variant of fault injection to use.",
 ) orelse .default();
@@ -127,6 +127,11 @@ try expectEqual(4, ctx.step);
 ```
 
 ###### [Thread Pool](src/executors/threadPool/compute.zig)
+Properties:
+- single task queue, shared between all worker threads (more sophisticated thread pool with threadlocal queues & work-stealing is [planned](https://github.com/zxubian/cozi/issues/13))
+- intrusive linked list as basis for task queue (thread pool itself does not allocate on task `submit`)
+- customizable stack size for worker threads
+
 ```zig
 const ThreadPool = cozi.executors.threadPools.Compute;
 // Create fixed number of "worker threads" at init time.
@@ -159,13 +164,10 @@ for (0..task_count) |_| {
 ctx.wait_group.wait();
 assert(ctx.sum.load(.seq_cst) == task_count);
 ```
-#### Properties:
-- intrusive linked list as basis for task queue (thread pool itself does not allocate on task `submit`)
-- single tasks queue, shared between all worker threads
-- customizable stack size for worker threads
+
+
 #### References:
 - [example](examples/threadPool.zig)
-- [source](src/executors/threadPool/compute.zig)
 - [roadmap](https://github.com/zxubian/cozi/issues?q=is%3Aissue%20state%3Aopen%20label%3Afeature%20label%3A%22Thread%20Pool%22)
 
 ### [Fibers](src/fiber/root.zig) - stackfull cooperatively-scheduled user-space threads
