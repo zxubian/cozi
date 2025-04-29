@@ -16,6 +16,18 @@ impl: Impl,
 const Impl = blk: {
     break :blk switch (builtin.target.cpu.arch) {
         .aarch64 => Aarch64Impl,
+        .x86_64 => switch (builtin.target.os.tag) {
+            .windows => x86_64WindowsImpl,
+            else => @compileError(
+                std.fmt.comptimePrint(
+                    "{s} is not imlemented for target architecture {s}",
+                    .{
+                        @typeName(@This()),
+                        @tagName(builtin.target.cpu.arch),
+                    },
+                ),
+            ),
+        },
         else => @compileError(
             std.fmt.comptimePrint(
                 "{s} is not imlemented for target architecture {s}",
@@ -28,6 +40,9 @@ const Impl = blk: {
     };
 };
 
+/// Referencs:
+/// - https://developer.arm.com/documentation/102374/0102/Procedure-Call-Standard
+/// - https://learn.microsoft.com/en-us/cpp/build/arm64-windows-abi-conventions?view=msvc-170
 const Aarch64Impl = struct {
     const TrampolineProto = *const fn (
         *anyopaque,
@@ -60,18 +75,20 @@ const Aarch64Impl = struct {
         stack: Stack,
         user_trampoline: Trampoline,
     ) void {
-        const stack_top = stack.top();
+        // high address is stack base
+        // stack grows downward, towards lower addresses
+        const stack_base = stack.base();
         log.debug(
             "storing machineContext impl ptr to stack: 0x{x:0>8}",
             .{@intFromPtr(self)},
         );
         self.stack_pointer = machine_context_init(
-            @ptrCast(stack_top),
+            @ptrCast(stack_base),
             runTrampoline,
             self,
         );
-        assert(@intFromPtr(stack.base()) <= @intFromPtr(self.stack_pointer));
-        assert(@intFromPtr(self.stack_pointer) < @intFromPtr(stack.top()));
+        assert(@intFromPtr(stack.ceil()) <= @intFromPtr(self.stack_pointer));
+        assert(@intFromPtr(self.stack_pointer) < @intFromPtr(stack.base()));
         self.user_trampoline = user_trampoline;
     }
 
@@ -90,7 +107,7 @@ const Aarch64Impl = struct {
         _: *anyopaque,
         _: *anyopaque,
         ctx: *anyopaque,
-    ) callconv(.C) void {
+    ) callconv(.C) noreturn {
         log.debug(
             "recovered machineContext impl ptr from stack: 0x{x:0>8}",
             .{@intFromPtr(ctx)},
@@ -223,6 +240,68 @@ const Aarch64Impl = struct {
             &machine_ctx,
             runTrampoline,
         );
+    }
+};
+
+/// https://learn.microsoft.com/en-us/cpp/build/x64-calling-convention?view=msvc-170#parameter-passing
+/// https://hackeradam.com/x86-64-calling-conventions/
+const x86_64WindowsImpl = struct {
+    /// ./machine/x86_64_windows.s
+    extern fn machine_context_init(
+        /// low address
+        stack_ceil: ?[*]u8,
+        /// high address
+        stack_base: ?[*]u8,
+        machine_context_trampoline: @TypeOf(&machine_context_trampoline),
+        trampoline_ctx: *anyopaque,
+    ) callconv(.C) *anyopaque;
+
+    /// ./machine/x86_64_windows.s
+    extern fn machine_context_switch_to(
+        old_stack_pointer: **anyopaque,
+        new_stack_pointer: **anyopaque,
+    ) callconv(.C) void;
+
+    fn machine_context_trampoline(
+        _: *anyopaque,
+        _: *anyopaque,
+        _: *anyopaque,
+        _: *anyopaque,
+        // passed on the stack
+        machine_ctx_self: *anyopaque,
+    ) callconv(.C) noreturn {
+        const self: *x86_64WindowsImpl = @alignCast(@ptrCast(machine_ctx_self));
+        self.user_trampoline.run();
+    }
+
+    stack_pointer: *anyopaque,
+    user_trampoline: Trampoline,
+
+    pub fn init(
+        self: *x86_64WindowsImpl,
+        stack: Stack,
+        user_trampoline: Trampoline,
+    ) void {
+        const stack_ceil = stack.ceil();
+        const stack_base = stack.base();
+        log.debug(
+            "storing machineContext impl ptr to stack: 0x{x:0>8}",
+            .{@intFromPtr(self)},
+        );
+        const new_stack_pointer: [*]u8 = @ptrCast(machine_context_init(
+            @ptrCast(stack_ceil),
+            @ptrCast(stack_base),
+            &machine_context_trampoline,
+            self,
+        ));
+        assert(@intFromPtr(stack.ceil()) <= @intFromPtr(new_stack_pointer));
+        assert(@intFromPtr(new_stack_pointer) < @intFromPtr(stack.base()));
+        self.stack_pointer = new_stack_pointer;
+        self.user_trampoline = user_trampoline;
+    }
+
+    pub fn switchTo(self: *x86_64WindowsImpl, other: *x86_64WindowsImpl) void {
+        machine_context_switch_to(&self.stack_pointer, &other.stack_pointer);
     }
 };
 

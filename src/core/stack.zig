@@ -17,16 +17,23 @@ slice: []align(ALIGNMENT_BYTES) u8,
 pub const ALIGNMENT_BYTES = builtin.target.stackAlignment();
 pub const DEFAULT_SIZE_BYTES = 16 * 1024 * 1024;
 
-pub fn top(self: *const Stack) PtrType {
+/// High address
+pub fn base(self: *const Stack) PtrType {
     return @alignCast(self.slice.ptr + self.slice.len);
 }
 
-pub fn base(self: *const Stack) PtrType {
+/// Low address
+pub fn ceil(self: *const Stack) PtrType {
     return @alignCast(self.slice.ptr);
 }
 
 pub fn bufferAllocator(self: *const Stack) FixedBufferAllocator {
     return std.heap.FixedBufferAllocator.init(self.slice);
+}
+
+pub fn contains(self: *const Stack, address: *anyopaque) bool {
+    return @intFromPtr(self.ceil()) <= @intFromPtr(address) and
+        @intFromPtr(address) <= @intFromPtr(self.base());
 }
 
 /// for debugging only
@@ -42,13 +49,13 @@ pub fn print(
         if (i % 16 == 0) {
             std.debug.print(
                 "0x{X:0>8}\t",
-                .{@intFromPtr(stack.top()) - i},
+                .{@intFromPtr(stack.ceil()) - i},
             );
         }
         std.debug.print("0x{X:0>2}", .{r});
         i += 1;
         if (stack_pointer) |sp| {
-            if (@intFromPtr(stack.top()) - i == @intFromPtr(sp)) {
+            if (@intFromPtr(stack.ceil()) - i == @intFromPtr(sp)) {
                 std.debug.print(" <- SP", .{});
             }
         }
@@ -100,7 +107,7 @@ pub const Managed = struct {
     }
 
     pub inline fn top(self: *const Self) PtrType {
-        return self.raw.top();
+        return self.raw.ceil();
     }
 
     pub inline fn base(self: *const Self) PtrType {
