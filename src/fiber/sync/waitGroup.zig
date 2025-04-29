@@ -139,7 +139,7 @@ const WaitGroupAwaiter = struct {
         };
     }
 
-    /// --- comptime awaiter interface ---
+    // --- comptime awaiter interface ---
     pub fn awaitReady(self: *WaitGroupAwaiter) bool {
         const state: State = @bitCast(self.wait_group.state.load(.seq_cst));
         if (state.num_waiters == 0) {

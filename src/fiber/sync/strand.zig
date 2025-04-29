@@ -190,7 +190,7 @@ const StrandAwaiter = struct {
         };
     }
 
-    /// --- comptime awaiter interface ---
+    // --- comptime awaiter interface ---
     pub fn awaitReady(_: *StrandAwaiter) bool {
         return false;
     }

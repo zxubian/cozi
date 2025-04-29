@@ -210,7 +210,7 @@ const LockAwaiter = struct {
         };
     }
 
-    /// --- comptime awaiter interface ---
+    // --- comptime awaiter interface ---
     pub fn awaitReady(self: *LockAwaiter) bool {
         // Fast path: no contention
         const acquired_lock = self.mutex.state.cmpxchgWeak(
@@ -329,7 +329,7 @@ const UnlockAwaiter = struct {
         };
     }
 
-    /// --- comptime awaiter interface ---
+    // --- comptime awaiter interface ---
     pub fn awaitReady(self: *UnlockAwaiter) bool {
         const mutex = self.mutex;
         // fast path: nobody else is waiting

@@ -10,7 +10,6 @@ const log = cozi.core.log.scoped(.@"await");
 pub fn @"await"(expr_ptr: anytype) awaitReturnType(getAwaitableType(@TypeOf(expr_ptr.*))) {
     const Expr = @TypeOf(expr_ptr.*);
     const Awaitable = getAwaitableType(Expr);
-
     const awaitable: *Awaitable = getAwaitable(expr_ptr);
     // for awaitables that always return false,
     // want to resolve optimize this branch out,

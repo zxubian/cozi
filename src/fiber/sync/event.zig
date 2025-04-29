@@ -84,7 +84,7 @@ const EventAwaiter = struct {
         };
     }
 
-    /// --- comptime awaiter interface ---
+    // --- comptime awaiter interface ---
     pub fn awaitReady(self: *EventAwaiter) bool {
         return self.event.state.load(.seq_cst) == .fired;
     }

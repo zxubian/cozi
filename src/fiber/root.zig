@@ -389,7 +389,7 @@ const YieldAwaiter = struct {
         };
     }
 
-    /// --- comptime awaiter interface ---
+    // --- comptime awaiter interface ---
     pub fn awaitReady(_: *YieldAwaiter) bool {
         return false;
     }
@@ -418,7 +418,7 @@ const SwitchAwaiter = struct {
         };
     }
 
-    /// --- comptime awaiter interface ---
+    // --- comptime awaiter interface ---
     pub fn awaitReady(_: *SwitchAwaiter) bool {
         return false;
     }
