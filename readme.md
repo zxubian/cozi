@@ -82,8 +82,10 @@ http://localhost:8000/index.html
 ## Features & Roadmap
 
 ### [Executors & Schedulers](src/executors)
-- `Executor` is a type-erased interface representing an abstract task queue.
-- `Executor` allows users to submit [Runnable](src/core/runnable.zig)s (an abstract representation a task) for eventual execution.
+- `Executor` is a type-erased interface representing an abstract task queue:
+    - users can submit [Runnable](src/core/runnable.zig)s (an abstract representation of a task) for eventual execution
+- `cozi`'s concurrency primitives (`Future`s, `Fiber`s) can run on any `Executor`
+- `Executor` is to asynchronous task execution what [Allocator](https://github.com/ziglang/zig/blob/master/lib/std/mem/Allocator.zig) is to memory management.
 
 ```zig
 const executor = thread_pool.executor();
@@ -91,7 +93,6 @@ executor.submit(some_function, .{args}, allocator);
 // eventually, some_function(args) will be called.
 // exact timing depends on the specific Executor implementation
 ```
-
 
 ### [Fibers](src/fiber) - stackfull cooperatively-scheduled user-space threads
 - **threads**: like OS threads, fibers represents a "thread" of execution, i.e. an independent sequence of instructions together with its execution context (stack space)
