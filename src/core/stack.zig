@@ -91,7 +91,7 @@ pub const Managed = struct {
         const size = options.size;
         const buffer = try allocator.alignedAlloc(
             u8,
-            ALIGNMENT_BYTES,
+            std.mem.Alignment.fromByteUnits(ALIGNMENT_BYTES),
             size,
         );
         return Self{
