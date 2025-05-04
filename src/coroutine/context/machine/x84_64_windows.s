@@ -13,12 +13,6 @@ machine_context_init:
     # RDX:        stack_base: u64 (high address)
     # R8:         machine_context_trampoline: &Trampoline.Run
     # R9:         trampoline_ctx: *anyopaque 
-    # [rsp+0x20]: trampoline_run: *TrampolineProto
-
-    # Trampoline.runC is the 5th argument to machine_context_init,
-    # so it is located at (%rsp + 0x28)
-    # put it into temp register
-    # movq 0x28(%rsp), %r11
 
     # callee-saved info
     # save TIB to current stack
@@ -58,8 +52,6 @@ machine_context_init:
     movq %rbp, %gs:0x08
 
     # --- stack parameter area ---
-    # # pass the ptr to Trampoline.runC as the 6th argument
-    # pushq %r11
     # pass the ptr to trampoline as the 5th argument
     pushq %r9
     # ----------------------------
