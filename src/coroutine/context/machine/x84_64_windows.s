@@ -1,6 +1,5 @@
 .global machine_context_init
 .global machine_context_switch_to
-.global machine_context_trampoline
 
 # extern fn machine_context_init(
 #     stack_ceil: ?[*]u8,
@@ -163,23 +162,3 @@ machine_context_switch_to:
     popq %gs:0x10
 
     retq
-
-
-# extern fn machine_context_trampoline(
-#     _: *anyopaque,
-#     _: *anyopaque,
-#     _: *anyopaque,
-#     _: *anyopaque,
-#     // passed on the stack
-#     machine_ctx_self: *anyopaque,
-#     // passed on the stack
-#     trampoline_run: *const fn (self: *anyopaque) callconv(.C) noreturn,
-# ) callconv(.C) noreturn;
-machine_context_trampoline:
-    # [rsp + machine_ctx_self: *anyopaque,
-    #     trampoline_run: *const fn (self: *anyopaque) callconv(.C) noreturn,
-    movq 0x28(%rsp), %rax 
-    movq 0x20(%rsp), %rcx
-    # allocate space for register homes
-    subq $0x20, %rsp
-    call *%rax
