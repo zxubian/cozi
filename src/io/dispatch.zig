@@ -113,5 +113,10 @@ pub fn deinit(self: *Dispatch) void {
 }
 
 test {
-    _ = @import("./dispatch/tests.zig");
+    switch (builtin.cpu.arch) {
+        .aarch64 => {
+            _ = @import("./dispatch/tests.zig");
+        },
+        else => {},
+    }
 }

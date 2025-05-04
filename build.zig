@@ -8,6 +8,16 @@ fn addAssemblyForMachineContext(
 ) void {
     const path = switch (target.result.cpu.arch) {
         .aarch64 => b.path("./src/coroutine/context/machine/aarch64.s"),
+        .x86_64 => switch (target.result.os.tag) {
+            .windows => b.path("./src/coroutine/context/machine/x84_64_windows.s"),
+            else => std.debug.panic(
+                "Target architecture {s}-{s} is not yet supported",
+                .{
+                    @tagName(target.result.os.tag),
+                    @tagName(target.result.cpu.arch),
+                },
+            ),
+        },
         else => std.debug.panic(
             "Target architecture {s}-{s} is not yet supported",
             .{

@@ -85,10 +85,10 @@ fn threadEntryPoint(
     current_ = thread_pool;
     ThreadExt.setCurrentThread(self);
     assert(current_.?.status.load(.seq_cst) != .not_started);
-    var thread_pool_name_buf: [512]u8 = undefined;
+    var thread_pool_name_buf: [std.Thread.max_name_len]u8 = undefined;
     const name = std.fmt.bufPrint(
         &thread_pool_name_buf,
-        "Thread Pool@{}/Thread #{}",
+        "Pool@{}/Thread #{}",
         .{ @intFromPtr(thread_pool), i },
     ) catch "Thread Pool@(unknown) Thread#(unknown)";
     self.setName(name) catch |e| {

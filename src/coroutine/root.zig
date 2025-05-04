@@ -131,16 +131,13 @@ pub fn @"suspend"(self: *Coroutine) void {
 /// the address range of this Coroutine's Stack.
 pub fn isInScope(self: *const Coroutine) bool {
     var a: usize = undefined;
-    const addr = @intFromPtr(&a);
-    const base = @intFromPtr(self.stack.base());
-    const top = @intFromPtr(self.stack.top());
-    const result = base <= addr and addr < top;
+    const result = self.stack.contains(&a);
     log.debug(
-        "rsp: 0x{x:0>8}. Coroutine stack address range [0x{x:0>8}, 0x{x:0>8}]. Is in range: {}",
+        "rsp: 0x{x:0>8}. stack address range [0x{x:0>8}, 0x{x:0>8}]. Is in range: {}",
         .{
-            addr,
-            base,
-            top,
+            &a,
+            self.stack.ceil(),
+            self.stack.base(),
             result,
         },
     );

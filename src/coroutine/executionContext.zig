@@ -49,7 +49,7 @@ fn trampoline(self: *ExecutionContext) Trampoline {
     };
 }
 
-fn runTrampoline(ctx: *anyopaque) void {
+fn runTrampoline(ctx: *anyopaque) noreturn {
     const self: *ExecutionContext = @ptrCast(@alignCast(ctx));
     self.sanitizer_context.afterStart();
     self.user_trampoline.run();
