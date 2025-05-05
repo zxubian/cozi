@@ -105,6 +105,9 @@ executor.submit(some_function, .{args}, allocator);
 - Fibers are an example of [Green Threads](https://en.wikipedia.org/wiki/Green_thread)
 - Fibers are similar to [goroutines](https://go.dev/tour/concurrency/1) in GoLang, and [coroutines](https://kotlinlang.org/docs/coroutines-guide.html) in Kotlin
 
+#### Supported Platforms
+See [Coroutine - Supported Platforms](#coroutine---supported-platforms)
+
 ```zig
 const Ctx = struct {
     sum: usize,
@@ -159,6 +162,16 @@ ctx.wait_group.wait();
 - [example](examples/coroutine.zig)
 - [source](src/coroutine/root.zig)
 - [roadmap](https://github.com/zxubian/cozi/issues?q=is%3Aissue%20state%3Aopen%20label%3ACoroutine%20label%3Afeature)
+
+#### Coroutine - Supported Platforms
+
+See [issue](https://github.com/zxubian/cozi/issues/8).
+
+| Arch\OS | MacOS | Windows | Linux |
+|:-------:|:-----:|:-------:|:-----:|
+| aarch64 | ✅     | ❌       | ❌     |
+| x86_64  | ❌     | ✅       | ❌     |
+
 ```zig
 const cozi = @import("cozi");
 const Coroutine = cozi.Coroutine;
