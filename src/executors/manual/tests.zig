@@ -1,12 +1,15 @@
 const std = @import("std");
-const testing = std.testing;
-const ManualExecutor = @import("../manual.zig");
-const Executor = @import("../root.zig").Executor;
-const Core = @import("../../core/root.zig");
-const Runnable = Core.Runnable;
 const Allocator = std.mem.Allocator;
-
+const testing = std.testing;
 const allocator = std.testing.allocator;
+
+const cozi = @import("../../root.zig");
+const executors = cozi.executors;
+const ManualExecutor = executors.Manual;
+const Executor = executors.Executor;
+const core = cozi.core;
+const Runnable = core.Runnable;
+const Fiber = cozi.Fiber;
 
 test "Just Works" {
     var manual = ManualExecutor{};
@@ -110,4 +113,71 @@ test "Drain" {
     };
     looper.start();
     try testing.expectEqual(117, manual.drain());
+}
+
+test "executors - event loop - basic" {
+    var event_loop: ManualExecutor = .{};
+    const executor = event_loop.executor();
+    var stage: usize = 0;
+    executor.submit(
+        struct {
+            pub fn run(
+                stage_: *usize,
+                executor_: Executor,
+                allocator_: std.mem.Allocator,
+            ) void {
+                stage_.* += 1;
+                executor_.submit(@This().finish, .{stage_}, allocator_);
+            }
+
+            pub fn finish(stage_: *usize) void {
+                stage_.* += 1;
+            }
+        }.run,
+        .{ &stage, executor, testing.allocator },
+        testing.allocator,
+    );
+    try testing.expectEqual(0, stage);
+    _ = event_loop.runBatch();
+    try testing.expectEqual(1, stage);
+    _ = event_loop.runBatch();
+    try testing.expectEqual(2, stage);
+}
+
+test "executors - manual - event loop - fiber" {
+    var event_loop: ManualExecutor = .{};
+    const executor = event_loop.executor();
+    const fiber_count = 2;
+    const iteration_count = 100;
+    const Ctx = struct {
+        progress: [fiber_count]usize = [_]usize{0} ** fiber_count,
+
+        pub fn fiber(idx: usize, ctx: *@This()) void {
+            for (0..iteration_count) |_| {
+                ctx.progress[idx] += 1;
+                Fiber.yield();
+            }
+        }
+    };
+    var ctx: Ctx = .{};
+    for (0..fiber_count) |fiber_idx| {
+        try Fiber.goWithNameFmt(
+            Ctx.fiber,
+            .{
+                fiber_idx,
+                &ctx,
+            },
+            testing.allocator,
+            executor,
+            "Fiber #{}",
+            .{fiber_idx},
+        );
+    }
+    for (0..iteration_count) |i| {
+        for (0..fiber_count) |fiber_idx| {
+            try testing.expectEqual(ctx.progress[fiber_idx], i);
+        }
+        try testing.expectEqual(2, event_loop.runBatch());
+    }
+    try testing.expectEqual(2, event_loop.runBatch());
 }

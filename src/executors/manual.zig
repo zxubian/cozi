@@ -1,4 +1,4 @@
-//! Single-threaded manually-executed task queue
+//! Single-threaded manually-executed task queue/event loop.
 const std = @import("std");
 const Core = @import("../core/root.zig");
 const Executor = @import("../executors/root.zig").Executor;
@@ -31,6 +31,13 @@ pub fn runNext(
     self: *ManualExecutor,
 ) bool {
     return self.runAtMost(1) == 1;
+}
+
+/// Run all currently queued tasks.
+/// Any additional tasks added while this is executing
+/// will not be included in this batch.
+pub fn runBatch(self: *ManualExecutor) usize {
+    return self.runAtMost(self.count());
 }
 
 pub inline fn isEmpty(self: *const ManualExecutor) bool {
