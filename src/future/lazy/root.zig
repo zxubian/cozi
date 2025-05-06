@@ -56,6 +56,10 @@ pub const syntax = @import("./syntax/root.zig");
 
 pub const State = struct {
     executor: Executor,
+
+    pub const init: @This() = .{
+        .executor = executors.@"inline",
+    };
 };
 
 pub fn Continuation(V: type) type {

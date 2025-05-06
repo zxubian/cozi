@@ -22,9 +22,7 @@ fn ConstValue(comptime v: anytype) type {
                 pub fn start(self: *@This()) void {
                     self.next.@"continue"(
                         v,
-                        .{
-                            .executor = InlineExecutor,
-                        },
+                        .init,
                     );
                 }
             };

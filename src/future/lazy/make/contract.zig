@@ -3,8 +3,6 @@ const assert = std.debug.assert;
 
 const cozi = @import("../../../root.zig");
 const executors = cozi.executors;
-const InlineExecutor = executors.@"inline";
-const Executor = executors.Executor;
 const core = cozi.core;
 const Runnable = core.Runnable;
 const future = cozi.future.lazy;
@@ -102,9 +100,7 @@ pub fn Contract(V: type) type {
                         .promise_arrived => {
                             continuation.@"continue"(
                                 self.value,
-                                future.State{
-                                    .executor = InlineExecutor,
-                                },
+                                .init,
                             );
                             if (managed) {
                                 self.allocator.destroy(self);
@@ -123,9 +119,7 @@ pub fn Contract(V: type) type {
                         .future_arrived => {
                             self.continuation.@"continue"(
                                 value,
-                                future.State{
-                                    .executor = executors.@"inline",
-                                },
+                                .init,
                             );
                             if (managed) {
                                 self.allocator.destroy(self);

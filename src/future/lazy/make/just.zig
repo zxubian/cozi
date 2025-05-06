@@ -22,9 +22,7 @@ pub fn Computation(Continuation: type) type {
         pub fn start(self: *@This()) void {
             self.next.@"continue"(
                 {},
-                .{
-                    .executor = InlineExecutor,
-                },
+                .init,
             );
         }
     };

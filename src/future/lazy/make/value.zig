@@ -22,9 +22,7 @@ pub fn Future(V: type) type {
                 pub fn start(self: *@This()) void {
                     self.next.@"continue"(
                         self.input,
-                        .{
-                            .executor = InlineExecutor,
-                        },
+                        .init,
                     );
                 }
             };

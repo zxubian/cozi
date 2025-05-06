@@ -2,8 +2,6 @@ const std = @import("std");
 const assert = std.debug.assert;
 
 const cozi = @import("../../../root.zig");
-const executors = cozi.executors;
-const Executor = executors.Executor;
 const core = cozi.core;
 const Runnable = core.Runnable;
 const future = cozi.future.lazy;
@@ -136,9 +134,7 @@ pub fn First(Inputs: type) type {
                             const self: *Impl = @alignCast(@ptrCast(ctx));
                             self.next.@"continue"(
                                 self.value,
-                                State{
-                                    .executor = executors.@"inline",
-                                },
+                                .init,
                             );
                         }
 
