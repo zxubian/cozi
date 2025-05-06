@@ -14,12 +14,14 @@ pub fn Contract(V: type) type {
 
         pub const Future = struct {
             shared_state: SharedStateInterface,
+            cancel_source: future.cancel.Source,
 
             pub const ValueType = V;
 
             pub fn Computation(Continuation: type) type {
                 return struct {
                     shared_state: SharedStateInterface,
+                    cancel_source: future.cancel.Source,
                     next: Continuation,
 
                     pub fn start(self: *@This()) void {
@@ -49,12 +51,17 @@ pub fn Contract(V: type) type {
 
         pub const Promise = struct {
             shared_state: SharedStateInterface,
+            cancel_token: future.cancel.Token,
 
             pub fn resolve(
                 self: *const @This(),
                 value: V,
             ) void {
                 self.shared_state.onPromiseArrived(value);
+            }
+
+            pub fn isCanceled(self: *const @This()) bool {
+                return self.cancel_token.isCanceled();
             }
         };
 
@@ -78,6 +85,7 @@ pub fn Contract(V: type) type {
                         break :blk {};
                     }
                 },
+                cancel_state: future.cancel.Source = .{},
 
                 pub const State = enum(u8) {
                     init = 0,
