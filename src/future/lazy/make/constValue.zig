@@ -19,6 +19,10 @@ fn ConstValue(comptime v: anytype) type {
                 next: Continuation,
                 input: void = undefined,
 
+                pub fn init(self: *@This()) void {
+                    self.next.init();
+                }
+
                 pub fn start(self: *@This()) void {
                     self.next.@"continue"(
                         v,

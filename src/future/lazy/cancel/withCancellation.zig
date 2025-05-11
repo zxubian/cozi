@@ -14,21 +14,25 @@ const cancel = future.cancellation;
 
 const WithCancellation = @This();
 
-token: cancel.Token,
+cancel_token: cancel.Token,
 
 pub fn Future(InputFuture: type) type {
     return struct {
         input_future: InputFuture,
-        token: cancel.Token,
+        cancel_token: cancel.Token,
 
         pub const ValueType = cancel.CancellationError!InputFuture.ValueType;
 
         pub fn Computation(Continuation: type) type {
             return struct {
-                input_computation: InputComputation,
                 runnable: Runnable = undefined,
+                cancel_state: future.cancellation.State = .{},
+                cancel_ctx: future.cancellation.LinkedContext = undefined,
+                on_outside_cancel: future.cancellation.Callback = undefined,
+
+                outside_cancel_token: future.cancellation.Token,
+                input_computation: InputComputation,
                 next: Continuation,
-                token: cancel.Token,
 
                 const State = enum {
                     init,
@@ -39,12 +43,24 @@ pub fn Future(InputFuture: type) type {
                 const Impl = @This();
                 const InputComputation = InputFuture.Computation(InputContinuation);
 
+                pub fn init(self: *Impl) void {
+                    self.input_computation.init();
+
+                    self.on_outside_cancel = .{
+                        .runnable = .{
+                            .runFn = @ptrCast(&future.cancellation.State.cancel),
+                            .ptr = &self.cancel_state,
+                        },
+                    };
+                    self.outside_cancel_token.subscribe(&self.on_outside_cancel);
+                    self.cancel_ctx.init(self, &self.cancel_state);
+
+                    self.next.init();
+                    self.cancel_ctx.linkTo(self.next.cancel_ctx);
+                }
+
                 pub fn start(self: *Impl) void {
-                    if (self.token.isCancelled()) {
-                        self.next.@"continue"(
-                            cancel.CancellationError.canceled,
-                            .init,
-                        );
+                    if (self.cancel_ctx.isCanceled()) {
                         return;
                     }
                     self.input_computation.start();
@@ -52,13 +68,15 @@ pub fn Future(InputFuture: type) type {
 
                 pub fn run(ctx_: *anyopaque) void {
                     const input_continuation: *InputContinuation = @alignCast(@ptrCast(ctx_));
-                    const input_computation: *InputComputation = @fieldParentPtr("next", input_continuation);
-                    const self: *Impl = @fieldParentPtr("input_computation", input_computation);
-                    if (self.token.isCancelled()) {
-                        self.next.@"continue"(
-                            cancel.CancellationError.canceled,
-                            .init,
-                        );
+                    const input_computation: *InputComputation = @fieldParentPtr(
+                        "next",
+                        input_continuation,
+                    );
+                    const self: *Impl = @fieldParentPtr(
+                        "input_computation",
+                        input_computation,
+                    );
+                    if (self.cancel_ctx.isCanceled()) {
                         return;
                     }
                     self.next.@"continue"(
@@ -67,26 +85,47 @@ pub fn Future(InputFuture: type) type {
                     );
                 }
 
+                pub fn onCancel(self: *@This()) void {
+                    self.next.@"continue"(
+                        cancel.CancellationError.canceled,
+                        .init,
+                    );
+                }
+
+                pub fn getCancelState(self: *Impl) *future.cancellation.State {
+                    return &self.cancel_state;
+                }
+
                 pub const InputContinuation = struct {
                     value: InputFuture.ValueType = undefined,
                     state: future.State = undefined,
                     runnable: Runnable = undefined,
-                    token: cancel.Token,
+
+                    pub fn init(_: *@This()) void {}
 
                     pub fn @"continue"(
                         self: *@This(),
                         value: InputFuture.ValueType,
                         state: future.State,
                     ) void {
+                        const input_computation: *InputComputation = @fieldParentPtr(
+                            "next",
+                            self,
+                        );
+                        const parent: *Impl = @fieldParentPtr(
+                            "input_computation",
+                            input_computation,
+                        );
+                        if (parent.cancel_ctx.isCanceled()) {
+                            return;
+                        }
                         self.value = value;
                         self.state = state;
                         self.runnable = .{
                             .runFn = run,
                             .ptr = self,
                         };
-                        if (!self.token.isCancelled()) {
-                            state.executor.submitRunnable(&self.runnable);
-                        }
+                        state.executor.submitRunnable(&self.runnable);
                     }
                 };
             };
@@ -99,11 +138,9 @@ pub fn Future(InputFuture: type) type {
             const Result = Computation(@TypeOf(continuation));
             const InputContinuation = Result.InputContinuation;
             return .{
-                .token = self.token,
+                .outside_cancel_token = self.cancel_token,
                 .input_computation = self.input_future.materialize(
-                    InputContinuation{
-                        .token = self.token,
-                    },
+                    InputContinuation{},
                 ),
                 .next = continuation,
             };
@@ -123,14 +160,14 @@ pub fn pipe(
 ) Future(@TypeOf(f)) {
     return .{
         .input_future = f,
-        .token = self.token,
+        .cancel_token = self.cancel_token,
     };
 }
 
 pub fn withCancellation(
-    token: cancel.Token,
+    cancel_token: cancel.Token,
 ) WithCancellation {
     return .{
-        .token = token,
+        .cancel_token = cancel_token,
     };
 }

@@ -3,14 +3,9 @@ const assert = std.debug.assert;
 
 const cozi = @import("../../../root.zig");
 const executors = cozi.executors;
-const InlineExecutor = executors.@"inline";
-const Executor = executors.Executor;
 const core = cozi.core;
 const Runnable = core.Runnable;
-const future = cozi.future;
-const State = future.State;
-const model = future.model;
-const meta = future.meta;
+const future = cozi.future.lazy;
 
 const Just = @This();
 pub const ValueType = void;
@@ -19,11 +14,12 @@ pub fn Computation(Continuation: type) type {
     return struct {
         next: Continuation,
 
+        pub fn init(self: *@This()) void {
+            self.next.init();
+        }
+
         pub fn start(self: *@This()) void {
-            self.next.@"continue"(
-                {},
-                .init,
-            );
+            self.next.@"continue"({}, .init);
         }
     };
 }
@@ -45,6 +41,6 @@ pub fn just() Just {
     return .{};
 }
 
-pub fn awaitable(self: Just) future.lazy.Awaitable(Just) {
+pub fn awaitable(self: Just) future.Awaitable(Just) {
     return .{ .future = self };
 }

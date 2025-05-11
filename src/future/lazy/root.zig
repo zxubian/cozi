@@ -49,6 +49,8 @@ pub const Impl = struct {
     pub const cancel = cancellation;
     pub const withCancellation = cancellation.withCancellation.withCancellation;
     pub const WithCancellation = cancellation.withCancellation.Future;
+    // --- meta ---
+    pub const meta = Lazy.meta;
 };
 
 // --- internal implementation ---

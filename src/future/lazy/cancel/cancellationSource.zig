@@ -55,7 +55,7 @@ const CancelState = struct {
         defer guard.unlock();
         if (self.cancelled.cmpxchgStrong(false, true, .seq_cst, .seq_cst)) |_| {
             @branchHint(.unlikely);
-            std.debug.panic("Cancelling twice", .{});
+            std.debug.panic("Canceling twice", .{});
         }
         while (self.subscribers.popFront()) |next| {
             next.run();

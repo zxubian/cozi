@@ -28,6 +28,10 @@ pub fn Future(InputFuture: type) type {
 
                 const Impl = @This();
 
+                pub fn init(self: *@This()) void {
+                    self.input_computation.init();
+                }
+
                 pub fn start(self: *@This()) void {
                     self.input_computation.start();
                 }
@@ -53,6 +57,8 @@ pub fn Future(InputFuture: type) type {
                 pub const InputContinuation = struct {
                     runnable: Runnable = undefined,
                     value: InputFuture.ValueType = undefined,
+
+                    pub fn init(_: *@This()) void {}
 
                     pub fn @"continue"(
                         self: *@This(),
