@@ -45,14 +45,21 @@ pub const Impl = struct {
     // --- other ---
     pub const State = Lazy.State;
     pub const Continuation = Lazy.Continuation;
+    // --- cancellation ---
+    pub const cancel = cancellation;
+    pub const withCancellation = cancellation.withCancellation.withCancellation;
+    pub const WithCancellation = cancellation.withCancellation.Future;
+    // --- meta ---
+    pub const meta = Lazy.meta;
 };
 
 // --- internal implementation ---
 pub const meta = @import("./meta.zig");
 pub const make = @import("./make/root.zig");
-pub const terminators = @import("./terminators//root.zig");
+pub const terminators = @import("./terminators/root.zig");
 pub const combinators = @import("./combinators/root.zig");
 pub const syntax = @import("./syntax/root.zig");
+pub const cancellation = @import("./cancel/root.zig");
 
 pub const State = struct {
     executor: Executor,

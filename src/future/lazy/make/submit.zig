@@ -11,12 +11,11 @@ const Computation = model.Computation;
 const meta = future.meta;
 const f = future.Impl;
 
-pub fn Future(map_fn: anytype) type {
-    const MapFn = @TypeOf(map_fn);
+pub fn Future(Lambda: type, Ctx: type) type {
     return future.syntax.pipeline.Result(std.meta.Tuple(&[_]type{
         future.make.just,
         future.combinators.via,
-        future.combinators.map.Map(MapFn),
+        future.combinators.map.Map(Lambda, Ctx),
     }));
 }
 
@@ -26,11 +25,17 @@ pub fn Future(map_fn: anytype) type {
 pub inline fn submit(
     executor: Executor,
     lambda: anytype,
-    ctx: ?*anyopaque,
-) Future(lambda) {
+    lambda_ctx_tuple: anytype,
+) Future(
+    @TypeOf(lambda),
+    @TypeOf(lambda_ctx_tuple),
+) {
     return f.pipeline(.{
         f.just(),
         f.via(executor),
-        f.map(lambda, ctx),
+        f.map(
+            lambda,
+            lambda_ctx_tuple,
+        ),
     });
 }

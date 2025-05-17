@@ -19,6 +19,10 @@ pub fn Future(V: type) type {
                 next: Continuation,
                 input: V,
 
+                pub fn init(self: *@This()) void {
+                    self.next.init();
+                }
+
                 pub fn start(self: *@This()) void {
                     self.next.@"continue"(
                         self.input,

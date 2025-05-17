@@ -14,6 +14,7 @@ pub fn Contract(V: type) type {
 
         pub const Future = struct {
             shared_state: SharedStateInterface,
+            cancel_source: future.cancel.Source,
 
             pub const ValueType = V;
 
@@ -21,11 +22,32 @@ pub fn Contract(V: type) type {
                 return struct {
                     shared_state: SharedStateInterface,
                     next: Continuation,
+                    cancel_ctx: future.cancel.LinkedContext,
+
+                    pub fn init(self: *@This()) void {
+                        self.cancel_ctx.init(
+                            self,
+                            self.shared_state.cancel_state,
+                        );
+                        self.next.init();
+                        self.cancel_ctx.linkTo(self.next.cancel_ctx);
+                    }
 
                     pub fn start(self: *@This()) void {
-                        self.shared_state.onFutureArrived(
-                            future.Continuation(V).eraseType(&self.next),
+                        if (self.cancel_ctx.isCanceled()) {
+                            return;
+                        }
+                        const continuation = future.Continuation(V).eraseType(
+                            &self.next,
                         );
+                        self.shared_state.onFutureArrived(continuation);
+                    }
+
+                    pub fn onCancel(self: *@This()) void {
+                        const continuation = future.Continuation(V).eraseType(
+                            &self.next,
+                        );
+                        self.shared_state.onCancel(continuation);
                     }
                 };
             }
@@ -36,6 +58,7 @@ pub fn Contract(V: type) type {
             ) Computation(@TypeOf(continuation)) {
                 return .{
                     .shared_state = self.shared_state,
+                    .cancel_source = self.cancel_source,
                     .next = continuation,
                 };
             }
@@ -49,12 +72,28 @@ pub fn Contract(V: type) type {
 
         pub const Promise = struct {
             shared_state: SharedStateInterface,
+            cancel_token: future.cancel.Token,
 
             pub fn resolve(
                 self: *const @This(),
                 value: V,
             ) void {
                 self.shared_state.onPromiseArrived(value);
+            }
+
+            pub fn isCanceled(self: @This()) bool {
+                return self.cancel_token.isCanceled();
+            }
+
+            pub fn subscribeOnCancel(
+                self: @This(),
+                callback: *future.cancel.Callback,
+            ) void {
+                self.cancel_token.subscribe(callback);
+            }
+
+            pub fn seal(self: @This()) void {
+                self.shared_state.onPromiseArrived(undefined);
             }
         };
 
@@ -78,12 +117,14 @@ pub fn Contract(V: type) type {
                         break :blk {};
                     }
                 },
+                cancel_state: future.cancel.State = .{},
 
                 pub const State = enum(u8) {
                     init = 0,
                     promise_arrived = 1 << 0,
                     future_arrived = 1 << 1,
-                    rendezvous = 3,
+                    canceled = 1 << 2,
+                    rendezvous = 1 + (1 << 1),
                 };
 
                 pub fn onFutureArrived(
@@ -98,14 +139,15 @@ pub fn Contract(V: type) type {
                             self.continuation = continuation;
                         },
                         .promise_arrived => {
+                            if (managed) {
+                                self.allocator.destroy(self);
+                            }
                             continuation.@"continue"(
                                 self.value,
                                 .init,
                             );
-                            if (managed) {
-                                self.allocator.destroy(self);
-                            }
                         },
+                        .canceled => {},
                         else => std.debug.panic("Attempting to get future result twice.", .{}),
                     }
                 }
@@ -117,10 +159,15 @@ pub fn Contract(V: type) type {
                     )))) {
                         .init => self.value = value,
                         .future_arrived => {
+                            if (managed) {
+                                self.allocator.destroy(self);
+                            }
                             self.continuation.@"continue"(
                                 value,
                                 .init,
                             );
+                        },
+                        .canceled => {
                             if (managed) {
                                 self.allocator.destroy(self);
                             }
@@ -128,10 +175,42 @@ pub fn Contract(V: type) type {
                         else => std.debug.panic("Attempting to resolve promise twice.", .{}),
                     }
                 }
+
+                pub fn onCancel(
+                    self: *@This(),
+                    continuation: future.Continuation(V),
+                ) void {
+                    switch (@as(State, @enumFromInt(self.state.fetchOr(
+                        @intFromEnum(State.canceled),
+                        .seq_cst,
+                    )))) {
+                        .init => {
+                            continuation.@"continue"(
+                                undefined,
+                                .init,
+                            );
+                        },
+                        .promise_arrived => {
+                            if (managed) {
+                                self.allocator.destroy(self);
+                            }
+                            continuation.@"continue"(
+                                undefined,
+                                .init,
+                            );
+                        },
+                        .canceled => {
+                            std.debug.panic("canceling twice", .{});
+                        },
+                        else => {},
+                    }
+                }
             };
         }
+
         const SharedStateInterface = struct {
             ptr: *anyopaque,
+            cancel_state: *future.cancel.State,
             vtable: Vtable,
 
             const Vtable = struct {
@@ -139,7 +218,14 @@ pub fn Contract(V: type) type {
                     self: *anyopaque,
                     continuation: future.Continuation(V),
                 ) void,
-                on_promise_arrived: *const fn (self: *anyopaque, value: V) void,
+                on_promise_arrived: *const fn (
+                    self: *anyopaque,
+                    value: V,
+                ) void,
+                on_cancel: *const fn (
+                    self: *anyopaque,
+                    continuation: future.Continuation(V),
+                ) void,
             };
 
             pub inline fn onFutureArrived(
@@ -153,6 +239,13 @@ pub fn Contract(V: type) type {
                 self.vtable.on_promise_arrived(self.ptr, value);
             }
 
+            pub inline fn onCancel(
+                self: @This(),
+                continuation: future.Continuation(V),
+            ) void {
+                self.vtable.on_cancel(self.ptr, continuation);
+            }
+
             pub fn eraseType(shared_state_ptr: anytype) @This() {
                 const T = @typeInfo(@TypeOf(shared_state_ptr)).pointer.child;
                 return .{
@@ -160,7 +253,9 @@ pub fn Contract(V: type) type {
                     .vtable = .{
                         .on_future_arrived = @ptrCast(&T.onFutureArrived),
                         .on_promise_arrived = @ptrCast(&T.onPromiseArrived),
+                        .on_cancel = @ptrCast(&T.onCancel),
                     },
+                    .cancel_state = &shared_state_ptr.cancel_state,
                 };
             }
         };
@@ -184,9 +279,15 @@ pub fn contract(
     return .{
         .{
             .shared_state = type_erased,
+            .cancel_source = .{
+                .state = &shared_state.cancel_state,
+            },
         },
         .{
             .shared_state = type_erased,
+            .cancel_token = .{
+                .state = &shared_state.cancel_state,
+            },
         },
     };
 }
@@ -202,9 +303,15 @@ pub fn contractNoAlloc(
     return .{
         .{
             .shared_state = type_erased,
+            .cancel_source = .{
+                .state = &shared_state.cancel_state,
+            },
         },
         .{
             .shared_state = type_erased,
+            .cancel_token = .{
+                .state = &shared_state.cancel_state,
+            },
         },
     };
 }
