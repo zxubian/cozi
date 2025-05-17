@@ -100,8 +100,7 @@ pub fn Future(InputFuture: type) type {
                     value: InputFuture.ValueType = undefined,
                     state: future.State = undefined,
                     runnable: Runnable = undefined,
-
-                    pub fn init(_: *@This()) void {}
+                    cancel_ctx: future.cancellation.Context,
 
                     pub fn @"continue"(
                         self: *@This(),

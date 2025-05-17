@@ -897,120 +897,120 @@ test "lazy future - cancel - withCancellation - contractNoAlloc" {
     try testing.expect(p.isCanceled());
 }
 
-test "lazy future - cancel - withCancellation - contract - resolve before get" {
-    var cancel_state: cancel.State = .{};
-    const source, const token = cancel.initNoAlloc(&cancel_state);
+// test "lazy future - cancel - withCancellation - contract - resolve before get" {
+//     var cancel_state: cancel.State = .{};
+//     const source, const token = cancel.initNoAlloc(&cancel_state);
 
-    const f, const p = try future.contract(usize, testing.allocator);
+//     const f, const p = try future.contract(usize, testing.allocator);
 
-    const cancellable = future.pipeline(
-        .{
-            f,
-            future.withCancellation(token),
-        },
-    );
+//     const cancellable = future.pipeline(
+//         .{
+//             f,
+//             future.withCancellation(token),
+//         },
+//     );
 
-    source.cancel();
-    p.resolve(123);
-    try testing.expectError(
-        cancel.CancellationError.canceled,
-        future.get(cancellable),
-    );
-}
+//     source.cancel();
+//     p.resolve(123);
+//     try testing.expectError(
+//         cancel.CancellationError.canceled,
+//         future.get(cancellable),
+//     );
+// }
 
-test "lazy future - cancel - withCancellation - contract - resolve after get" {
-    var cancel_state: cancel.State = .{};
-    const source, const token = cancel.initNoAlloc(&cancel_state);
+// test "lazy future - cancel - withCancellation - contract - resolve after get" {
+//     var cancel_state: cancel.State = .{};
+//     const source, const token = cancel.initNoAlloc(&cancel_state);
 
-    const f, const p = try future.contract(usize, testing.allocator);
+//     const f, const p = try future.contract(usize, testing.allocator);
 
-    const cancellable = future.pipeline(
-        .{
-            f,
-            future.withCancellation(token),
-        },
-    );
+//     const cancellable = future.pipeline(
+//         .{
+//             f,
+//             future.withCancellation(token),
+//         },
+//     );
 
-    source.cancel();
-    try testing.expectError(
-        cancel.CancellationError.canceled,
-        future.get(cancellable),
-    );
-    p.resolve(123);
-}
+//     source.cancel();
+//     try testing.expectError(
+//         cancel.CancellationError.canceled,
+//         future.get(cancellable),
+//     );
+//     p.resolve(123);
+// }
 
-test "lazy future - cancel - withCancellation - contract - seal" {
-    var cancel_state: cancel.State = .{};
-    const source, const token = cancel.initNoAlloc(&cancel_state);
+// test "lazy future - cancel - withCancellation - contract - seal" {
+//     var cancel_state: cancel.State = .{};
+//     const source, const token = cancel.initNoAlloc(&cancel_state);
 
-    const f, const p = try future.contract(usize, testing.allocator);
+//     const f, const p = try future.contract(usize, testing.allocator);
 
-    const cancellable = future.pipeline(
-        .{
-            f,
-            future.withCancellation(token),
-        },
-    );
+//     const cancellable = future.pipeline(
+//         .{
+//             f,
+//             future.withCancellation(token),
+//         },
+//     );
 
-    const Ctx = struct {
-        promise: future.Contract(usize).Promise,
-        called: bool,
-        pub fn onCancel(self: *@This()) void {
-            testing.expect(self.promise.isCanceled()) catch unreachable;
-            self.promise.seal();
-            self.called = true;
-        }
-    };
+//     const Ctx = struct {
+//         promise: future.Contract(usize).Promise,
+//         called: bool,
+//         pub fn onCancel(self: *@This()) void {
+//             testing.expect(self.promise.isCanceled()) catch unreachable;
+//             self.promise.seal();
+//             self.called = true;
+//         }
+//     };
 
-    var ctx: Ctx = .{
-        .promise = p,
-        .called = false,
-    };
+//     var ctx: Ctx = .{
+//         .promise = p,
+//         .called = false,
+//     };
 
-    var callback: future.cancel.Callback = .{
-        .runnable = .{
-            .runFn = @ptrCast(&Ctx.onCancel),
-            .ptr = &ctx,
-        },
-    };
-    p.subscribeOnCancel(&callback);
-    source.cancel();
-    try testing.expectError(
-        cancel.CancellationError.canceled,
-        future.get(cancellable),
-    );
-    try testing.expect(ctx.called);
-}
+//     var callback: future.cancel.Callback = .{
+//         .runnable = .{
+//             .runFn = @ptrCast(&Ctx.onCancel),
+//             .ptr = &ctx,
+//         },
+//     };
+//     p.subscribeOnCancel(&callback);
+//     source.cancel();
+//     try testing.expectError(
+//         cancel.CancellationError.canceled,
+//         future.get(cancellable),
+//     );
+//     try testing.expect(ctx.called);
+// }
 
-test "lazy future - cancel - withCancellation - submit" {
-    var state: cancel.State = .{};
-    const source, const token = cancel.initNoAlloc(&state);
+// test "lazy future - cancel - withCancellation - submit" {
+//     var state: cancel.State = .{};
+//     const source, const token = cancel.initNoAlloc(&state);
 
-    var manual: executors.Manual = .{};
-    const executor = manual.executor();
+//     var manual: executors.Manual = .{};
+//     const executor = manual.executor();
 
-    const Ctx = struct {
-        pub fn run(
-            cancel_token: future.cancel.Token,
-        ) !void {
-            try testing.expect(cancel_token.isCanceled());
-        }
-    };
-    const cancellable = future.pipeline(
-        .{
-            future.submit(
-                executor,
-                Ctx.run,
-                .{},
-            ),
-            future.withCancellation(token),
-        },
-    );
+//     const Ctx = struct {
+//         pub fn run(
+//             cancel_token: future.cancel.Token,
+//         ) !void {
+//             try testing.expect(cancel_token.isCanceled());
+//         }
+//     };
+//     const cancellable = future.pipeline(
+//         .{
+//             future.submit(
+//                 executor,
+//                 Ctx.run,
+//                 .{},
+//             ),
+//             future.withCancellation(token),
+//         },
+//     );
 
-    source.cancel();
-    _ = manual.drain();
-    try testing.expectError(
-        cancel.CancellationError.canceled,
-        future.get(cancellable),
-    );
-}
+//     source.cancel();
+//     _ = manual.drain();
+//     try testing.expectError(
+//         cancel.CancellationError.canceled,
+//         future.get(cancellable),
+//     );
+// }

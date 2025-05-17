@@ -24,15 +24,31 @@ pub fn Contract(V: type) type {
                     next: Continuation,
                     cancel_ctx: future.cancel.LinkedContext,
 
+                    pub fn init(self: *@This()) void {
+                        self.cancel_ctx.init(
+                            self,
+                            self.shared_state.cancel_state,
+                        );
+                        self.next.init();
+                        self.cancel_ctx.linkTo(self.next.cancel_ctx);
+                    }
+
                     pub fn start(self: *@This()) void {
-                        future.cancel.linkToNext(self, self.next.cancelCtx()) catch return;
+                        if (self.cancel_ctx.isCanceled()) {
+                            return;
+                        }
                         const continuation = future.Continuation(V).eraseType(
                             &self.next,
                         );
                         self.shared_state.onFutureArrived(continuation);
                     }
 
-                    pub fn onCancel(_: *@This()) void {}
+                    pub fn onCancel(self: *@This()) void {
+                        const continuation = future.Continuation(V).eraseType(
+                            &self.next,
+                        );
+                        self.shared_state.onCancel(continuation);
+                    }
                 };
             }
 
