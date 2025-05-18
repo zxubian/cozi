@@ -7,6 +7,7 @@ pub const Executor = @import("./executor.zig");
 pub const threadPools = @import("./threadPools.zig");
 pub const Manual = @import("./manual.zig");
 pub const @"inline" = @import("./inline.zig").executor;
+pub const FiberPool = @import("./fiberPool.zig");
 
 test {
     std.testing.refAllDecls(@This());
