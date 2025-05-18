@@ -217,7 +217,7 @@ test "fiber - Pre-supplied stack" {
     const size = 1024 * 1024 * 16;
     const slice = try alloc.alignedAlloc(
         u8,
-        std.mem.Alignment.fromByteUnits(Stack.ALIGNMENT_BYTES),
+        std.mem.Alignment.fromByteUnits(Stack.alignment_bytes),
         size,
     );
     defer (alloc.free(slice));

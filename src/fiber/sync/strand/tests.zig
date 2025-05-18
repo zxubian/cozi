@@ -89,7 +89,7 @@ test "strand - many fibers" {
 test "strand - run on single fiber" {
     var strand: Strand = .{};
     var manual_executor = ManualExecutor{};
-    var fiber_name: [Fiber.MAX_FIBER_NAME_LENGTH_BYTES:0]u8 = undefined;
+    var fiber_name: [Fiber.max_name_length_bytes:0]u8 = undefined;
     const Ctx = struct {
         strand: *Strand,
 
@@ -163,7 +163,7 @@ test "strand - thread pool" {
     defer tp.deinit();
     try tp.start();
     defer tp.stop();
-    var fiber_name: [Fiber.MAX_FIBER_NAME_LENGTH_BYTES:0]u8 = undefined;
+    var fiber_name: [Fiber.max_name_length_bytes:0]u8 = undefined;
     const iterations_per_fiber = 3;
     const fiber_count = 5;
     const Ctx = struct {
@@ -228,7 +228,7 @@ test "strand - stress" {
         defer tp.deinit();
         try tp.start();
         defer tp.stop();
-        var fiber_name: [Fiber.MAX_FIBER_NAME_LENGTH_BYTES:0]u8 = undefined;
+        var fiber_name: [Fiber.max_name_length_bytes:0]u8 = undefined;
         const iterations_per_fiber = 100;
         const fiber_count = 100;
         const Ctx = struct {

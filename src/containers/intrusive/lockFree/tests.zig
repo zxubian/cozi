@@ -348,7 +348,7 @@ test "queue - stress" {
         return error.SkipZigTest;
     }
 
-    var fiber_name_buffer: [Fiber.MAX_FIBER_NAME_LENGTH_BYTES:0]u8 = undefined;
+    var fiber_name_buffer: [Fiber.max_name_length_bytes:0]u8 = undefined;
     const cpu_count = try std.Thread.getCpuCount();
     var tp = try ThreadPool.init(cpu_count, testing.allocator);
     defer tp.deinit();

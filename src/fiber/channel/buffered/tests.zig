@@ -481,7 +481,7 @@ test "BufferedChannel - Fiber - Buffered Channel - Stress SPMC" {
         .channel = channel,
     };
 
-    var name_buffer: [Fiber.MAX_FIBER_NAME_LENGTH_BYTES]u8 = undefined;
+    var name_buffer: [Fiber.max_name_length_bytes]u8 = undefined;
 
     for (0..producer_count) |i| {
         ctx.wait_group.start();
@@ -578,7 +578,7 @@ test "BufferedChannel - Fiber - Buffered Channel - Stress MPSC" {
         .channel = channel,
     };
 
-    var name_buffer: [Fiber.MAX_FIBER_NAME_LENGTH_BYTES]u8 = undefined;
+    var name_buffer: [Fiber.max_name_length_bytes]u8 = undefined;
 
     for (0..producer_count) |i| {
         ctx.wait_group.start();
@@ -675,7 +675,7 @@ test "BufferedChannel - Fiber - Buffered Channel - Stress MPMC" {
         .channel = channel,
     };
 
-    var name_buffer: [Fiber.MAX_FIBER_NAME_LENGTH_BYTES]u8 = undefined;
+    var name_buffer: [Fiber.max_name_length_bytes]u8 = undefined;
 
     for (0..producer_count) |i| {
         ctx.wait_group.start();

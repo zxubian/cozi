@@ -31,7 +31,7 @@ pub fn init(
 }
 
 pub const Options = struct {
-    stack_size: usize = Stack.DEFAULT_SIZE_BYTES,
+    stack_size: usize = Stack.default_size_bytes,
 };
 
 pub fn initOptions(

@@ -10,12 +10,12 @@ const log = cozi.core.log.scoped(.stack);
 
 const Stack = @This();
 
-const PtrType = [*]align(ALIGNMENT_BYTES) u8;
+const PtrType = [*]align(alignment_bytes) u8;
 
-slice: []align(ALIGNMENT_BYTES) u8,
+slice: []align(alignment_bytes) u8,
 
-pub const ALIGNMENT_BYTES = builtin.target.stackAlignment();
-pub const DEFAULT_SIZE_BYTES = 16 * 1024 * 1024;
+pub const alignment_bytes = builtin.target.stackAlignment();
+pub const default_size_bytes = 16 * 1024 * 1024;
 
 /// High address
 pub fn base(self: *const Stack) PtrType {
@@ -81,7 +81,7 @@ pub const Managed = struct {
     }
 
     pub const InitOptions = struct {
-        size: usize = DEFAULT_SIZE_BYTES,
+        size: usize = default_size_bytes,
     };
 
     pub fn initOptions(
@@ -91,7 +91,7 @@ pub const Managed = struct {
         const size = options.size;
         const buffer = try allocator.alignedAlloc(
             u8,
-            std.mem.Alignment.fromByteUnits(ALIGNMENT_BYTES),
+            std.mem.Alignment.fromByteUnits(alignment_bytes),
             size,
         );
         return Self{
@@ -120,7 +120,7 @@ pub const Managed = struct {
         return self.raw.bufferAllocator();
     }
 
-    pub inline fn slice(self: *const Self) []align(ALIGNMENT_BYTES) u8 {
+    pub inline fn slice(self: *const Self) []align(alignment_bytes) u8 {
         return self.raw.slice;
     }
 };

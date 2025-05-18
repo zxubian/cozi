@@ -43,8 +43,8 @@ state: stdlike.atomic.Value(u8) = .init(0),
 awaiter: ?Awaiter,
 suspend_illegal_scope_depth: Atomic(usize) = .init(0),
 
-pub const MAX_FIBER_NAME_LENGTH_BYTES = 100;
-pub const DEFAULT_NAME = "Fiber";
+pub const max_name_length_bytes = 100;
+pub const default_name = "Fiber";
 
 /// Create new fiber and schedule it for execution on `executor`.
 /// Fiber will call `routine(args)` when executed.
@@ -92,7 +92,7 @@ pub fn goWithNameFmt(
     comptime name_fmt: [:0]const u8,
     name_fmt_args: anytype,
 ) !void {
-    var name_buf: [MAX_FIBER_NAME_LENGTH_BYTES]u8 = undefined;
+    var name_buf: [max_name_length_bytes]u8 = undefined;
     return goWithName(
         routine,
         args,
@@ -103,11 +103,11 @@ pub fn goWithNameFmt(
 }
 
 pub const Options = struct {
-    stack_size: usize = Stack.DEFAULT_SIZE_BYTES,
+    stack_size: usize = Stack.default_size_bytes,
     fiber: FiberOptions = .{},
 
     pub const FiberOptions = struct {
-        name: [:0]const u8 = DEFAULT_NAME,
+        name: [:0]const u8 = default_name,
     };
 };
 
@@ -208,7 +208,7 @@ pub fn init(
 }
 
 fn copyNameToStack(name: []const u8, stack_arena: Allocator) ![]const u8 {
-    const result = try stack_arena.alloc(u8, MAX_FIBER_NAME_LENGTH_BYTES);
+    const result = try stack_arena.alloc(u8, max_name_length_bytes);
     std.mem.copyForwards(u8, result, name);
     return result;
 }
