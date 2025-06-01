@@ -11,6 +11,9 @@ const ThreadPool = executors.threadPools.Compute;
 const future = cozi.future.lazy;
 
 test "Fiber Pool - basic" {
+    if (cozi.build_options.options.sanitizer_variant == .thread) {
+        return error.SkipZigTest;
+    }
     var thread_pool = try ThreadPool.init(1, testing.allocator);
     defer thread_pool.deinit();
     try thread_pool.start();
@@ -28,6 +31,9 @@ test "Fiber Pool - basic" {
 }
 
 test "Fiber Pool - future" {
+    if (cozi.build_options.options.sanitizer_variant == .thread) {
+        return error.SkipZigTest;
+    }
     var thread_pool = try ThreadPool.init(
         1,
         testing.allocator,
@@ -67,9 +73,11 @@ test "Fiber Pool - future" {
 }
 
 test "Fiber Pool - future - stress " {
+    if (cozi.build_options.options.sanitizer_variant == .thread) {
+        return error.SkipZigTest;
+    }
     var thread_pool = try ThreadPool.init(
-        1,
-        // try std.Thread.getCpuCount(),
+        try std.Thread.getCpuCount(),
         testing.allocator,
     );
     defer thread_pool.deinit();
@@ -80,7 +88,7 @@ test "Fiber Pool - future - stress " {
         testing.allocator,
         thread_pool.executor(),
         .{
-            .fiber_count = 1,
+            .fiber_count = 100,
         },
     );
     defer fiber_pool.deinit();
@@ -88,8 +96,8 @@ test "Fiber Pool - future - stress " {
     defer fiber_pool.stop();
 
     const executor = fiber_pool.executor();
-    const future_count = 1;
-    const iteratins_per_future = 1;
+    const future_count = 10;
+    const iterations_per_future = 1000;
     const Ctx = struct {
         stage: usize,
         mutex: Fiber.Mutex = .{},
@@ -98,7 +106,7 @@ test "Fiber Pool - future - stress " {
             self: *@This(),
             idx: usize,
         ) !void {
-            for (0..iteratins_per_future) |_| {
+            for (0..iterations_per_future) |_| {
                 {
                     self.mutex.lock();
                     defer self.mutex.unlock();
@@ -138,7 +146,7 @@ test "Fiber Pool - future - stress " {
         try testing.expect(i);
     }
     try testing.expectEqual(
-        iteratins_per_future * future_count,
+        iterations_per_future * future_count,
         ctx.stage,
     );
 }
