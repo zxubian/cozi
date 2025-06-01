@@ -15,11 +15,11 @@ pub fn main() !void {
             future.constValue(@as(usize, 123)),
             future.map(
                 struct {
-                    pub fn run(_: ?*anyopaque, in: usize) usize {
+                    pub fn run(in: usize) usize {
                         return in + 1;
                     }
                 }.run,
-                null,
+                .{},
             ),
         },
     );
