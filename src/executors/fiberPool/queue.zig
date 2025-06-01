@@ -11,7 +11,7 @@ const Awaiter = Fiber.@"await".Awaiter;
 const Impl = @This();
 const Queue = cozi.containers.intrusive.ForwardList;
 
-queue: Queue(*Runnable) = .{},
+queue: Queue(Runnable) = .{},
 lock: SpinLock = .{},
 closed: bool = false,
 idle_fibers: Queue(IdleFibersQueueEntry) = .{},
@@ -37,7 +37,7 @@ pub fn pushBack(
     if (Fiber.current()) |_| {
         var awaiter: PushBackAwaiter = .{
             .task = task,
-            .queue = self,
+            .task_queue = self,
             .guard = &guard,
         };
         Await(&awaiter);
@@ -89,7 +89,7 @@ const PushBackAwaiter = struct {
     task: *Runnable,
     task_queue: *Impl,
     guard: *SpinLock.Guard,
-    fiber: *Fiber,
+    fiber: *Fiber = undefined,
 
     pub fn awaiter(self: *@This()) Awaiter {
         return Awaiter{
@@ -105,7 +105,7 @@ const PushBackAwaiter = struct {
         fiber: *Fiber,
     ) Awaiter.AwaitSuspendResult {
         self.fiber = fiber;
-        self.task_queue.pushBack(self.task);
+        self.task_queue.queue.pushBack(self.task);
         defer self.guard.unlock();
         if (self.task_queue.idle_fibers.popFront()) |waiting_fiber| {
             return Awaiter.AwaitSuspendResult{
@@ -148,14 +148,14 @@ const PopFrontAwaiter = struct {
         if (self.task_queue.closed) {
             return .never_suspend;
         }
-        if (self.task_queue.queue.isEmpty()) {
-            self.entry = .{
-                .fiber = fiber,
-            };
-            self.task_queue.idle_fibers.pushBack(&self.entry);
-            return .always_suspend;
+        if (!self.task_queue.queue.isEmpty()) {
+            return .never_suspend;
         }
-        return .never_suspend;
+        self.entry = .{
+            .fiber = fiber,
+        };
+        self.task_queue.idle_fibers.pushBack(&self.entry);
+        return .always_suspend;
     }
 
     pub fn awaitReady(self: *@This()) bool {
@@ -170,7 +170,7 @@ const PopFrontAwaiter = struct {
         if (self.task_queue.closed) {
             return null;
         }
-        return self.task_queue.popFront().?;
+        return self.task_queue.queue.popFront();
     }
 };
 

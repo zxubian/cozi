@@ -133,7 +133,7 @@ pub fn All(Inputs: type) type {
                                 pub fn @"continue"(
                                     self: *@This(),
                                     value: F.ValueType,
-                                    state: State,
+                                    _: State,
                                 ) void {
                                     const computation: *F.Computation(@This()) = @alignCast(@fieldParentPtr("next", self));
                                     const computation_field_name_in_tuple = std.fmt.comptimePrint("{}", .{index});
@@ -155,7 +155,8 @@ pub fn All(Inputs: type) type {
                                             .runFn = inputContinue,
                                             .ptr = all_computation,
                                         };
-                                        state.executor.submitRunnable(&self.runnable);
+                                        // reset state to "inline"
+                                        cozi.executors.@"inline".submitRunnable(&self.runnable);
                                     }
                                 }
                             };

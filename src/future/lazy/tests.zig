@@ -614,7 +614,7 @@ test "lazy future - flatten" {
             self: *Self,
         ) future.Submit(
             @TypeOf(InnerCtx.inner_run),
-            @TypeOf(.{}),
+            std.meta.ArgsTuple(@TypeOf(InnerCtx.inner_run)),
         ) {
             return future.submit(
                 self.executor,

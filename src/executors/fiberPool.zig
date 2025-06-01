@@ -8,6 +8,8 @@ const core = cozi.core;
 const Runnable = core.Runnable;
 const Stack = core.Stack;
 
+const log = std.log.scoped(.fiber_pool);
+
 const TaskQueue = @import("./fiberPool/queue.zig");
 
 const FiberPool = @This();
@@ -77,9 +79,16 @@ pub fn stop(self: *@This()) void {
 }
 
 fn fiberEntryPoint(pool: *FiberPool) !void {
+    const self = Fiber.current();
+    log.debug("{s}: started", .{self.?.name});
     while (pool.task_queue.popFront()) |next| {
+        log.debug("{s}: acquired new task {}", .{
+            self.?.name,
+            next,
+        });
         next.run();
     }
+    log.debug("{s}: finishing", .{self.?.name});
     pool.join_wait_group.finish();
 }
 

@@ -25,7 +25,7 @@ pub fn Future(Lambda: type, Ctx: type) type {
 pub inline fn submit(
     executor: Executor,
     lambda: anytype,
-    lambda_ctx_tuple: anytype,
+    lambda_ctx_tuple: std.meta.ArgsTuple(@TypeOf(lambda)),
 ) Future(
     @TypeOf(lambda),
     @TypeOf(lambda_ctx_tuple),
