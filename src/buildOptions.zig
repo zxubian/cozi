@@ -29,7 +29,7 @@ pub const options: BuildOptions = blk: {
     for (std.meta.fields(BuildOptions)) |field| {
         switch (@typeInfo(field.type)) {
             .@"enum" => {
-                if (@hasField(impl_, field.name)) {
+                if (@hasDecl(impl_, field.name)) {
                     @field(result, field.name) = @enumFromInt(@intFromEnum(@field(impl_, field.name)));
                 }
             },
