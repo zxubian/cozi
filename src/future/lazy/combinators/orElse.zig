@@ -9,18 +9,19 @@ const State = future.State;
 const model = future.model;
 const meta = future.meta;
 
-pub fn OrElse(OrElseFn: type) type {
+pub fn OrElse(
+    OrElseFn: type,
+    Ctx: type,
+) type {
     const Args = std.meta.ArgsTuple(OrElseFn);
 
     return struct {
         map_fn: *const OrElseFn,
-        map_ctx: ?*anyopaque,
+        map_ctx: Ctx,
 
         pub fn Future(InputFuture: type) type {
             const args_info: std.builtin.Type.Struct = @typeInfo(Args).@"struct";
-            const map_fn_has_args = args_info.fields.len > 1;
-            // TODO: make this more flexible?
-            assert(args_info.fields[0].type == ?*anyopaque);
+            const map_fn_has_args = args_info.fields.len > 0;
             if (!map_fn_has_args) {
                 @compileError(std.fmt.comptimePrint(
                     "Map function {} in {} with input future {} must accept a parameter",
@@ -31,7 +32,7 @@ pub fn OrElse(OrElseFn: type) type {
                     },
                 ));
             }
-            const OrElseFnArgType = args_info.fields[1].type;
+            const OrElseFnArgType = args_info.fields[0].type;
             const input_future_value_type_info = @typeInfo(InputFuture.ValueType);
             if (std.meta.activeTag(input_future_value_type_info) != .error_union) {
                 @compileError(std.fmt.comptimePrint(
@@ -48,6 +49,14 @@ pub fn OrElse(OrElseFn: type) type {
             const FlattenedType = OrElseReturnFuture.ValueType;
             const UnwrappedValueType = input_future_value_type_info.error_union.payload;
             const Error = input_future_value_type_info.error_union.error_set;
+            comptime meta.ValidateMapFnArgs(
+                InputFuture,
+                OrElseReturnFuture,
+                Error,
+                OrElseFnArgType,
+                OrElseFn,
+                Ctx,
+            );
             if (Error != OrElseFnArgType) {
                 @compileError(std.fmt.comptimePrint(
                     "Incompatible parameter type for map function {} in {} with input future {}. Expected: !{}. Got: !{}",
@@ -63,7 +72,7 @@ pub fn OrElse(OrElseFn: type) type {
             return struct {
                 input_future: InputFuture,
                 map_fn: *const OrElseFn,
-                map_ctx: ?*anyopaque,
+                map_ctx: Ctx,
 
                 pub const ValueType = FlattenedType;
 
@@ -71,7 +80,7 @@ pub fn OrElse(OrElseFn: type) type {
                     return struct {
                         input_computation: InputComputation,
                         map_fn: *const OrElseFn,
-                        map_ctx: ?*anyopaque,
+                        map_ctx: Ctx,
                         output_future: OrElseReturnFuture = undefined,
                         output_future_computation: OutputComputation = undefined,
                         next: Continuation,
@@ -102,10 +111,21 @@ pub fn OrElse(OrElseFn: type) type {
                                 };
                                 unreachable;
                             };
+                            const or_else_fn_args: std.meta.ArgsTuple(OrElseFn) = blk: {
+                                var tmp_args: std.meta.ArgsTuple(OrElseFn) = undefined;
+                                comptime var i: usize = 0;
+                                tmp_args[i] = error_value;
+                                i += 1;
+                                inline for (self.map_ctx) |ctx_arg| {
+                                    tmp_args[i] = ctx_arg;
+                                    i += 1;
+                                }
+                                break :blk tmp_args;
+                            };
                             self.output_future = @call(
                                 .auto,
                                 self.map_fn,
-                                .{ self.map_ctx, error_value },
+                                or_else_fn_args,
                             );
                             self.output_future_computation = self.output_future
                                 .materialize(OutputContinuation{});
@@ -206,8 +226,11 @@ pub fn OrElse(OrElseFn: type) type {
 ///
 pub fn orElse(
     map_fn: anytype,
-    ctx: ?*anyopaque,
-) OrElse(@TypeOf(map_fn)) {
+    ctx: anytype,
+) OrElse(
+    @TypeOf(map_fn),
+    @TypeOf(ctx),
+) {
     return .{
         .map_fn = map_fn,
         .map_ctx = ctx,

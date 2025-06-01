@@ -9,18 +9,19 @@ const State = future.State;
 const model = future.model;
 const meta = future.meta;
 
-pub fn AndThen(AndThenFn: type) type {
+pub fn AndThen(
+    AndThenFn: type,
+    Ctx: type,
+) type {
     const Args = std.meta.ArgsTuple(AndThenFn);
 
     return struct {
         map_fn: *const AndThenFn,
-        map_ctx: ?*anyopaque,
+        map_ctx: Ctx,
 
         pub fn Future(InputFuture: type) type {
             const args_info: std.builtin.Type.Struct = @typeInfo(Args).@"struct";
-            const map_fn_has_args = args_info.fields.len > 1;
-            // TODO: make this more flexible?
-            assert(args_info.fields[0].type == ?*anyopaque);
+            const map_fn_has_args = args_info.fields.len > 0;
             if (!map_fn_has_args) {
                 @compileError(std.fmt.comptimePrint(
                     "Map function {} in {} with input future {} must accept a parameter",
@@ -31,11 +32,23 @@ pub fn AndThen(AndThenFn: type) type {
                     },
                 ));
             }
-            const AndThenFnArgType = args_info.fields[1].type;
+            const AndThenFnArgType = args_info.fields[0].type;
             const AndThenReturnFuture = meta.ReturnType(AndThenFn);
             const FlattenedType = AndThenReturnFuture.ValueType;
             const input_future_value_type_info = @typeInfo(InputFuture.ValueType);
             const input_is_error_union = comptime std.meta.activeTag(input_future_value_type_info) == .error_union;
+            const UnwrappedInputType = if (input_is_error_union)
+                input_future_value_type_info.error_union.payload
+            else
+                InputFuture.ValueType;
+            comptime meta.ValidateMapFnArgs(
+                InputFuture,
+                AndThenReturnFuture,
+                UnwrappedInputType,
+                AndThenFnArgType,
+                AndThenFn,
+                Ctx,
+            );
             if (input_is_error_union) {
                 const UnwrappedValueType = input_future_value_type_info.error_union.payload;
                 if (input_future_value_type_info.error_union.payload != AndThenFnArgType) {
@@ -54,7 +67,7 @@ pub fn AndThen(AndThenFn: type) type {
             return struct {
                 input_future: InputFuture,
                 map_fn: *const AndThenFn,
-                map_ctx: ?*anyopaque,
+                map_ctx: Ctx,
 
                 pub const ValueType = FlattenedType;
 
@@ -62,7 +75,7 @@ pub fn AndThen(AndThenFn: type) type {
                     return struct {
                         input_computation: InputComputation,
                         map_fn: *const AndThenFn,
-                        map_ctx: ?*anyopaque,
+                        map_ctx: Ctx,
                         output_future: AndThenReturnFuture = undefined,
                         output_future_computation: OutputComputation = undefined,
                         next: Continuation,
@@ -99,13 +112,21 @@ pub fn AndThen(AndThenFn: type) type {
                                     input_continuation.value catch unreachable
                                 else
                                     input_continuation.value;
+                            const and_then_fn_args: std.meta.ArgsTuple(AndThenFn) = blk: {
+                                var tmp_args: std.meta.ArgsTuple(AndThenFn) = undefined;
+                                comptime var i: usize = 0;
+                                tmp_args[i] = input_value;
+                                i += 1;
+                                inline for (self.map_ctx) |ctx_arg| {
+                                    tmp_args[i] = ctx_arg;
+                                    i += 1;
+                                }
+                                break :blk tmp_args;
+                            };
                             self.output_future = @call(
                                 .auto,
                                 self.map_fn,
-                                .{
-                                    self.map_ctx,
-                                    input_value,
-                                },
+                                and_then_fn_args,
                             );
                             self.output_future_computation = self.output_future
                                 .materialize(OutputContinuation{});
@@ -205,8 +226,11 @@ pub fn AndThen(AndThenFn: type) type {
 /// `map_fn` is executed on the last Executor set earlier in the pipeline.
 pub fn andThen(
     map_fn: anytype,
-    ctx: ?*anyopaque,
-) AndThen(@TypeOf(map_fn)) {
+    ctx: anytype,
+) AndThen(
+    @TypeOf(map_fn),
+    @TypeOf(ctx),
+) {
     return .{
         .map_fn = map_fn,
         .map_ctx = ctx,

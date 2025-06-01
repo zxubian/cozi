@@ -45,6 +45,7 @@ pub const Impl = struct {
     // --- other ---
     pub const State = Lazy.State;
     pub const Continuation = Lazy.Continuation;
+    pub const meta = Lazy.meta;
 };
 
 // --- internal implementation ---

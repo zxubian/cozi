@@ -8,29 +8,18 @@ const future = @import("../root.zig");
 const State = future.State;
 const meta = future.meta;
 
-pub fn MapOk(MapOkFn: type) type {
+pub fn MapOk(
+    MapOkFn: type,
+    Ctx: type,
+) type {
     const Args = std.meta.ArgsTuple(MapOkFn);
 
     return struct {
         map_fn: *const MapOkFn,
-        map_ctx: ?*anyopaque,
+        map_ctx: Ctx,
 
         pub fn Future(InputFuture: type) type {
             const args_info: std.builtin.Type.Struct = @typeInfo(Args).@"struct";
-            const map_fn_has_args = args_info.fields.len > 1;
-            // TODO: make this more flexible?
-            assert(args_info.fields[0].type == ?*anyopaque);
-            if (!map_fn_has_args) {
-                @compileError(std.fmt.comptimePrint(
-                    "Map function {} in {} with input future {} must accept a parameter",
-                    .{
-                        MapOkFn,
-                        @This(),
-                        InputFuture,
-                    },
-                ));
-            }
-            const MapOkFnArgType = args_info.fields[1].type;
             const input_future_value_type_info = @typeInfo(InputFuture.ValueType);
             if (std.meta.activeTag(input_future_value_type_info) != .error_union) {
                 @compileError(std.fmt.comptimePrint(
@@ -62,23 +51,20 @@ pub fn MapOk(MapOkFn: type) type {
                 },
             };
             const OutputValueType = @Type(output_value_type);
+            const MapOkFnArgType = args_info.fields[0].type;
             const UnwrappedValueType = input_future_value_type_info.error_union.payload;
-            if (input_future_value_type_info.error_union.payload != MapOkFnArgType) {
-                @compileError(std.fmt.comptimePrint(
-                    "Incompatible parameter type for map function {} in {} with input future {}. Expected: !{}. Got: !{}",
-                    .{
-                        MapOkFn,
-                        @This(),
-                        InputFuture,
-                        UnwrappedValueType,
-                        MapOkFnArgType,
-                    },
-                ));
-            }
+            comptime meta.ValidateMapFnArgs(
+                InputFuture,
+                OutputValueType,
+                UnwrappedValueType,
+                MapOkFnArgType,
+                MapOkFn,
+                Ctx,
+            );
             return struct {
                 input_future: InputFuture,
                 map_fn: *const MapOkFn,
-                map_ctx: ?*anyopaque,
+                map_ctx: Ctx,
 
                 pub const ValueType = OutputValueType;
 
@@ -86,7 +72,7 @@ pub fn MapOk(MapOkFn: type) type {
                     return struct {
                         input_computation: InputComputation,
                         map_fn: *const MapOkFn,
-                        map_ctx: ?*anyopaque,
+                        map_ctx: Ctx,
                         next: Continuation,
 
                         const ComputationImpl = @This();
@@ -124,24 +110,22 @@ pub fn MapOk(MapOkFn: type) type {
                                 return;
                             }
                             const input_value = &input_continuation.value;
-                            const output: OutputValueType = blk: {
-                                if (map_fn_has_args) {
-                                    break :blk @call(
-                                        .auto,
-                                        self.map_fn,
-                                        .{
-                                            self.map_ctx,
-                                            input_value.* catch unreachable,
-                                        },
-                                    );
-                                } else {
-                                    break :blk @call(
-                                        .auto,
-                                        self.map_fn,
-                                        .{self.map_ctx},
-                                    );
+                            const map_ok_fn_args: std.meta.ArgsTuple(MapOkFn) = blk: {
+                                var tmp_args: std.meta.ArgsTuple(MapOkFn) = undefined;
+                                comptime var i: usize = 0;
+                                tmp_args[i] = input_value.* catch unreachable;
+                                i += 1;
+                                inline for (self.map_ctx) |ctx_arg| {
+                                    tmp_args[i] = ctx_arg;
+                                    i += 1;
                                 }
+                                break :blk tmp_args;
                             };
+                            const output: OutputValueType = @call(
+                                .auto,
+                                self.map_fn,
+                                map_ok_fn_args,
+                            );
                             self.next.@"continue"(
                                 output,
                                 input_continuation.state,
@@ -198,8 +182,8 @@ pub fn MapOk(MapOkFn: type) type {
 /// map_fn is executed on the Executor set earlier in the pipeline.
 pub fn mapOk(
     map_fn: anytype,
-    ctx: ?*anyopaque,
-) MapOk(@TypeOf(map_fn)) {
+    ctx: anytype,
+) MapOk(@TypeOf(map_fn), @TypeOf(ctx)) {
     return .{
         .map_fn = map_fn,
         .map_ctx = ctx,

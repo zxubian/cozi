@@ -1,46 +1,35 @@
 const std = @import("std");
 const assert = std.debug.assert;
-const executors = @import("../../../root.zig").executors;
+const cozi = @import("../../../root.zig");
+const executors = cozi.executors;
 const Executor = executors.Executor;
-const core = @import("../../../root.zig").core;
+const core = cozi.core;
 const Runnable = core.Runnable;
-const future = @import("../root.zig");
+const future = cozi.future.lazy;
 const State = future.State;
-const model = future.model;
 const meta = future.meta;
 
-pub fn Map(MapFn: type) type {
-    const Args = std.meta.ArgsTuple(MapFn);
+pub fn Map(MapFn: type, Ctx: type) type {
     const OutputValueType = meta.ReturnType(MapFn);
 
     return struct {
         map_fn: *const MapFn,
-        map_ctx: ?*anyopaque,
+        map_ctx: Ctx,
 
         pub fn Future(InputFuture: type) type {
-            const args_info: std.builtin.Type.Struct = @typeInfo(Args).@"struct";
-            const map_fn_has_args = args_info.fields.len > 1;
-            // TODO: make this more flexible?
-            assert(args_info.fields[0].type == ?*anyopaque);
-            if (map_fn_has_args) {
-                const MapFnArgType = args_info.fields[1].type;
-                if (InputFuture.ValueType != MapFnArgType) {
-                    @compileError(std.fmt.comptimePrint(
-                        "Incorrect parameter type for map function {} in {} with input future {}. Expected: {}. Got: {}",
-                        .{
-                            MapFn,
-                            @This(),
-                            InputFuture,
-                            InputFuture.ValueType,
-                            MapFnArgType,
-                        },
-                    ));
-                }
-            }
+            comptime meta.ValidateMapFnArgs(
+                InputFuture,
+                OutputValueType,
+                InputFuture.ValueType,
+                InputFuture.ValueType,
+                MapFn,
+                Ctx,
+            );
+            const input_future_produces_value = InputFuture.ValueType != void;
             return struct {
                 input_future: InputFuture,
                 map_fn: *const MapFn,
-                map_ctx: ?*anyopaque,
+                map_ctx: Ctx,
 
                 pub const ValueType = OutputValueType;
 
@@ -48,12 +37,17 @@ pub fn Map(MapFn: type) type {
                     return struct {
                         input_computation: InputComputation,
                         map_fn: *const MapFn,
-                        map_ctx: ?*anyopaque,
+                        map_ctx: Ctx,
                         runnable: Runnable = undefined,
                         next: Continuation,
 
                         const Impl = @This();
                         const InputComputation = InputFuture.Computation(InputContinuation);
+
+                        pub fn init(self: *Impl) void {
+                            self.input_computation.init();
+                            self.next.init();
+                        }
 
                         pub fn start(self: *Impl) void {
                             self.input_computation.start();
@@ -63,25 +57,24 @@ pub fn Map(MapFn: type) type {
                             const input_continuation: *InputContinuation = @alignCast(@ptrCast(ctx_));
                             const input_computation: *InputComputation = @fieldParentPtr("next", input_continuation);
                             const self: *Impl = @fieldParentPtr("input_computation", input_computation);
-                            const input_value = &input_continuation.value;
-                            const output: OutputValueType = blk: {
-                                if (map_fn_has_args) {
-                                    break :blk @call(
-                                        .auto,
-                                        self.map_fn,
-                                        .{
-                                            self.map_ctx,
-                                            input_value.*,
-                                        },
-                                    );
-                                } else {
-                                    break :blk @call(
-                                        .auto,
-                                        self.map_fn,
-                                        .{self.map_ctx},
-                                    );
+                            const map_fn_args: std.meta.ArgsTuple(MapFn) = blk: {
+                                var tmp_args: std.meta.ArgsTuple(MapFn) = undefined;
+                                comptime var i: usize = 0;
+                                if (input_future_produces_value) {
+                                    tmp_args[i] = input_continuation.value;
+                                    i += 1;
                                 }
+                                inline for (self.map_ctx) |ctx_arg| {
+                                    tmp_args[i] = ctx_arg;
+                                    i += 1;
+                                }
+                                break :blk tmp_args;
                             };
+                            const output: OutputValueType = @call(
+                                .auto,
+                                self.map_fn,
+                                map_fn_args,
+                            );
                             self.next.@"continue"(
                                 output,
                                 input_continuation.state,
@@ -92,6 +85,8 @@ pub fn Map(MapFn: type) type {
                             value: InputFuture.ValueType = undefined,
                             state: State = undefined,
                             runnable: Runnable = undefined,
+
+                            pub fn init(_: *@This()) void {}
 
                             pub fn @"continue"(
                                 self: *@This(),
@@ -120,14 +115,13 @@ pub fn Map(MapFn: type) type {
                         .input_computation = self.input_future.materialize(
                             InputContinuation{},
                         ),
-
                         .map_fn = self.map_fn,
                         .map_ctx = self.map_ctx,
                         .next = continuation,
                     };
                 }
 
-                pub fn awaitable(self: @This()) future.Impl.Awaitable(@This()) {
+                pub fn awaitable(self: @This()) future.Awaitable(@This()) {
                     return .{
                         .future = self,
                     };
@@ -155,8 +149,13 @@ pub fn Map(MapFn: type) type {
 /// `map_fn` is executed on the Executor set earlier in the pipeline.
 pub fn map(
     map_fn: anytype,
-    ctx: ?*anyopaque,
-) Map(@TypeOf(map_fn)) {
+    ctx: anytype,
+) Map(@TypeOf(map_fn), @TypeOf(ctx)) {
+    const Ctx = @TypeOf(ctx);
+    const ctx_type_info = @typeInfo(Ctx);
+    if (ctx_type_info != .@"struct" or !ctx_type_info.@"struct".is_tuple) {
+        @compileError("Ctx passed to Map must be a tuple");
+    }
     return .{
         .map_fn = map_fn,
         .map_ctx = ctx,

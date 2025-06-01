@@ -126,11 +126,11 @@ test "fiber - future - pipeline basic" {
                     future.via(ctx.future_executor),
                     future.map(
                         struct {
-                            pub fn map(_: ?*anyopaque, input: usize) usize {
+                            pub fn map(input: usize) usize {
                                 return input + 1;
                             }
                         }.map,
-                        null,
+                        .{},
                     ),
                 },
             );
@@ -170,12 +170,11 @@ test "fiber - future - submit" {
             const submit = future.submit(
                 ctx.future_executor,
                 struct {
-                    pub fn innerRun(ctx_: ?*anyopaque) void {
-                        const self: *Impl = @alignCast(@ptrCast(ctx_));
+                    pub fn innerRun(self: *Impl) void {
                         self.inner_done = true;
                     }
                 }.innerRun,
-                ctx,
+                .{ctx},
             );
             @"await"(&submit);
             try testing.expect(ctx.inner_done);
@@ -210,14 +209,16 @@ test "fiber - future - MapOk" {
             const pipeline = future.pipeline(
                 .{
                     future.value(@as(anyerror!u32, 123)),
-                    future.mapOk(struct {
-                        pub fn run(
-                            _: ?*anyopaque,
-                            in: u32,
-                        ) u32 {
-                            return in + 1;
-                        }
-                    }.run, null),
+                    future.mapOk(
+                        struct {
+                            pub fn run(
+                                in: u32,
+                            ) u32 {
+                                return in + 1;
+                            }
+                        }.run,
+                        .{},
+                    ),
                 },
             );
             const result = @"await"(&pipeline);
@@ -246,14 +247,16 @@ test "fiber - future - andThen" {
             const pipeline = future.pipeline(
                 .{
                     future.constValue(@as(IoError!u32, 123)),
-                    future.andThen(struct {
-                        pub fn run(
-                            _: ?*anyopaque,
-                            input: u32,
-                        ) future.Value(IoError!u32) {
-                            return future.value(@as(IoError!u32, input + 1));
-                        }
-                    }.run, null),
+                    future.andThen(
+                        struct {
+                            pub fn run(
+                                input: u32,
+                            ) future.Value(IoError!u32) {
+                                return future.value(@as(IoError!u32, input + 1));
+                            }
+                        }.run,
+                        .{},
+                    ),
                 },
             );
             const result = @"await"(&pipeline);
@@ -282,14 +285,16 @@ test "fiber - future - orElse" {
             const pipeline = future.pipeline(
                 .{
                     future.constValue(@as(IoError!u32, IoError.file_not_found)),
-                    future.orElse(struct {
-                        pub fn run(
-                            _: ?*anyopaque,
-                            _: IoError,
-                        ) future.Value(u32) {
-                            return future.value(@as(u32, 123));
-                        }
-                    }.run, null),
+                    future.orElse(
+                        struct {
+                            pub fn run(
+                                _: IoError,
+                            ) future.Value(u32) {
+                                return future.value(@as(u32, 123));
+                            }
+                        }.run,
+                        .{},
+                    ),
                 },
             );
             const result = @"await"(&pipeline);
@@ -318,57 +323,58 @@ test "fiber - future - pipeline combinators" {
             const pipeline = future.pipeline(
                 .{
                     future.just(),
-                    future.map(struct {
-                        pub fn run(
-                            _: ?*anyopaque,
-                        ) IoError!u32 {
-                            return 3;
-                        }
-                    }.run, null),
-                    future.orElse(struct {
-                        pub fn run(
-                            _: ?*anyopaque,
-                            _: IoError,
-                        ) future.Value(u32) {
-                            unreachable;
-                        }
-                    }.run, null),
-                    future.andThen(struct {
-                        pub fn run(
-                            _: ?*anyopaque,
-                            _: u32,
-                        ) future.Value(IoError!u32) {
-                            return future.value(@as(
-                                IoError!u32,
-                                IoError.file_not_found,
-                            ));
-                        }
-                    }.run, null),
-                    future.andThen(struct {
-                        pub fn run(
-                            _: ?*anyopaque,
-                            _: u32,
-                        ) future.Value(IoError!u32) {
-                            unreachable;
-                        }
-                    }.run, null),
-                    future.orElse(struct {
-                        pub fn run(
-                            _: ?*anyopaque,
-                            err: IoError,
-                        ) future.Value(IoError!u32) {
-                            std.debug.assert(IoError.file_not_found == err);
-                            return future.value(@as(IoError!u32, 3));
-                        }
-                    }.run, null),
-                    future.mapOk(struct {
-                        pub fn run(
-                            _: ?*anyopaque,
-                            in: u32,
-                        ) u32 {
-                            return in + 1;
-                        }
-                    }.run, null),
+                    future.map(
+                        struct {
+                            pub fn run() IoError!u32 {
+                                return 3;
+                            }
+                        }.run,
+                        .{},
+                    ),
+                    future.orElse(
+                        struct {
+                            pub fn run(_: IoError) future.Value(u32) {
+                                unreachable;
+                            }
+                        }.run,
+                        .{},
+                    ),
+                    future.andThen(
+                        struct {
+                            pub fn run(_: u32) future.Value(IoError!u32) {
+                                return future.value(@as(
+                                    IoError!u32,
+                                    IoError.file_not_found,
+                                ));
+                            }
+                        }.run,
+                        .{},
+                    ),
+                    future.andThen(
+                        struct {
+                            pub fn run(_: u32) future.Value(IoError!u32) {
+                                unreachable;
+                            }
+                        }.run,
+                        .{},
+                    ),
+                    future.orElse(
+                        struct {
+                            pub fn run(err: IoError) future.Value(IoError!u32) {
+                                std.debug.assert(IoError.file_not_found == err);
+                                return future.value(@as(IoError!u32, 3));
+                            }
+                        }.run,
+                        .{},
+                    ),
+                    future.mapOk(
+                        struct {
+                            pub fn run(in: u32) u32 {
+                                return in + 1;
+                            }
+                        }.run,
+                        .{},
+                    ),
                 },
             );
             const result = try @"await"(&pipeline);
@@ -391,11 +397,11 @@ test "fiber - future - all" {
     var future_executor: ManualExecutor = .{};
 
     const Futures = struct {
-        pub fn run1(_: ?*anyopaque) usize {
+        pub fn run1() usize {
             return 123;
         }
 
-        pub fn run2(_: ?*anyopaque) []const u8 {
+        pub fn run2() []const u8 {
             return "abc";
         }
     };
@@ -404,8 +410,8 @@ test "fiber - future - all" {
         done: bool = false,
         future_executor: executors.Executor,
         pub fn run(ctx: *@This()) !void {
-            const submit1 = future.submit(ctx.future_executor, Futures.run1, null);
-            const submit2 = future.submit(ctx.future_executor, Futures.run2, null);
+            const submit1 = future.submit(ctx.future_executor, Futures.run1, .{});
+            const submit2 = future.submit(ctx.future_executor, Futures.run2, .{});
             const all = future.pipeline(
                 .{
                     future.just(),
@@ -449,11 +455,11 @@ test "fiber - future - first" {
     var second_executor: ManualExecutor = .{};
 
     const Futures = struct {
-        pub fn run1(_: ?*anyopaque) usize {
+        pub fn run1() usize {
             return 123;
         }
 
-        pub fn run2(_: ?*anyopaque) []const u8 {
+        pub fn run2() []const u8 {
             return "abc";
         }
     };
@@ -464,8 +470,16 @@ test "fiber - future - first" {
         first_executor: executors.Executor,
         second_executor: executors.Executor,
         pub fn run(ctx: *@This()) !void {
-            const submit1 = future.submit(ctx.second_executor, Futures.run1, null);
-            const submit2 = future.submit(ctx.first_executor, Futures.run2, null);
+            const submit1 = future.submit(
+                ctx.second_executor,
+                Futures.run1,
+                .{},
+            );
+            const submit2 = future.submit(
+                ctx.first_executor,
+                Futures.run2,
+                .{},
+            );
             const first = future.pipeline(
                 .{
                     future.just(),

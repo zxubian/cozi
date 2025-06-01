@@ -27,14 +27,16 @@ test "lazy future - value - basic" {
 test "lazy future - pipeline - basic" {
     const value = future.value(@as(usize, 44));
     const via = future.via(InlineExecutor).pipe(value);
-    const map = future.map(struct {
-        pub fn run(
-            _: ?*anyopaque,
-            in: usize,
-        ) usize {
-            return in + 1;
-        }
-    }.run, null).pipe(via);
+    const map = future.map(
+        struct {
+            pub fn run(
+                in: usize,
+            ) usize {
+                return in + 1;
+            }
+        }.run,
+        .{},
+    ).pipe(via);
     const result = future.get(map);
     try testing.expectEqual(45, result);
 }
@@ -44,20 +46,21 @@ test "lazy future - pipeline - multiple" {
     const via = future.via(InlineExecutor).pipe(value);
     const map = future.map(struct {
         pub fn run(
-            _: ?*anyopaque,
             in: usize,
         ) usize {
             return in + 1;
         }
-    }.run, null).pipe(via);
-    const map_2 = future.map(struct {
-        pub fn run(
-            _: ?*anyopaque,
-            in: usize,
-        ) usize {
-            return in + 2;
-        }
-    }.run, null).pipe(map);
+    }.run, .{}).pipe(via);
+    const map_2 = future.map(
+        struct {
+            pub fn run(
+                in: usize,
+            ) usize {
+                return in + 2;
+            }
+        }.run,
+        .{},
+    ).pipe(map);
     const result = future.get(map_2);
     try testing.expectEqual(3, result);
 }
@@ -66,14 +69,18 @@ test "lazy future map - with side effects" {
     const just = future.just();
     const via = future.via(InlineExecutor).pipe(just);
     var done: bool = false;
-    const map = future.map(struct {
-        pub fn run(
-            ctx: ?*anyopaque,
-        ) void {
-            const done_: *bool = @alignCast(@ptrCast(ctx));
-            done_.* = true;
-        }
-    }.run, @alignCast(@ptrCast(&done))).pipe(via);
+    const map = future.map(
+        struct {
+            pub fn run(
+                done_: *bool,
+            ) void {
+                done_.* = true;
+            }
+        }.run,
+        .{
+            &done,
+        },
+    ).pipe(via);
     future.get(map);
     try testing.expect(done);
 }
@@ -83,14 +90,16 @@ test "lazy future - pipeline - syntax" {
         .{
             future.value(@as(u32, 123)),
             future.via(InlineExecutor),
-            future.map(struct {
-                pub fn run(
-                    _: ?*anyopaque,
-                    in: u32,
-                ) u32 {
-                    return in + 1;
-                }
-            }.run, null),
+            future.map(
+                struct {
+                    pub fn run(
+                        in: u32,
+                    ) u32 {
+                        return in + 1;
+                    }
+                }.run,
+                .{},
+            ),
         },
     );
     const result = future.get(pipeline);
@@ -109,11 +118,11 @@ test "lazy future - submit - basic" {
     const compute = future.submit(
         pool.executor(),
         struct {
-            pub fn run(_: ?*anyopaque) usize {
+            pub fn run() usize {
                 return 11;
             }
         }.run,
-        null,
+        .{},
     );
     const result: usize = future.get(compute);
     try testing.expectEqual(11, result);
@@ -131,12 +140,12 @@ test "lazy future - submit - timer" {
     const compute = future.submit(
         pool.executor(),
         struct {
-            pub fn run(_: ?*anyopaque) usize {
+            pub fn run() usize {
                 std.Thread.sleep(std.time.ns_per_s);
                 return 12;
             }
         }.run,
-        null,
+        .{},
     );
     var timer: std.time.Timer = try .start();
     defer timer.reset();
@@ -150,14 +159,16 @@ test "lazy future - pipeline - fallible" {
     const pipeline = future.pipeline(
         .{
             future.value(@as(u32, 123)),
-            future.map(struct {
-                pub fn run(
-                    _: ?*anyopaque,
-                    in: u32,
-                ) !u32 {
-                    return in + 1;
-                }
-            }.run, null),
+            future.map(
+                struct {
+                    pub fn run(
+                        in: u32,
+                    ) !u32 {
+                        return in + 1;
+                    }
+                }.run,
+                .{},
+            ),
         },
     );
     const result = try future.get(pipeline);
@@ -168,14 +179,16 @@ test "lazy future - MapOk" {
     const pipeline = future.pipeline(
         .{
             future.value(@as(anyerror!u32, 123)),
-            future.mapOk(struct {
-                pub fn run(
-                    _: ?*anyopaque,
-                    in: u32,
-                ) u32 {
-                    return in + 1;
-                }
-            }.run, null),
+            future.mapOk(
+                struct {
+                    pub fn run(
+                        in: u32,
+                    ) u32 {
+                        return in + 1;
+                    }
+                }.run,
+                .{},
+            ),
         },
     );
     const result = future.get(pipeline);
@@ -189,14 +202,16 @@ test "lazy future - MapOk - not called on error" {
     const pipeline = future.pipeline(
         .{
             future.value(@as(IoError!u32, IoError.file_not_found)),
-            future.mapOk(struct {
-                pub fn run(
-                    _: ?*anyopaque,
-                    _: u32,
-                ) u32 {
-                    unreachable;
-                }
-            }.run, null),
+            future.mapOk(
+                struct {
+                    pub fn run(
+                        _: u32,
+                    ) u32 {
+                        unreachable;
+                    }
+                }.run,
+                .{},
+            ),
         },
     );
     const result = future.get(pipeline);
@@ -217,14 +232,16 @@ test "lazy future - MapOk - return error" {
     const pipeline = future.pipeline(
         .{
             future.value(@as(IoError!u32, 123)),
-            future.mapOk(struct {
-                pub fn run(
-                    _: ?*anyopaque,
-                    _: u32,
-                ) MapError!u32 {
-                    return MapError.some_other_error;
-                }
-            }.run, null),
+            future.mapOk(
+                struct {
+                    pub fn run(
+                        _: u32,
+                    ) MapError!u32 {
+                        return MapError.some_other_error;
+                    }
+                }.run,
+                .{},
+            ),
         },
     );
     _ = future.get(pipeline) catch |err| switch (err) {
@@ -235,6 +252,35 @@ test "lazy future - MapOk - return error" {
     };
 }
 
+test "lazy future - MapOk - with context" {
+    const Ctx = struct {
+        done: bool,
+    };
+    var ctx: Ctx = .{ .done = false };
+    const pipeline = future.pipeline(
+        .{
+            future.value(@as(anyerror!u32, 123)),
+            future.mapOk(
+                struct {
+                    pub fn run(
+                        in: u32,
+                        ctx_: *Ctx,
+                    ) u32 {
+                        ctx_.done = true;
+                        return in + 1;
+                    }
+                }.run,
+                .{
+                    &ctx,
+                },
+            ),
+        },
+    );
+    const result = future.get(pipeline);
+    try testing.expectEqual(124, result);
+    try testing.expect(ctx.done);
+}
+
 test "lazy future - andThen" {
     const IoError = error{
         file_not_found,
@@ -242,14 +288,16 @@ test "lazy future - andThen" {
     const pipeline = future.pipeline(
         .{
             future.constValue(@as(IoError!u32, 123)),
-            future.andThen(struct {
-                pub fn run(
-                    _: ?*anyopaque,
-                    input: u32,
-                ) future.Value(IoError!u32) {
-                    return future.value(@as(IoError!u32, input + 1));
-                }
-            }.run, null),
+            future.andThen(
+                struct {
+                    pub fn run(
+                        input: u32,
+                    ) future.Value(IoError!u32) {
+                        return future.value(@as(IoError!u32, input + 1));
+                    }
+                }.run,
+                .{},
+            ),
         },
     );
     const result = future.get(pipeline);
@@ -263,18 +311,50 @@ test "lazy future - andThen - return error" {
     const pipeline = future.pipeline(
         .{
             future.constValue(@as(IoError!u32, IoError.file_not_found)),
-            future.andThen(struct {
-                pub fn run(
-                    _: ?*anyopaque,
-                    _: u32,
-                ) future.Value(IoError!u32) {
-                    unreachable;
-                }
-            }.run, null),
+            future.andThen(
+                struct {
+                    pub fn run(
+                        _: u32,
+                    ) future.Value(IoError!u32) {
+                        unreachable;
+                    }
+                }.run,
+                .{},
+            ),
         },
     );
     const result = future.get(pipeline);
     try testing.expectError(IoError.file_not_found, result);
+}
+
+test "lazy future - andThen - with context" {
+    const Ctx = struct {
+        done: bool,
+    };
+    var ctx: Ctx = .{ .done = false };
+    const IoError = error{
+        file_not_found,
+    };
+    const pipeline = future.pipeline(
+        .{
+            future.constValue(@as(IoError!u32, 123)),
+            future.andThen(
+                struct {
+                    pub fn run(
+                        input: u32,
+                        ctx_: *Ctx,
+                    ) future.Value(IoError!u32) {
+                        ctx_.done = true;
+                        return future.value(@as(IoError!u32, input + 1));
+                    }
+                }.run,
+                .{&ctx},
+            ),
+        },
+    );
+    const result = future.get(pipeline);
+    try testing.expectEqual(124, result);
+    try testing.expect(ctx.done);
 }
 
 test "lazy future - orElse" {
@@ -284,14 +364,16 @@ test "lazy future - orElse" {
     const pipeline = future.pipeline(
         .{
             future.constValue(@as(IoError!u32, IoError.file_not_found)),
-            future.orElse(struct {
-                pub fn run(
-                    _: ?*anyopaque,
-                    _: IoError,
-                ) future.Value(u32) {
-                    return future.value(@as(u32, 123));
-                }
-            }.run, null),
+            future.orElse(
+                struct {
+                    pub fn run(
+                        _: IoError,
+                    ) future.Value(u32) {
+                        return future.value(@as(u32, 123));
+                    }
+                }.run,
+                .{},
+            ),
         },
     );
     const result = future.get(pipeline);
@@ -305,18 +387,50 @@ test "lazy future - orElse - return value" {
     const pipeline = future.pipeline(
         .{
             future.constValue(@as(IoError!u32, 123)),
-            future.orElse(struct {
-                pub fn run(
-                    _: ?*anyopaque,
-                    _: IoError,
-                ) future.Value(u32) {
-                    unreachable;
-                }
-            }.run, null),
+            future.orElse(
+                struct {
+                    pub fn run(
+                        _: IoError,
+                    ) future.Value(u32) {
+                        unreachable;
+                    }
+                }.run,
+                .{},
+            ),
         },
     );
     const result = future.get(pipeline);
     try testing.expectEqual(123, result);
+}
+
+test "lazy future - orElse - with context" {
+    const Ctx = struct {
+        done: bool,
+    };
+    var ctx: Ctx = .{ .done = false };
+    const IoError = error{
+        file_not_found,
+    };
+    const pipeline = future.pipeline(
+        .{
+            future.constValue(@as(IoError!u32, IoError.file_not_found)),
+            future.orElse(
+                struct {
+                    pub fn run(
+                        _: IoError,
+                        ctx_: *Ctx,
+                    ) future.Value(u32) {
+                        ctx_.done = true;
+                        return future.value(@as(u32, 123));
+                    }
+                }.run,
+                .{&ctx},
+            ),
+        },
+    );
+    const result = future.get(pipeline);
+    try testing.expectEqual(123, result);
+    try testing.expect(ctx.done);
 }
 
 test "lazy future - pipeline - combinators" {
@@ -326,61 +440,161 @@ test "lazy future - pipeline - combinators" {
     const pipeline = future.pipeline(
         .{
             future.just(),
-            future.map(struct {
-                pub fn run(
-                    _: ?*anyopaque,
-                ) IoError!u32 {
-                    return 3;
-                }
-            }.run, null),
-            future.orElse(struct {
-                pub fn run(
-                    _: ?*anyopaque,
-                    _: IoError,
-                ) future.Value(u32) {
-                    unreachable;
-                }
-            }.run, null),
-            future.andThen(struct {
-                pub fn run(
-                    _: ?*anyopaque,
-                    _: u32,
-                ) future.Value(IoError!u32) {
-                    return future.value(@as(
-                        IoError!u32,
-                        IoError.file_not_found,
-                    ));
-                }
-            }.run, null),
-            future.andThen(struct {
-                pub fn run(
-                    _: ?*anyopaque,
-                    _: u32,
-                ) future.Value(IoError!u32) {
-                    unreachable;
-                }
-            }.run, null),
-            future.orElse(struct {
-                pub fn run(
-                    _: ?*anyopaque,
-                    err: IoError,
-                ) future.Value(IoError!u32) {
-                    assert(err == IoError.file_not_found);
-                    return future.value(@as(IoError!u32, 3));
-                }
-            }.run, null),
-            future.mapOk(struct {
-                pub fn run(
-                    _: ?*anyopaque,
-                    in: u32,
-                ) u32 {
-                    return in + 1;
-                }
-            }.run, null),
+            future.map(
+                struct {
+                    pub fn run() IoError!u32 {
+                        return 3;
+                    }
+                }.run,
+                .{},
+            ),
+            future.orElse(
+                struct {
+                    pub fn run(
+                        _: IoError,
+                    ) future.Value(u32) {
+                        unreachable;
+                    }
+                }.run,
+                .{},
+            ),
+            future.andThen(
+                struct {
+                    pub fn run(
+                        _: u32,
+                    ) future.Value(IoError!u32) {
+                        return future.value(@as(
+                            IoError!u32,
+                            IoError.file_not_found,
+                        ));
+                    }
+                }.run,
+                .{},
+            ),
+            future.andThen(
+                struct {
+                    pub fn run(
+                        _: u32,
+                    ) future.Value(IoError!u32) {
+                        unreachable;
+                    }
+                }.run,
+                .{},
+            ),
+            future.orElse(
+                struct {
+                    pub fn run(
+                        err: IoError,
+                    ) future.Value(IoError!u32) {
+                        assert(err == IoError.file_not_found);
+                        return future.value(@as(IoError!u32, 3));
+                    }
+                }.run,
+                .{},
+            ),
+            future.mapOk(
+                struct {
+                    pub fn run(
+                        in: u32,
+                    ) u32 {
+                        return in + 1;
+                    }
+                }.run,
+                .{},
+            ),
         },
     );
     const result = try future.get(pipeline);
     try testing.expectEqual(4, result);
+}
+
+test "lazy future - pipeline - combinators - with context" {
+    const Ctx = struct {
+        stage: usize,
+    };
+    var ctx: Ctx = .{ .stage = 0 };
+    const IoError = error{
+        file_not_found,
+    };
+    const pipeline = future.pipeline(
+        .{
+            future.just(),
+            future.map(
+                struct {
+                    pub fn run(ctx_: *Ctx) IoError!u32 {
+                        ctx_.stage += 1;
+                        return 3;
+                    }
+                }.run,
+                .{&ctx},
+            ),
+            future.orElse(
+                struct {
+                    pub fn run(
+                        _: IoError,
+                        _: *Ctx,
+                    ) future.Value(u32) {
+                        unreachable;
+                    }
+                }.run,
+                .{&ctx},
+            ),
+            future.andThen(
+                struct {
+                    pub fn run(
+                        _: u32,
+                        ctx_: *Ctx,
+                    ) future.Value(IoError!u32) {
+                        ctx_.stage += 1;
+                        return future.value(@as(
+                            IoError!u32,
+                            IoError.file_not_found,
+                        ));
+                    }
+                }.run,
+                .{&ctx},
+            ),
+            future.andThen(
+                struct {
+                    pub fn run(
+                        _: u32,
+                        _: *Ctx,
+                    ) future.Value(IoError!u32) {
+                        unreachable;
+                    }
+                }.run,
+                .{&ctx},
+            ),
+            future.orElse(
+                struct {
+                    pub fn run(
+                        err: IoError,
+                        ctx_: *Ctx,
+                    ) future.Value(IoError!u32) {
+                        assert(err == IoError.file_not_found);
+                        ctx_.stage += 1;
+                        return future.value(@as(IoError!u32, 3));
+                    }
+                }.run,
+                .{&ctx},
+            ),
+            future.mapOk(
+                struct {
+                    pub fn run(
+                        in: u32,
+                        ctx_: *Ctx,
+                    ) u32 {
+                        ctx_.stage += 1;
+                        return in + 1;
+                    }
+                }.run,
+                .{&ctx},
+            ),
+        },
+    );
+    const result = try future.get(pipeline);
+    try testing.expectEqual(4, result);
+    try testing.expectEqual(4, ctx.stage);
 }
 
 test "lazy future - flatten" {
@@ -396,22 +610,32 @@ test "lazy future - flatten" {
     const Ctx = struct {
         executor: executors.Executor,
         const Self = @This();
-        pub fn run(ctx: ?*anyopaque) future.Submit(InnerCtx.inner_run) {
-            const self: *Self = @alignCast(@ptrCast(ctx));
-            return future.submit(self.executor, InnerCtx.inner_run, null);
+        pub fn run(
+            self: *Self,
+        ) future.Submit(
+            @TypeOf(InnerCtx.inner_run),
+            @TypeOf(.{}),
+        ) {
+            return future.submit(
+                self.executor,
+                InnerCtx.inner_run,
+                .{},
+            );
         }
         const InnerCtx = struct {
-            pub fn inner_run(_: ?*anyopaque) usize {
+            pub fn inner_run() usize {
                 return 7;
             }
         };
     };
 
-    var ctx: Ctx = .{ .executor = tp.executor() };
+    var ctx: Ctx = .{
+        .executor = tp.executor(),
+    };
     const nested = future.submit(
         tp.executor(),
         Ctx.run,
-        &ctx,
+        .{&ctx},
     );
     const flattened = future.pipeline(.{
         nested,
@@ -445,13 +669,12 @@ test "lazy future - contract - thread pool" {
         future.map(
             struct {
                 pub fn run(
-                    _: ?*anyopaque,
                     value: usize,
                 ) usize {
                     return value * 3;
                 }
             }.run,
-            null,
+            .{},
         ),
     });
     promise_.resolve(3);
@@ -465,15 +688,16 @@ test "lazy future - detach" {
     const Ctx = struct {
         done: bool,
 
-        pub fn run(ctx: ?*anyopaque) void {
-            const self: *@This() = @alignCast(@ptrCast(ctx.?));
+        pub fn run(self: *@This()) void {
             self.done = true;
         }
     };
 
-    var ctx: Ctx = .{ .done = false };
+    var ctx: Ctx = .{
+        .done = false,
+    };
 
-    const f = future.submit(manual.executor(), Ctx.run, &ctx);
+    const f = future.submit(manual.executor(), Ctx.run, .{&ctx});
     try testing.expect(manual.isEmpty());
     try testing.expect(!ctx.done);
 
@@ -492,10 +716,8 @@ test "lazy future - contract - detach - promise first" {
     const Ctx = struct {
         done: bool,
         pub fn run(
-            ctx: ?*anyopaque,
-            _: void,
+            self: *@This(),
         ) void {
-            const self: *@This() = @alignCast(@ptrCast(ctx.?));
             self.done = true;
         }
     };
@@ -506,7 +728,7 @@ test "lazy future - contract - detach - promise first" {
             future.via(executors.@"inline"),
             future.map(
                 Ctx.run,
-                &ctx,
+                .{&ctx},
             ),
         },
     );
@@ -522,10 +744,8 @@ test "lazy future - contract - detach - future first" {
     const Ctx = struct {
         done: bool,
         pub fn run(
-            ctx: ?*anyopaque,
-            _: void,
+            self: *@This(),
         ) void {
-            const self: *@This() = @alignCast(@ptrCast(ctx.?));
             self.done = true;
         }
     };
@@ -536,7 +756,7 @@ test "lazy future - contract - detach - future first" {
             future.via(executors.@"inline"),
             future.map(
                 Ctx.run,
-                &ctx,
+                .{&ctx},
             ),
         },
     );
@@ -656,10 +876,9 @@ test "lazy future - pipline - threadpool - all" {
         thread_pool: *ThreadPool,
         const A_and_B = future.All(@TypeOf(.{ future_a, future_b })).OutputTupleType;
         fn map(
-            ctx: ?*anyopaque,
             input: A_and_B,
+            self: *@This(),
         ) !A_and_B {
-            const self: *@This() = @alignCast(@ptrCast(ctx));
             try std.testing.expectEqual(ThreadPool.current(), self.thread_pool);
             return input;
         }
@@ -678,7 +897,7 @@ test "lazy future - pipline - threadpool - all" {
             future.via(executor),
             future.map(
                 Ctx.map,
-                &ctx,
+                .{&ctx},
             ),
         },
     );
@@ -717,10 +936,9 @@ test "lazy future - pipline - threadpool - first" {
 
         const FirstResultType = future.First(@TypeOf(.{ future_a, future_b })).OutputUnionType;
         fn map(
-            ctx: ?*anyopaque,
             input: FirstResultType,
+            self: *@This(),
         ) !FirstResultType {
-            const self: *@This() = @alignCast(@ptrCast(ctx));
             try std.testing.expectEqual(ThreadPool.current(), self.thread_pool);
             return input;
         }
@@ -739,7 +957,7 @@ test "lazy future - pipline - threadpool - first" {
             future.via(executor),
             future.map(
                 Ctx.map,
-                &ctx,
+                .{&ctx},
             ),
         },
     );
