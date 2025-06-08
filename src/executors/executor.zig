@@ -19,7 +19,7 @@ const Executor = @This();
 ptr: *anyopaque,
 vtable: Vtable,
 
-const Vtable = struct {
+pub const Vtable = struct {
     submit: *const fn (ctx: *anyopaque, *Runnable) void,
 };
 
