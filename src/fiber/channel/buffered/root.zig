@@ -160,7 +160,7 @@ pub fn BufferedChannel(T: type) type {
 
             pub fn awaitSuspend(
                 ctx: *anyopaque,
-                handle: *anyopaque,
+                handle: Worker,
             ) Awaiter.AwaitSuspendResult {
                 const self: *SendAwaiter = @alignCast(@ptrCast(ctx));
                 const channel = self.channel;
@@ -225,7 +225,7 @@ pub fn BufferedChannel(T: type) type {
 
             pub fn awaitSuspend(
                 ctx: *anyopaque,
-                handle: *anyopaque,
+                handle: Worker,
             ) Awaiter.AwaitSuspendResult {
                 const self: *ReceiveAwaiter = @alignCast(@ptrCast(ctx));
                 const channel = self.channel;

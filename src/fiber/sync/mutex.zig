@@ -14,9 +14,9 @@ const Atomic = stdlike.atomic.Value;
 const log = cozi.core.log.scoped(.fiber_mutex);
 
 const Fiber = cozi.Fiber;
-const GenericAwait = Fiber.@"await";
-const Await = GenericAwait.@"await";
-const Awaiter = GenericAwait.Awaiter;
+const Await = cozi.@"await".@"await";
+const Awaiter = cozi.@"await".Awaiter;
+const Worker = cozi.@"await".Worker;
 
 const containers = cozi.containers;
 const Queue = containers.intrusive.lock_free.MpscQueue;
@@ -112,11 +112,10 @@ const LockAwaiter = struct {
 
     // --- type-erased awaiter interface ---
     pub fn awaitSuspend(
-        ctx: *anyopaque,
-        handle: *anyopaque,
+        self: *@This(),
+        worker: Worker,
     ) Awaiter.AwaitSuspendResult {
-        const fiber: *Fiber = @alignCast(@ptrCast(handle));
-        var self: *LockAwaiter = @alignCast(@ptrCast(ctx));
+        const fiber: *Fiber = @alignCast(@ptrCast(worker.ptr));
         var mutex = self.mutex;
         self.queue_node = Node{
             .fiber = fiber,
@@ -206,7 +205,7 @@ const LockAwaiter = struct {
     pub fn awaiter(self: *LockAwaiter) Awaiter {
         return Awaiter{
             .ptr = self,
-            .vtable = .{ .await_suspend = awaitSuspend },
+            .vtable = .{ .await_suspend = @ptrCast(&awaitSuspend) },
         };
     }
 
@@ -232,12 +231,12 @@ const UnlockAwaiter = struct {
 
     // --- type-erased awaiter interface ---
     pub fn awaitSuspend(
-        ctx: *anyopaque,
-        handle: *anyopaque,
+        self: *@This(),
+        worker: Worker,
     ) Awaiter.AwaitSuspendResult {
-        const self: *UnlockAwaiter = @alignCast(@ptrCast(ctx));
+        assert(worker.type == .fiber);
         const mutex = self.mutex;
-        const fiber: *Fiber = @alignCast(@ptrCast(handle));
+        const fiber: *Fiber = @alignCast(@ptrCast(worker.ptr));
 
         log.debug("{s} start unlock loop", .{fiber.name});
         while (true) {
@@ -325,7 +324,7 @@ const UnlockAwaiter = struct {
     pub fn awaiter(self: *UnlockAwaiter) Awaiter {
         return Awaiter{
             .ptr = self,
-            .vtable = .{ .await_suspend = awaitSuspend },
+            .vtable = .{ .await_suspend = @ptrCast(&awaitSuspend) },
         };
     }
 

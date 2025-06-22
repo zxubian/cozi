@@ -2,8 +2,8 @@ const std = @import("std");
 
 const cozi = @import("../../../root.zig");
 
-const Fiber = cozi.Fiber;
-const Awaiter = Fiber.@"await".Awaiter;
+const Awaiter = cozi.@"await".Awaiter;
+const Worker = cozi.@"await".Worker;
 const Runnable = cozi.core.Runnable;
 const atomic = cozi.fault.stdlike.atomic;
 const SpinLock = cozi.sync.Spinlock;
@@ -15,7 +15,7 @@ pub fn Awaitable(Future: type) type {
     return struct {
         future: Future,
         input_computation: InputComputation = undefined,
-        fiber: *Fiber = undefined,
+        worker: Worker = undefined,
         lock: SpinLock = .{},
 
         const InputComputation = Future.Computation(Demand);
@@ -39,9 +39,9 @@ pub fn Awaitable(Future: type) type {
 
         pub fn awaitSuspend(
             self: *@This(),
-            handle: *Fiber,
+            handle: Worker,
         ) Awaiter.AwaitSuspendResult {
-            self.fiber = handle;
+            self.worker = handle;
             self.input_computation = self.future.materialize(Demand{});
             self.input_computation.start();
             switch (@as(
@@ -49,21 +49,21 @@ pub fn Awaitable(Future: type) type {
                 @enumFromInt(
                     self.input_computation.next.rendezvous.fetchOr(
                         @intFromEnum(
-                            Demand.State.fiber_arrived,
+                            Demand.State.thread_arrived,
                         ),
                         .seq_cst,
                     ),
                 ),
             )) {
                 .init => {
-                    // fiber arrived first, future was not ready
-                    // fiber will suspend
+                    // thread arrived first, future was not ready
+                    // thread will suspend
                     return .always_suspend;
                 },
                 .future_arrived => {
                     return .never_suspend;
                 },
-                else => std.debug.panic("Fiber arrived at rendezvous twice", .{}),
+                else => std.debug.panic("Thread arrived at rendezvous twice", .{}),
             }
         }
 
@@ -85,14 +85,14 @@ pub fn Awaitable(Future: type) type {
                     ),
                 ),
             )) {
-                .fiber_arrived => {
-                    // fiber arrived first and was suspended
-                    self.fiber.scheduleSelf();
+                .thread_arrived => {
+                    // thread arrived first and was suspended
+                    self.worker.@"resume"();
                 },
                 .init => {
-                    // arrived before fiber, no need to do anything
+                    // arrived before thread, no need to do anything
                 },
-                else => std.debug.panic("Future arrived at rendezvous twice", .{}),
+                else => std.debug.panic("Thread arrived at rendezvous twice", .{}),
             }
         }
 
@@ -103,7 +103,7 @@ pub fn Awaitable(Future: type) type {
 
             pub const State = enum(u8) {
                 init = 0,
-                fiber_arrived = 1 << 0,
+                thread_arrived = 1 << 0,
                 future_arrived = 1 << 1,
                 rendezvous = 3,
             };

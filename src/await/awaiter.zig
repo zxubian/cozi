@@ -1,17 +1,18 @@
 //! Type-erased awaiter interface
-//! See `cozi.fiber.@"await".@"await"` for usage.
+//! See `cozi.cozi.@"await".@"await"` for usage.
 //! See `cozi.fiber.YieldAwaiter` for example implementation.
 const std = @import("std");
 const Awaiter = @This();
-const cozi = @import("../../root.zig");
+const cozi = @import("../root.zig");
 const Fiber = cozi.Fiber;
+const Worker = @import("./worker/root.zig");
 
 ptr: *anyopaque,
 
 vtable: struct {
     await_suspend: *const fn (
         ctx: *anyopaque,
-        coroutine_handle: *anyopaque,
+        worker: Worker,
     ) AwaitSuspendResult,
 },
 
@@ -34,10 +35,10 @@ pub const AwaitSuspendResult = union(enum(usize)) {
 /// c) control should be transfered to another fiber without going through the scheduler
 pub inline fn awaitSuspend(
     self: *const Awaiter,
-    coroutine_handle: *anyopaque,
+    worker: Worker,
 ) AwaitSuspendResult {
     return self.vtable.await_suspend(
         self.ptr,
-        coroutine_handle,
+        worker,
     );
 }

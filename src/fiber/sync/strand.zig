@@ -10,9 +10,10 @@ const core = cozi.core;
 const Runnable = core.Runnable;
 const Closure = core.Closure;
 const Fiber = cozi.Fiber;
-const generic_await = Fiber.@"await";
+const generic_await = cozi.@"await";
 const Await = generic_await.@"await";
 const Awaiter = generic_await.Awaiter;
+const Worker = generic_await.Worker;
 const containers = cozi.containers;
 const intrusive = containers.intrusive;
 const Queue = intrusive.lock_free.MpscQueue;
@@ -175,10 +176,11 @@ const StrandAwaiter = struct {
 
     // --- type-erased awaiter interface ---
     pub fn awaitSuspend(
-        ctx: *anyopaque,
-        _: *anyopaque,
+        self: *@This(),
+        worker: Worker,
     ) Awaiter.AwaitSuspendResult {
-        const self: *StrandAwaiter = @alignCast(@ptrCast(ctx));
+        //TODO: support threads?
+        assert(worker.type == .fiber);
         self.strand.tasks.pushBack(self.node);
         return Awaiter.AwaitSuspendResult{ .always_suspend = {} };
     }
@@ -186,7 +188,7 @@ const StrandAwaiter = struct {
     pub fn awaiter(self: *StrandAwaiter) Awaiter {
         return Awaiter{
             .ptr = self,
-            .vtable = .{ .await_suspend = awaitSuspend },
+            .vtable = .{ .await_suspend = @ptrCast(&awaitSuspend) },
         };
     }
 

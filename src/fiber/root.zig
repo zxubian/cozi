@@ -17,8 +17,9 @@ const core = cozi.core;
 const Closure = core.Closure;
 const Runnable = core.Runnable;
 const Stack = core.Stack;
-const Await = @"await".@"await";
-const Awaiter = @"await".Awaiter;
+const Await = cozi.@"await".@"await";
+const Awaiter = cozi.@"await".Awaiter;
+const Worker = cozi.@"await".Worker;
 
 const Sync = @import("./sync.zig");
 const Channel_ = @import("./channel/root.zig");
@@ -30,15 +31,13 @@ pub const Event = Sync.Event;
 pub const Mutex = Sync.Mutex;
 pub const Strand = Sync.Strand;
 pub const WaitGroup = Sync.WaitGroup;
-pub const @"await" = @import("./await/root.zig");
 
 const log = core.log.scoped(.fiber);
 
-threadlocal var current_fiber: ?*Fiber = null;
 coroutine: *Coroutine,
 executor: Executor,
 tick_runnable: Runnable,
-name: [:0]const u8,
+name: [:0]u8,
 state: stdlike.atomic.Value(u8) = .init(0),
 awaiter: ?Awaiter,
 suspend_illegal_scope_depth: Atomic(usize) = .init(0),
@@ -207,23 +206,27 @@ pub fn init(
     return fiber;
 }
 
-fn copyNameToStack(name: []const u8, stack_arena: Allocator) ![]const u8 {
+fn copyNameToStack(name: []const u8, stack_arena: Allocator) ![]u8 {
     const result = try stack_arena.alloc(u8, max_name_length_bytes);
     std.mem.copyForwards(u8, result, name);
     return result;
 }
 
 pub fn isInFiber() bool {
-    return current_fiber != null;
+    return Worker.current().type == .fiber;
 }
 
 pub fn current() ?*Fiber {
-    return current_fiber;
+    const current_worker = Worker.current();
+    if (current_worker.type == .fiber) {
+        return @alignCast(@ptrCast(current_worker.ptr));
+    }
+    return null;
 }
 
 /// Suspend current fiber, and reschedule it for execution on the same executor.
 pub fn yield() void {
-    if (current_fiber) |curr| {
+    if (current()) |curr| {
         curr.yield_();
     } else {
         std.debug.panic("Must use Fiber.yield only when executing on a fiber", .{});
@@ -250,7 +253,7 @@ pub fn @"suspend"(self: *Fiber, awaiter: Awaiter) void {
 }
 
 pub fn @"resume"(self: *Fiber) void {
-    self.tick_runnable.run();
+    self.scheduleSelf();
 }
 
 pub fn scheduleSelf(self: *Fiber) void {
@@ -260,7 +263,7 @@ pub fn scheduleSelf(self: *Fiber) void {
 
 /// Suspend the current fiber, and reschedule it on new_executor
 pub fn switchTo(new_executor: Executor) void {
-    if (current_fiber) |curr| {
+    if (current()) |curr| {
         curr.switchTo_(new_executor);
     } else {
         std.debug.panic("Must use Fiber.switchTo only when executing on a fiber", .{});
@@ -292,13 +295,12 @@ fn RunFunctions(comptime owns_stack: bool) type {
             }
             if (self.awaiter) |awaiter| {
                 self.awaiter = null;
-                const suspend_result = awaiter.awaitSuspend(self);
+                const suspend_result = awaiter.awaitSuspend(self.worker());
                 switch (suspend_result) {
                     .always_suspend => return null,
                     .never_suspend => return self,
                     .symmetric_transfer_next => |next| {
                         const next_fiber: *Fiber = @alignCast(@ptrCast(next));
-                        // TODO: consider if self.resume() or self.scheduleSelf() is better
                         log.debug("Got request for symmetric transfer: {s} -> {s}", .{ self.name, next_fiber.name });
                         log.debug("{s} Resuming self first.", .{self.name});
                         self.@"resume"();
@@ -351,8 +353,8 @@ fn getManagedStack(self: *Fiber) Stack.Managed {
 }
 
 fn runTick(self: *Fiber) void {
-    current_fiber = self;
-    defer current_fiber = null;
+    const previous = Worker.beginScope(self.worker());
+    defer Worker.endScope(previous);
     if (self.state.cmpxchgStrong(0, 1, .seq_cst, .seq_cst)) |_| {
         std.debug.panic("{s} resuming twice!!", .{self.name});
     }
@@ -374,10 +376,11 @@ pub fn inSuspendIllegalScope(self: *Fiber) bool {
 const YieldAwaiter = struct {
     // --- type-erased awaiter interface ---
     pub fn awaitSuspend(
-        _: *anyopaque,
-        handle: *anyopaque,
+        _: *@This(),
+        handle: Worker,
     ) Awaiter.AwaitSuspendResult {
-        var fiber: *Fiber = @alignCast(@ptrCast(handle));
+        assert(handle.type == .fiber);
+        var fiber: *Fiber = @alignCast(@ptrCast(handle.ptr));
         fiber.scheduleSelf();
         return Awaiter.AwaitSuspendResult{ .always_suspend = {} };
     }
@@ -385,7 +388,7 @@ const YieldAwaiter = struct {
     pub fn awaiter(self: *YieldAwaiter) Awaiter {
         return Awaiter{
             .ptr = self,
-            .vtable = .{ .await_suspend = awaitSuspend },
+            .vtable = .{ .await_suspend = @ptrCast(&awaitSuspend) },
         };
     }
 
@@ -401,11 +404,11 @@ const SwitchAwaiter = struct {
     executor: Executor,
     // --- type-erased awaiter interface ---
     pub fn awaitSuspend(
-        ctx: *anyopaque,
-        handle: *anyopaque,
+        self: *@This(),
+        handle: Worker,
     ) Awaiter.AwaitSuspendResult {
-        const self: *@This() = @alignCast(@ptrCast(ctx));
-        var fiber: *Fiber = @alignCast(@ptrCast(handle));
+        assert(handle.type == .fiber);
+        var fiber: *Fiber = @alignCast(@ptrCast(handle.ptr));
         fiber.executor = self.executor;
         fiber.scheduleSelf();
         return .always_suspend;
@@ -414,7 +417,7 @@ const SwitchAwaiter = struct {
     pub fn awaiter(self: *SwitchAwaiter) Awaiter {
         return Awaiter{
             .ptr = self,
-            .vtable = .{ .await_suspend = awaitSuspend },
+            .vtable = .{ .await_suspend = @ptrCast(&awaitSuspend) },
         };
     }
 
@@ -425,6 +428,27 @@ const SwitchAwaiter = struct {
 
     pub fn awaitResume(_: *SwitchAwaiter, _: bool) void {}
 };
+
+pub inline fn worker(self: *Fiber) cozi.@"await".Worker {
+    return .{
+        .ptr = self,
+        .vtable = Worker.VTable{
+            .@"suspend" = @ptrCast(&Fiber.@"suspend"),
+            .@"resume" = @ptrCast(&Fiber.@"resume"),
+            .getName = @ptrCast(&Fiber.getName),
+            .setName = @ptrCast(&Fiber.setName),
+        },
+        .type = .fiber,
+    };
+}
+
+pub fn getName(self: *Fiber) [:0]const u8 {
+    return self.name;
+}
+
+pub fn setName(self: *Fiber, name: [:0]const u8) void {
+    std.mem.copyForwards(u8, self.name, name);
+}
 
 test {
     _ = @import("./tests.zig");

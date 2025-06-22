@@ -7,9 +7,10 @@ const log = cozi.core.log.scoped(.fiber_channel_select);
 const Fiber = cozi.Fiber;
 const sync = cozi.sync;
 const Spinlock = sync.Spinlock;
-const GenericAwait = Fiber.@"await";
-const Awaiter = GenericAwait.Awaiter;
-const Await = GenericAwait.@"await";
+const generic_await = cozi.@"await";
+const Awaiter = generic_await.Awaiter;
+const Await = generic_await.@"await";
+const Worker = generic_await.Worker;
 const channel_ = @import("../root.zig");
 const PendingOperation = channel_.PendingOperation;
 const fault = cozi.fault;
@@ -66,11 +67,11 @@ fn Select(Cases: type) type {
             }
 
             pub fn awaitSuspend(
-                ctx: *anyopaque,
-                handle: *anyopaque,
+                self: *@This(),
+                handle: Worker,
             ) Awaiter.AwaitSuspendResult {
-                const self: *Self = @alignCast(@ptrCast(ctx));
-                self.fiber = @alignCast(@ptrCast(handle));
+                assert(handle.type == .fiber);
+                self.fiber = @alignCast(@ptrCast(handle.ptr));
                 var guards: [case_count]Spinlock.Guard = undefined;
                 lockAll(self.locks, &guards);
                 defer {
@@ -221,7 +222,7 @@ fn Select(Cases: type) type {
                 return Awaiter{
                     .ptr = self,
                     .vtable = .{
-                        .await_suspend = awaitSuspend,
+                        .await_suspend = @ptrCast(&awaitSuspend),
                     },
                 };
             }

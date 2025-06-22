@@ -5,8 +5,9 @@ const Fiber = cozi.Fiber;
 const core = cozi.core;
 const SpinLock = cozi.sync.Spinlock;
 const Runnable = core.Runnable;
-const Await = Fiber.@"await".@"await";
-const Awaiter = Fiber.@"await".Awaiter;
+const Await = cozi.@"await".@"await";
+const Awaiter = cozi.@"await".Awaiter;
+const Worker = cozi.@"await".Worker;
 
 const Impl = @This();
 const Queue = cozi.containers.intrusive.ForwardList;
@@ -102,9 +103,10 @@ const PushBackAwaiter = struct {
 
     pub fn awaitSuspend(
         self: *@This(),
-        fiber: *Fiber,
+        worker: Worker,
     ) Awaiter.AwaitSuspendResult {
-        self.fiber = fiber;
+        std.debug.assert(worker.type == .fiber);
+        self.fiber = @alignCast(@ptrCast(worker.ptr));
         self.task_queue.queue.pushBack(self.task);
         defer self.guard.unlock();
         if (self.task_queue.idle_fibers.popFront()) |waiting_fiber| {
@@ -142,7 +144,7 @@ const PopFrontAwaiter = struct {
 
     pub fn awaitSuspend(
         self: *@This(),
-        fiber: *Fiber,
+        handle: Worker,
     ) Awaiter.AwaitSuspendResult {
         defer self.guard.unlock();
         if (self.task_queue.closed) {
@@ -151,8 +153,9 @@ const PopFrontAwaiter = struct {
         if (!self.task_queue.queue.isEmpty()) {
             return .never_suspend;
         }
+        std.debug.assert(handle.type == .fiber);
         self.entry = .{
-            .fiber = fiber,
+            .fiber = @alignCast(@ptrCast(handle.ptr)),
         };
         self.task_queue.idle_fibers.pushBack(&self.entry);
         return .always_suspend;
@@ -193,7 +196,7 @@ const CloseAwaiter = struct {
 
     pub fn awaitSuspend(
         self: *@This(),
-        _: *Fiber,
+        _: Worker,
     ) Awaiter.AwaitSuspendResult {
         defer self.guard.unlock();
         while (self.task_queue.idle_fibers.popFront()) |next| {

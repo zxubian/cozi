@@ -1,7 +1,7 @@
 //! Compute thread pool, suitable for small number of independent tasks.
 //! For fiber workloads, consider using work-stealing thread pool.
 const std = @import("std");
-const Thread = std.Thread;
+const SystemThread = std.Thread;
 const builtin = @import("builtin");
 const assert = std.debug.assert;
 
@@ -11,7 +11,7 @@ const fault = cozi.fault;
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
 const Allocator = std.mem.Allocator;
-const ThreadExt = cozi.sync.Thread;
+const Worker = cozi.@"await".Worker;
 
 const Core = @import("../../core/root.zig");
 const Runnable = Core.Runnable;
@@ -29,25 +29,25 @@ const Status = enum(u8) {
 };
 
 // for internal storage
-threads: []Thread,
+threads: []SystemThread,
 /// used to allocate the Threads. No allocations happen on runnable submit
 gpa: ?Allocator = null,
 tasks: Queue(Runnable) = .{},
 status: Atomic(Status) = .init(.not_started),
-finish_init_barrier: Thread.ResetEvent = .{},
-thread_start_barrier: Thread.WaitGroup = .{},
+finish_init_barrier: SystemThread.ResetEvent = .{},
+thread_start_barrier: SystemThread.WaitGroup = .{},
 
 threadlocal var current_: ?*ThreadPool = null;
 
 pub fn init(thread_count: usize, gpa: Allocator) !ThreadPool {
-    const threads = try gpa.alloc(Thread, thread_count);
+    const threads = try gpa.alloc(SystemThread, thread_count);
     return ThreadPool{
         .threads = threads,
         .gpa = gpa,
     };
 }
 
-pub fn initNoAlloc(threads: []Thread) ThreadPool {
+pub fn initNoAlloc(threads: []SystemThread) ThreadPool {
     return ThreadPool{
         .threads = threads,
     };
@@ -57,7 +57,7 @@ pub fn start(self: *ThreadPool) !void {
     assert(self.status.cmpxchgStrong(.not_started, .running_or_idle, .seq_cst, .seq_cst) == null);
     self.thread_start_barrier.startMany(self.threads.len);
     for (self.threads, 0..) |*thread, i| {
-        thread.* = try Thread.spawn(
+        thread.* = try SystemThread.spawn(
             .{ .allocator = self.gpa },
             threadEntryPoint,
             .{
@@ -78,12 +78,15 @@ pub fn current() ?*ThreadPool {
 fn threadEntryPoint(
     thread_pool: *ThreadPool,
     i: usize,
-    self: *Thread,
+    self: *SystemThread,
 ) void {
     thread_pool.thread_start_barrier.finish();
     thread_pool.finish_init_barrier.wait();
     current_ = thread_pool;
-    ThreadExt.setCurrentThread(self);
+
+    const previous = Worker.beginScope(Worker.Thread.worker(self));
+    defer Worker.endScope(previous);
+
     assert(current_.?.status.load(.seq_cst) != .not_started);
     var thread_pool_name_buf: [std.Thread.max_name_len]u8 = undefined;
     const name = std.fmt.bufPrint(

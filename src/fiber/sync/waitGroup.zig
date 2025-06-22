@@ -14,9 +14,9 @@ const containers = cozi.containers;
 const Queue = containers.intrusive.lock_free.MpscQueue;
 
 const Fiber = cozi.Fiber;
-const GenericAwait = Fiber.@"await";
-const Await = GenericAwait.@"await";
-const Awaiter = GenericAwait.Awaiter;
+const Await = cozi.@"await".@"await";
+const Awaiter = cozi.@"await".Awaiter;
+const Worker = cozi.@"await".Worker;
 
 const WaitGroup = @This();
 
@@ -115,11 +115,11 @@ const WaitGroupAwaiter = struct {
 
     // --- type-erased awaiter interface ---
     pub fn awaitSuspend(
-        ctx: *anyopaque,
-        handle: *anyopaque,
+        self: *@This(),
+        handle: Worker,
     ) Awaiter.AwaitSuspendResult {
-        var self: *WaitGroupAwaiter = @ptrCast(@alignCast(ctx));
-        const fiber: *Fiber = @alignCast(@ptrCast(handle));
+        std.debug.assert(handle.type == .fiber);
+        const fiber: *Fiber = @alignCast(@ptrCast(handle.ptr));
         const state: State = @bitCast(self.wait_group.state.load(.seq_cst));
         if (state.num_waiters == 0) {
             _ = self.wait_group.state.fetchSub(1 << 32, .seq_cst);
@@ -135,7 +135,7 @@ const WaitGroupAwaiter = struct {
     pub fn awaiter(self: *WaitGroupAwaiter) Awaiter {
         return Awaiter{
             .ptr = self,
-            .vtable = .{ .await_suspend = awaitSuspend },
+            .vtable = .{ .await_suspend = @ptrCast(&awaitSuspend) },
         };
     }
 

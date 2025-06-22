@@ -1,9 +1,10 @@
 const std = @import("std");
 
-const cozi = @import("../../root.zig");
-pub const Awaiter = @import("./awaiter.zig");
-const Fiber = cozi.Fiber;
+const cozi = @import("../root.zig");
 const log = cozi.core.log.scoped(.@"await");
+
+pub const Awaiter = @import("./awaiter.zig");
+pub const Worker = @import("./worker/root.zig");
 
 /// Generic await algorithm
 /// https://lewissbaker.github.io/2017/11/17/understanding-operator-co-await
@@ -15,12 +16,15 @@ pub fn @"await"(expr_ptr: anytype) awaitReturnType(getAwaitableType(@TypeOf(expr
     // want to resolve optimize this branch out,
     // so rely on duck-typing here
     if (!awaitable.awaitReady()) {
-        // need to handle to Fiber, so use type-erased
-        // awaiter here:
+        // Right now we store the Awaiter handle in Fiber as a field,
+        // so we use the type-erased Awaiter interface here here:
         const awaiter: Awaiter = awaitable.awaiter();
-        const handle = getHandle();
-        log.debug("{s} about to suspend due to {s}", .{ handle.name, @typeName(@TypeOf(awaitable)) });
-        handle.@"suspend"(awaiter);
+        const worker_handle = Worker.current();
+        log.debug("{s} about to suspend due to {s}", .{
+            worker_handle.getName(),
+            @typeName(@TypeOf(awaitable)),
+        });
+        worker_handle.@"suspend"(awaiter);
         // --- resume ---
         return awaitable.awaitResume(true);
     }
@@ -53,11 +57,4 @@ fn awaitReturnType(Awaitable: type) type {
         },
         else => @compileError("can only be used with function types"),
     }
-}
-
-fn getHandle() *Fiber {
-    if (Fiber.current()) |curr| {
-        return curr;
-    }
-    std.debug.panic("`await` is only supported in Fiber context", .{});
 }

@@ -3,7 +3,7 @@ const testing = std.testing;
 
 const cozi = @import("../../root.zig");
 const Fiber = cozi.Fiber;
-const Await = Fiber.@"await";
+const Await = cozi.@"await";
 const Awaiter = Await.Awaiter;
 const @"await" = Await.@"await";
 const executors = cozi.executors;

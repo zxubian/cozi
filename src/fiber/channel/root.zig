@@ -11,9 +11,10 @@ const fault = cozi.fault;
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
 
-const GenericAwait = Fiber.@"await";
-const Awaiter = GenericAwait.Awaiter;
-const Await = GenericAwait.@"await";
+const generic_await = cozi.@"await";
+const Awaiter = generic_await.Awaiter;
+const Await = generic_await.@"await";
+const Worker = generic_await.Worker;
 
 const containers = cozi.containers;
 const Queue = containers.intrusive.ForwardList;
@@ -94,10 +95,11 @@ fn SendAwaiter(T: type) type {
 
         pub fn awaitSuspend(
             ctx: *anyopaque,
-            handle: *anyopaque,
+            handle: Worker,
         ) Awaiter.AwaitSuspendResult {
             const self: *Self = @alignCast(@ptrCast(ctx));
-            const fiber: *Fiber = @alignCast(@ptrCast(handle));
+            assert(handle.type == .fiber);
+            const fiber: *Fiber = @alignCast(@ptrCast(handle.ptr));
             self.fiber = fiber;
             defer self.guard.unlock();
             const channel = self.channel;
@@ -176,10 +178,11 @@ fn ReceiveAwaiter(T: type) type {
 
         pub fn awaitSuspend(
             ctx: *anyopaque,
-            handle: *anyopaque,
+            handle: Worker,
         ) Awaiter.AwaitSuspendResult {
             const self: *Self = @alignCast(@ptrCast(ctx));
-            const fiber: *Fiber = @alignCast(@ptrCast(handle));
+            assert(handle.type == .fiber);
+            const fiber: *Fiber = @alignCast(@ptrCast(handle.ptr));
             self.fiber = fiber;
             const channel = self.channel;
             defer self.guard.unlock();
@@ -327,11 +330,12 @@ pub fn Channel(T: type) type {
 
             pub fn awaitSuspend(
                 ctx: *anyopaque,
-                handle: *anyopaque,
+                handle: Worker,
             ) Awaiter.AwaitSuspendResult {
                 const self: *CloseAwaiter = @alignCast(@ptrCast(ctx));
                 const channel = self.channel;
-                const fiber: *Fiber = @alignCast(@ptrCast(handle));
+                assert(handle.type == .fiber);
+                const fiber: *Fiber = @alignCast(@ptrCast(handle.ptr));
                 self.fiber = fiber;
                 const guard = self.guard;
                 defer guard.unlock();
