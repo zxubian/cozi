@@ -2,7 +2,6 @@ const cozi = @import("../../root.zig");
 const std = @import("std");
 const Worker = @This();
 const Awaiter = cozi.@"await".Awaiter;
-const Scope = cozi.core.Scope(?Worker);
 pub const Thread = @import("./thread.zig");
 
 vtable: VTable,
@@ -54,4 +53,8 @@ pub fn current() Worker {
         current_ = Thread.systemThreadWorker();
     }
     return current_.?;
+}
+
+test {
+    _ = @import("./tests.zig");
 }
