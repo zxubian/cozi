@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const testing = std.testing;
 
 const cozi = @import("../../root.zig");
@@ -11,7 +12,7 @@ const ThreadPool = executors.threadPools.Compute;
 const future = cozi.future.lazy;
 
 test "Fiber Pool - basic" {
-    if (cozi.build_options.options.sanitizer_variant == .thread) {
+    if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
     var thread_pool = try ThreadPool.init(1, testing.allocator);
@@ -30,8 +31,53 @@ test "Fiber Pool - basic" {
     defer fiber_pool.stop();
 }
 
+test "Fiber Pool - many threads" {
+    if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
+    const count = 4;
+    var tp = try cozi.executors.threadPools.Compute.init(
+        count,
+        testing.allocator,
+    );
+    defer tp.deinit();
+    try tp.start();
+    defer tp.stop();
+
+    var fiber_pool = try cozi.executors.FiberPool.init(
+        testing.allocator,
+        tp.executor(),
+        .{
+            .fiber_count = count,
+        },
+    );
+    defer fiber_pool.deinit();
+    fiber_pool.start();
+    defer fiber_pool.stop();
+
+    const exec = fiber_pool.executor();
+
+    const Ctx = struct {
+        wg: std.Thread.WaitGroup = .{},
+        pub fn run(self: *@This()) void {
+            self.wg.finish();
+        }
+    };
+    var ctx: Ctx = .{};
+    ctx.wg.startMany(count);
+
+    for (0..count) |_| {
+        exec.submit(Ctx.run, .{&ctx}, testing.allocator);
+    }
+
+    ctx.wg.wait();
+}
+
 test "Fiber Pool - future" {
     if (cozi.build_options.options.sanitizer_variant == .thread) {
+        return error.SkipZigTest;
+    }
+    if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
     var thread_pool = try ThreadPool.init(
@@ -74,6 +120,9 @@ test "Fiber Pool - future" {
 
 test "Fiber Pool - future - stress " {
     if (cozi.build_options.options.sanitizer_variant == .thread) {
+        return error.SkipZigTest;
+    }
+    if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
     var thread_pool = try ThreadPool.init(
