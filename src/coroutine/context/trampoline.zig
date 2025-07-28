@@ -12,7 +12,7 @@ pub fn run(self: *Trampoline) noreturn {
 }
 
 // intended for calling from assembly
-pub fn runC(ctx: *anyopaque) callconv(.C) noreturn {
+pub fn runC(ctx: *anyopaque) callconv(.c) noreturn {
     const self: *Trampoline = @alignCast(@ptrCast(ctx));
     self.vtable.run(self.ptr);
 }

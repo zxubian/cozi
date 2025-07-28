@@ -98,6 +98,7 @@ test "Fiber Pool - future - stress " {
     const executor = fiber_pool.executor();
     const future_count = 10;
     const iterations_per_future = 1000;
+    @setEvalBranchQuota(100_000);
     const Ctx = struct {
         stage: usize,
         mutex: Fiber.Mutex = .{},

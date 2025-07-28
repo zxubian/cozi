@@ -91,12 +91,18 @@ pub fn build(b: *std.Build) void {
     addAssemblyForMachineContext(b, root, &target);
 
     const test_filter_option = b.option([]const []const u8, "test-filter", "Test filter");
-    const unit_tests = b.addTest(.{
+
+    const test_module = b.createModule(.{
         .root_source_file = b.path("src/tests.zig"),
         .target = target,
         .optimize = optimize,
-        .filters = if (test_filter_option) |o| o else &.{},
         .sanitize_thread = sanitizer_variant == .thread,
+        .link_libcpp = sanitizer_variant == .thread,
+    });
+
+    const unit_tests = b.addTest(.{
+        .root_module = test_module,
+        .filters = if (test_filter_option) |o| o else &.{},
     });
 
     if (sanitizer_variant) |variant| {

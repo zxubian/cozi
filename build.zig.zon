@@ -2,7 +2,7 @@
     .name = .cozi,
     .version = "0.0.1",
     .fingerprint = 0xaae2436c6f73c03f,
-    .minimum_zig_version = "0.15.0-dev.670+1a08c83eb",
+    .minimum_zig_version = "0.15.0-dev.1262+e12dc4947",
     .dependencies = .{},
     .paths = .{
         "build.zig",

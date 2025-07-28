@@ -54,18 +54,18 @@ const Aarch64Impl = struct {
         *anyopaque,
         *anyopaque,
         machine_context: *anyopaque,
-    ) callconv(.C) void;
+    ) callconv(.c) void;
 
     extern fn machine_context_init(
         stack: ?[*]u8,
         trampoline_run: TrampolineProto,
         trampoline_ctx: *anyopaque,
-    ) callconv(.C) *anyopaque;
+    ) callconv(.c) *anyopaque;
 
     extern fn machine_context_switch_to(
         old_stack_pointer: **anyopaque,
         new_stack_pointer: **anyopaque,
-    ) callconv(.C) void;
+    ) callconv(.c) void;
 
     stack_pointer: *anyopaque,
     user_trampoline: Trampoline,
@@ -107,7 +107,7 @@ const Aarch64Impl = struct {
         _: *anyopaque,
         _: *anyopaque,
         ctx: *anyopaque,
-    ) callconv(.C) noreturn {
+    ) callconv(.c) noreturn {
         log.debug(
             "recovered machineContext impl ptr from stack: 0x{x:0>8}",
             .{@intFromPtr(ctx)},
@@ -254,13 +254,13 @@ const x86_64WindowsImpl = struct {
         stack_base: ?[*]u8,
         machine_context_trampoline: @TypeOf(&machine_context_trampoline),
         trampoline_ctx: *anyopaque,
-    ) callconv(.C) *anyopaque;
+    ) callconv(.c) *anyopaque;
 
     /// ./machine/x86_64_windows.s
     extern fn machine_context_switch_to(
         old_stack_pointer: **anyopaque,
         new_stack_pointer: **anyopaque,
-    ) callconv(.C) void;
+    ) callconv(.c) void;
 
     fn machine_context_trampoline(
         _: *anyopaque,
@@ -269,7 +269,7 @@ const x86_64WindowsImpl = struct {
         _: *anyopaque,
         // passed on the stack
         machine_ctx_self: *anyopaque,
-    ) callconv(.C) noreturn {
+    ) callconv(.c) noreturn {
         const self: *x86_64WindowsImpl = @alignCast(@ptrCast(machine_ctx_self));
         self.user_trampoline.run();
     }

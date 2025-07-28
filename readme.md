@@ -15,7 +15,7 @@ _Fibers, thread pools, futures - all in userland Zig. Oh My!_
 ### Minimum Supported Zig Version
 
 ```
-0.15.0-dev.670+1a08c83eb
+0.15.0-dev.1262+e12dc4947
 ```
 
 ### Steps

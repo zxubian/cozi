@@ -82,7 +82,7 @@ test "Wait" {
         done: bool,
         wait_group: WaitGroup = .{},
         pub fn run(self: *@This()) void {
-            std.time.sleep(std.time.ns_per_ms);
+            std.Thread.sleep(std.time.ns_per_ms);
             self.done = true;
             self.wait_group.finish();
         }
@@ -116,7 +116,7 @@ test "Multi-wait" {
         done: bool,
         wait_group: *WaitGroup,
         pub fn run(self: *@This()) void {
-            std.time.sleep(std.time.ns_per_ms);
+            std.Thread.sleep(std.time.ns_per_ms);
             self.done = true;
             self.wait_group.finish();
         }
@@ -196,7 +196,7 @@ test "Parallel" {
             sleep_nanoseconds: u64,
         ) void {
             if (sleep_nanoseconds > 0) {
-                std.time.sleep(sleep_nanoseconds);
+                std.Thread.sleep(sleep_nanoseconds);
             }
             _ = self.tasks.fetchAdd(1, .seq_cst);
             self.wait_group.finish();
@@ -207,7 +207,7 @@ test "Parallel" {
     ctx.wait_group.startMany(2);
     executor.submit(Context.Run, .{ &ctx, std.time.ns_per_s }, alloc);
     executor.submit(Context.Run, .{ &ctx, 0 }, alloc);
-    std.time.sleep(std.time.ns_per_ms * 500);
+    std.Thread.sleep(std.time.ns_per_ms * 500);
     try testing.expectEqual(1, ctx.tasks.load(.seq_cst));
     ctx.wait_group.wait();
     try testing.expectEqual(2, ctx.tasks.load(.seq_cst));
@@ -240,7 +240,7 @@ test "Two Pools" {
         const sleep_nanoseconds: u64 = std.time.ns_per_s;
 
         pub fn Run(self: *@This()) void {
-            std.time.sleep(sleep_nanoseconds);
+            std.Thread.sleep(sleep_nanoseconds);
             _ = self.tasks.fetchAdd(1, .seq_cst);
             self.wait_group.finish();
         }
@@ -279,7 +279,7 @@ test "Stop" {
     const Context = struct {
         wait_group: WaitGroup = .{},
         pub fn Run(self: *@This()) void {
-            std.time.sleep(std.time.ns_per_ms * 128);
+            std.Thread.sleep(std.time.ns_per_ms * 128);
             self.wait_group.finish();
         }
     };
@@ -316,7 +316,7 @@ test "Current" {
         pub fn Run(self: *@This()) void {
             const c = ThreadPool.current();
             std.testing.expectEqual(self.tp, c) catch std.debug.panic(
-                "Expected: {?} Got: {?}",
+                "Expected: {*} Got: {?}",
                 .{ self.tp, c },
             );
             self.wait_group.finish();
@@ -354,7 +354,7 @@ test "Submit after waitgroup finish" {
 
         pub fn Run(self: *@This()) void {
             var wg = self.wait_group;
-            std.time.sleep(std.time.ns_per_ms * 500);
+            std.Thread.sleep(std.time.ns_per_ms * 500);
             self.done.* = true;
             self.alloc.destroy(self);
             wg.finish();
@@ -366,7 +366,7 @@ test "Submit after waitgroup finish" {
         wait_group: *WaitGroup,
 
         pub fn Run(self: *@This()) void {
-            std.time.sleep(std.time.ns_per_ms * 500);
+            std.Thread.sleep(std.time.ns_per_ms * 500);
             // must allocate on heap:
             // if we allocate on stack, then ptr to ctx will be destroyed
             // as soon as ContextA.Run exits, but before ContextB.Run accesses
@@ -418,7 +418,7 @@ test "Use Threads" {
             wait_group: WaitGroup = .{},
 
             pub fn run(self: *@This()) void {
-                std.time.sleep(std.time.ns_per_ms * 750);
+                std.Thread.sleep(std.time.ns_per_ms * 750);
                 _ = self.tasks.fetchAdd(1, .seq_cst);
                 self.wait_group.finish();
             }
@@ -461,7 +461,7 @@ test "Too Many Threads" {
             wait_group: WaitGroup = .{},
 
             pub fn run(self: *@This()) void {
-                std.time.sleep(std.time.ns_per_ms * 750);
+                std.Thread.sleep(std.time.ns_per_ms * 750);
                 _ = self.tasks.fetchAdd(1, .seq_cst);
                 self.wait_group.finish();
             }

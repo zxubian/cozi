@@ -7,7 +7,7 @@
 #     machine_context_trampoline: TrampolineProto,
 #     trampoline_ctx: *anyopaque,
 #     trampoline_run: *anyopaque,
-# ) callconv(.C) *anyopaque;
+# ) callconv(.c) *anyopaque;
 machine_context_init:
     # RCX:        stack_ceil: ?[*]u8 (low address)
     # RDX:        stack_base: u64 (high address)
@@ -110,7 +110,7 @@ machine_context_init:
 # extern fn machine_context_switch_to(
 #     old_stack_pointer: **anyopaque,
 #     new_stack_pointer: **anyopaque,
-# ) callconv(.C) void;
+# ) callconv(.c) void;
 machine_context_switch_to:
     # rcx: stack pointer for self context
     # rdx: stack pointer for other context
