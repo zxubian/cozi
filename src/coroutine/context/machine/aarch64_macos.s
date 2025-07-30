@@ -1,7 +1,7 @@
-.global machine_context_init
-.global machine_context_switch_to
+.global _machine_context_init
+.global _machine_context_switch_to
 
-machine_context_init:
+_machine_context_init:
     # X0 is stack top
     # X1 is ptr to trampoline function
     # X2 is ptr to MachineContext trampoline mpl 
@@ -65,7 +65,7 @@ machine_context_init:
 
     ret
 
-machine_context_switch_to:
+_machine_context_switch_to:
     # X0 is stack pointer for self context
     # X1 is stack pointer for other context
 

@@ -169,8 +169,8 @@ See [issue](https://github.com/zxubian/cozi/issues/8).
 
 | Arch\OS | MacOS | Windows | Linux |
 |:-------:|:-----:|:-------:|:-----:|
-| aarch64 | ✅     | ❌       | ❌     |
-| x86_64  | ❌     | ✅       | ❌     |
+| aarch64 | ✅     | ❌     | ✅    |
+| x86_64  | ❌     | ✅     | ❌    |
 
 ```zig
 const cozi = @import("cozi");
