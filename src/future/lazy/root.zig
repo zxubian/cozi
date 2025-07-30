@@ -36,10 +36,11 @@ pub const Impl = struct {
     pub const All = combinators.all.All;
     pub const first = combinators.first.first;
     pub const First = combinators.first.First;
+    pub const firstUnwrapResult = combinators.first.unwrapResult;
     // --- terminators ---
     pub const get = terminators.get;
     pub const detach = terminators.detach;
-    pub const Awaitable = terminators.@"await".Awaitable;
+    pub const Awaitable = terminators.await.Awaitable;
     // --- syntax ---
     pub const pipeline = syntax.pipeline.pipeline;
     // --- other ---

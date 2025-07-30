@@ -8,6 +8,27 @@ const future = cozi.future.lazy;
 const State = future.State;
 
 const log = core.log.scoped(.future_first);
+
+fn UnwrapResult(Result: type) type {
+    const result_type_info = @typeInfo(Result);
+    comptime assert(result_type_info == .@"union");
+    const FirstCaseType = @typeInfo(Result).@"union".fields[0].type;
+    inline for (result_type_info.@"union".fields) |case| {
+        if (case.type != FirstCaseType) {
+            @compileError("Union types must be heterogenous to use unwrap");
+        }
+    }
+    return FirstCaseType;
+}
+
+pub fn unwrapResult(result_union: anytype) UnwrapResult(@TypeOf(result_union)) {
+    switch (result_union) {
+        inline else => |val| {
+            return val;
+        },
+    }
+}
+
 pub fn First(Inputs: type) type {
     const inputs_type_info = @typeInfo(Inputs);
     if (std.meta.activeTag(inputs_type_info) != .@"struct") {
