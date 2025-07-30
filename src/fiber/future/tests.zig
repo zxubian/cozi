@@ -607,14 +607,12 @@ test "fiber - future - await" {
     defer fiber_pool.deinit();
     fiber_pool.start();
     defer fiber_pool.stop();
-    while (10000) {
-        const Ctx = struct {
-            pub fn a() u32 {
-                return 42;
-            }
-        };
-        const f = future.submit(fiber_pool.executor(), Ctx.a, .{});
-        const result = await(&f);
-        try testing.expectEqual(@as(u32, 42), result);
-    }
+    const Ctx = struct {
+        pub fn a() u32 {
+            return 42;
+        }
+    };
+    const f = future.submit(fiber_pool.executor(), Ctx.a, .{});
+    const result = await(&f);
+    try testing.expectEqual(@as(u32, 42), result);
 }

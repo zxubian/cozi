@@ -310,9 +310,11 @@ fn RunFunctions(comptime owns_stack: bool) type {
             self.runTick();
             log.debug("{s} returned from coroutine", .{self.name});
             if (self.coroutine.is_completed) {
-                if (owns_stack) {
-                    log.debug("{s} about to deinit", .{self.name});
-                    self.getManagedStack().deinit();
+                defer {
+                    if (owns_stack) {
+                        log.debug("{s} about to deinit", .{self.name});
+                        self.getManagedStack().deinit();
+                    }
                 }
                 if (self.state.cmpxchgStrong(
                     .running,
