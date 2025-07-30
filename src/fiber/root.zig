@@ -17,9 +17,9 @@ const core = cozi.core;
 const Closure = core.Closure;
 const Runnable = core.Runnable;
 const Stack = core.Stack;
-const Await = cozi.@"await".@"await";
-const Awaiter = cozi.@"await".Awaiter;
-const Worker = cozi.@"await".Worker;
+const Await = cozi.await.await;
+const Awaiter = cozi.await.Awaiter;
+const Worker = cozi.await.Worker;
 
 const Sync = @import("./sync.zig");
 const Channel_ = @import("./channel/root.zig");
@@ -38,7 +38,7 @@ coroutine: *Coroutine,
 executor: Executor,
 tick_runnable: Runnable,
 name: [:0]u8,
-state: stdlike.atomic.Value(u8) = .init(0),
+is_running: stdlike.atomic.Value(bool) = .init(false),
 awaiter: ?Awaiter,
 suspend_illegal_scope_depth: Atomic(usize) = .init(0),
 
@@ -169,6 +169,14 @@ pub fn initOptions(
     const store_allocator_ptr = try arena.create(Allocator);
     store_allocator_ptr.* = allocator;
     const coroutine = try Coroutine.initOnStack(routine, args, stack.raw, arena);
+    log.debug(
+        "Initializing {s} on stack: [{*}, {*}]",
+        .{
+            options.fiber.name,
+            stack.raw.base(),
+            stack.raw.ceil(),
+        },
+    );
     return try init(coroutine, executor, options.fiber, arena, true);
 }
 
@@ -184,6 +192,14 @@ pub fn initWithStack(
     var fixed_buffer_allocator = stack.bufferAllocator();
     const arena = fixed_buffer_allocator.allocator();
     const coroutine = try Coroutine.initOnStack(routine, args, stack, arena);
+    log.debug(
+        "Initializing {s} on stack: [{*}, {*}]",
+        .{
+            options.name,
+            stack.base(),
+            stack.ceil(),
+        },
+    );
     return try init(coroutine, executor, options, arena, false);
 }
 
@@ -245,7 +261,12 @@ pub fn @"suspend"(self: *Fiber, awaiter: Awaiter) void {
         std.debug.panic("Cannot suspend fiber while in \"suspend illegal\" scope.", .{});
     }
     log.debug("{s} about to suspend", .{self.name});
-    if (self.state.cmpxchgStrong(1, 0, .seq_cst, .seq_cst)) |_| {
+    if (self.is_running.cmpxchgStrong(
+        true,
+        false,
+        .seq_cst,
+        .seq_cst,
+    )) |_| {
         std.debug.panic("suspending twice!!", .{});
     }
     self.awaiter = awaiter;
@@ -289,6 +310,7 @@ fn RunFunctions(comptime owns_stack: bool) type {
             log.debug("{s} returned from coroutine", .{self.name});
             if (self.coroutine.is_completed) {
                 if (owns_stack) {
+                    log.debug("{s} about to deinit", .{self.name});
                     self.getManagedStack().deinit();
                 }
                 return null;
@@ -355,7 +377,12 @@ fn getManagedStack(self: *Fiber) Stack.Managed {
 fn runTick(self: *Fiber) void {
     const previous = Worker.beginScope(self.worker());
     defer Worker.endScope(previous);
-    if (self.state.cmpxchgStrong(0, 1, .seq_cst, .seq_cst)) |_| {
+    if (self.is_running.cmpxchgStrong(
+        false,
+        true,
+        .seq_cst,
+        .seq_cst,
+    )) |_| {
         std.debug.panic("{s} resuming twice!!", .{self.name});
     }
     self.coroutine.@"resume"();
@@ -429,7 +456,7 @@ const SwitchAwaiter = struct {
     pub fn awaitResume(_: *SwitchAwaiter, _: bool) void {}
 };
 
-pub inline fn worker(self: *Fiber) cozi.@"await".Worker {
+pub inline fn worker(self: *Fiber) cozi.await.Worker {
     return .{
         .ptr = self,
         .vtable = Worker.VTable{
