@@ -115,14 +115,6 @@ pub fn All(Inputs: type) type {
                             }
                         };
 
-                        fn inputContinue(ctx: *anyopaque) void {
-                            const self: *Impl = @alignCast(@ptrCast(ctx));
-                            self.next.@"continue"(
-                                self.value,
-                                .init,
-                            );
-                        }
-
                         fn InputContinuation(
                             F: type,
                             comptime computation_index: usize,
@@ -151,12 +143,11 @@ pub fn All(Inputs: type) type {
                                     );
                                     all_computation.value[index] = value;
                                     if (all_computation.rendezvous_state.fetchSub(1, .seq_cst) - 1 == 0) {
-                                        self.runnable = .{
-                                            .runFn = inputContinue,
-                                            .ptr = all_computation,
-                                        };
                                         // reset state to "inline"
-                                        cozi.executors.@"inline".submitRunnable(&self.runnable);
+                                        all_computation.next.@"continue"(
+                                            all_computation.value,
+                                            .init,
+                                        );
                                     }
                                 }
                             };

@@ -7,6 +7,7 @@ const Runnable = core.Runnable;
 const future = cozi.future.lazy;
 const State = future.State;
 
+const log = core.log.scoped(.future_first);
 pub fn First(Inputs: type) type {
     const inputs_type_info = @typeInfo(Inputs);
     if (std.meta.activeTag(inputs_type_info) != .@"struct") {
@@ -102,12 +103,21 @@ pub fn First(Inputs: type) type {
                             inline for (
                                 &self.input_computations,
                                 &self.input_computation_runnables,
-                            ) |*computation, *runnable| {
+                                0..,
+                            ) |
+                                *computation,
+                                *runnable,
+                                i,
+                            | {
                                 const InputComputation = @TypeOf(computation.*);
                                 runnable.* = .{
                                     .runFn = @ptrCast(&InputComputation.start),
                                     .ptr = computation,
                                 };
+                                log.debug("[{s}] submitting input #{} from worker", .{
+                                    cozi.await.Worker.current().getName(),
+                                    i,
+                                });
                                 executor.submitRunnable(runnable);
                             }
                         }
@@ -130,25 +140,16 @@ pub fn First(Inputs: type) type {
                             }
                         };
 
-                        fn inputContinue(ctx: *anyopaque) void {
-                            const self: *Impl = @alignCast(@ptrCast(ctx));
-                            self.next.@"continue"(
-                                self.value,
-                                .init,
-                            );
-                        }
-
                         fn InputContinuation(
                             F: type,
                             comptime computation_index: usize,
                         ) type {
                             return struct {
                                 const index: usize = computation_index;
-                                runnable: Runnable = undefined,
                                 pub fn @"continue"(
                                     self: *@This(),
                                     value: F.ValueType,
-                                    state: State,
+                                    _: State,
                                 ) void {
                                     const computation: *F.Computation(@This()) =
                                         @alignCast(@fieldParentPtr("next", self));
@@ -174,19 +175,23 @@ pub fn First(Inputs: type) type {
                                         .seq_cst,
                                         .seq_cst,
                                     )) |_| {
+                                        log.debug(
+                                            "Input #{}: received result, but lost race. Dropping",
+                                            .{computation_index},
+                                        );
                                         // lost the race
                                         return;
                                     }
+                                    log.debug(
+                                        "Input #{}: received result and won race.",
+                                        .{computation_index},
+                                    );
                                     first_computation.value = @unionInit(
                                         ValueType,
                                         computation_field_name_in_tuple,
                                         value,
                                     );
-                                    self.runnable = .{
-                                        .runFn = inputContinue,
-                                        .ptr = first_computation,
-                                    };
-                                    state.executor.submitRunnable(&self.runnable);
+                                    first_computation.next.@"continue"(first_computation.value, .init);
                                 }
                             };
                         }
