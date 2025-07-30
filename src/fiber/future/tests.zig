@@ -3,9 +3,9 @@ const testing = std.testing;
 
 const cozi = @import("../../root.zig");
 const Fiber = cozi.Fiber;
-const Await = cozi.@"await";
+const Await = cozi.await;
 const Awaiter = Await.Awaiter;
-const @"await" = Await.@"await";
+const await = Await.await;
 const executors = cozi.executors;
 const ManualExecutor = executors.Manual;
 const future = cozi.future.lazy;
@@ -16,7 +16,7 @@ test "fiber - future - just" {
     const Ctx = struct {
         pub fn run() !void {
             const f = future.just();
-            @"await"(&f);
+            await(&f);
         }
     };
     try Fiber.go(
@@ -34,7 +34,7 @@ test "fiber - future - value" {
     const Ctx = struct {
         pub fn run() !void {
             const f = future.value(@as(usize, 123));
-            const result = @"await"(&f);
+            const result = await(&f);
             try testing.expectEqual(123, result);
         }
     };
@@ -53,7 +53,7 @@ test "fiber - future - constValue" {
     const Ctx = struct {
         pub fn run() !void {
             const f = future.constValue(@as(usize, 123));
-            const result = @"await"(&f);
+            const result = await(&f);
             try testing.expectEqual(123, result);
         }
     };
@@ -81,7 +81,7 @@ test "fiber - future - contract" {
         }
 
         pub fn consumer(ctx: *@This()) !void {
-            const result = @"await"(&ctx.contract[0]);
+            const result = await(&ctx.contract[0]);
             try testing.expectEqual(123, result);
             ctx.consumer_done = true;
         }
@@ -134,7 +134,7 @@ test "fiber - future - pipeline basic" {
                     ),
                 },
             );
-            const result = @"await"(&pipeline);
+            const result = await(&pipeline);
             try testing.expectEqual(124, result);
             ctx.done = true;
         }
@@ -176,7 +176,7 @@ test "fiber - future - submit" {
                 }.innerRun,
                 .{ctx},
             );
-            @"await"(&submit);
+            await(&submit);
             try testing.expect(ctx.inner_done);
             ctx.done = true;
         }
@@ -221,7 +221,7 @@ test "fiber - future - MapOk" {
                     ),
                 },
             );
-            const result = @"await"(&pipeline);
+            const result = await(&pipeline);
             try testing.expectEqual(124, result);
         }
     };
@@ -259,7 +259,7 @@ test "fiber - future - andThen" {
                     ),
                 },
             );
-            const result = @"await"(&pipeline);
+            const result = await(&pipeline);
             try testing.expectEqual(124, result);
         }
     };
@@ -297,7 +297,7 @@ test "fiber - future - orElse" {
                     ),
                 },
             );
-            const result = @"await"(&pipeline);
+            const result = await(&pipeline);
             try testing.expectEqual(123, result);
         }
     };
@@ -377,7 +377,7 @@ test "fiber - future - pipeline combinators" {
                     ),
                 },
             );
-            const result = try @"await"(&pipeline);
+            const result = try await(&pipeline);
             try testing.expectEqual(4, result);
         }
     };
@@ -424,7 +424,7 @@ test "fiber - future - all" {
                     ),
                 },
             );
-            const int, const string = @"await"(&all);
+            const int, const string = await(&all);
             try testing.expectEqual(123, int);
             try testing.expectEqualStrings("abc", string);
             ctx.done = true;
@@ -492,7 +492,7 @@ test "fiber - future - first" {
                     ),
                 },
             );
-            const result = @"await"(&first);
+            const result = await(&first);
             switch (result) {
                 .@"0" => |_| unreachable,
                 .@"1" => |string| try testing.expectEqualStrings("abc", string),
@@ -570,7 +570,7 @@ test "fiber - future - box" {
 
         pub fn run(ctx: *@This()) !void {
             const async_reader = ctx.reader.eraseType();
-            const result: u32 = try @"await"(&async_reader.read());
+            const result: u32 = try await(&async_reader.read());
             try testing.expectEqual(1, result);
             ctx.done = true;
         }
@@ -587,4 +587,34 @@ test "fiber - future - box" {
     );
     _ = fiber_executor.drain();
     try testing.expect(ctx.done);
+}
+
+test "fiber - future - await" {
+    var tp = try cozi.executors.threadPools.Compute.init(
+        1,
+        testing.allocator,
+    );
+    defer tp.deinit();
+    try tp.start();
+    defer tp.stop();
+    var fiber_pool = try cozi.executors.FiberPool.init(
+        testing.allocator,
+        tp.executor(),
+        .{
+            .fiber_count = 1,
+        },
+    );
+    defer fiber_pool.deinit();
+    fiber_pool.start();
+    defer fiber_pool.stop();
+    while (10000) {
+        const Ctx = struct {
+            pub fn a() u32 {
+                return 42;
+            }
+        };
+        const f = future.submit(fiber_pool.executor(), Ctx.a, .{});
+        const result = await(&f);
+        try testing.expectEqual(@as(u32, 42), result);
+    }
 }
