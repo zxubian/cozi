@@ -98,7 +98,10 @@ pub fn deinit(self: *@This()) void {
 pub fn start(self: *@This()) void {
     self.join_wait_group.startMany(self.fibers.len);
     for (self.fibers) |fiber| {
-        const closure: *cozi.core.Closure(fiberEntryPoint) = @alignCast(@ptrCast(fiber.coroutine.runnable.ptr));
+        const closure: *cozi.core.Closure(fiberEntryPoint) =
+            @alignCast(
+                @ptrCast(fiber.coroutine.runnable.ptr),
+            );
         closure.arguments = .{
             self,
         };
@@ -110,6 +113,19 @@ pub fn stop(self: *@This()) void {
     log.debug("stopping fiber pool", .{});
     self.task_queue.tryClose() catch unreachable;
     self.join_wait_group.wait();
+    while (true) {
+        const all_fibers_finished = for (self.fibers) |fiber| {
+            if (fiber.state.load(.seq_cst) == .finished) {
+                continue;
+            }
+            break false;
+        } else true;
+        if (all_fibers_finished) {
+            break;
+        } else {
+            std.atomic.spinLoopHint();
+        }
+    }
 }
 
 fn fiberEntryPoint(pool: *FiberPool) !void {

@@ -38,12 +38,18 @@ coroutine: *Coroutine,
 executor: Executor,
 tick_runnable: Runnable,
 name: [:0]u8,
-is_running: stdlike.atomic.Value(bool) = .init(false),
+state: stdlike.atomic.Value(State) = .init(.init),
 awaiter: ?Awaiter,
 suspend_illegal_scope_depth: Atomic(usize) = .init(0),
 
 pub const max_name_length_bytes = 100;
 pub const default_name = "Fiber";
+pub const State = enum(u8) {
+    init,
+    running,
+    susended,
+    finished,
+};
 
 /// Create new fiber and schedule it for execution on `executor`.
 /// Fiber will call `routine(args)` when executed.
@@ -261,14 +267,6 @@ pub fn @"suspend"(self: *Fiber, awaiter: Awaiter) void {
         std.debug.panic("Cannot suspend fiber while in \"suspend illegal\" scope.", .{});
     }
     log.debug("{s} about to suspend", .{self.name});
-    if (self.is_running.cmpxchgStrong(
-        true,
-        false,
-        .seq_cst,
-        .seq_cst,
-    )) |_| {
-        std.debug.panic("suspending twice!!", .{});
-    }
     self.awaiter = awaiter;
     self.coroutine.@"suspend"();
 }
@@ -278,7 +276,10 @@ pub fn @"resume"(self: *Fiber) void {
 }
 
 pub fn scheduleSelf(self: *Fiber) void {
-    log.debug("{s} getting scheduled", .{self.name});
+    log.debug(
+        "{s} getting scheduled (runnable@{*})",
+        .{ self.name, &self.tick_runnable },
+    );
     self.executor.submitRunnable(&self.tick_runnable);
 }
 
@@ -313,9 +314,41 @@ fn RunFunctions(comptime owns_stack: bool) type {
                     log.debug("{s} about to deinit", .{self.name});
                     self.getManagedStack().deinit();
                 }
+                if (self.state.cmpxchgStrong(
+                    .running,
+                    .finished,
+                    .seq_cst,
+                    .seq_cst,
+                )) |actual| {
+                    std.debug.panic(
+                        "Invalid fiber state transition: expected {}->{}. actual: {}->{}",
+                        .{
+                            State.running,
+                            State.finished,
+                            actual,
+                            State.finished,
+                        },
+                    );
+                }
                 return null;
             }
             if (self.awaiter) |awaiter| {
+                if (self.state.cmpxchgStrong(
+                    .running,
+                    .susended,
+                    .seq_cst,
+                    .seq_cst,
+                )) |actual| {
+                    std.debug.panic(
+                        "Invalid fiber state transition: expected {}->{}. actual: {}->{}",
+                        .{
+                            State.running,
+                            State.susended,
+                            actual,
+                            State.susended,
+                        },
+                    );
+                }
                 self.awaiter = null;
                 const suspend_result = awaiter.awaitSuspend(self.worker());
                 switch (suspend_result) {
@@ -377,12 +410,7 @@ fn getManagedStack(self: *Fiber) Stack.Managed {
 fn runTick(self: *Fiber) void {
     const previous = Worker.beginScope(self.worker());
     defer Worker.endScope(previous);
-    if (self.is_running.cmpxchgStrong(
-        false,
-        true,
-        .seq_cst,
-        .seq_cst,
-    )) |_| {
+    if (self.state.swap(.running, .seq_cst) == .running) {
         std.debug.panic("{s} resuming twice!!", .{self.name});
     }
     self.coroutine.@"resume"();
