@@ -11,7 +11,7 @@ const fault = cozi.fault;
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
 const Allocator = std.mem.Allocator;
-const Worker = cozi.@"await".Worker;
+const Worker = cozi.await.Worker;
 
 const Core = @import("../../core/root.zig");
 const Runnable = Core.Runnable;
@@ -84,23 +84,23 @@ fn threadEntryPoint(
     thread_pool.finish_init_barrier.wait();
     current_ = thread_pool;
 
-    const previous = Worker.beginScope(Worker.Thread.worker(self));
-    defer Worker.endScope(previous);
-
     assert(current_.?.status.load(.seq_cst) != .not_started);
-    var thread_pool_name_buf: [std.Thread.max_name_len]u8 = undefined;
-    const name = std.fmt.bufPrint(
+    var thread_pool_name_buf: [std.Thread.max_name_len:0]u8 = undefined;
+    const name = std.fmt.bufPrintZ(
         &thread_pool_name_buf,
         "Pool@{}/Thread #{}",
         .{ @intFromPtr(thread_pool), i },
     ) catch "Thread Pool@(unknown) Thread#(unknown)";
-    self.setName(name) catch |e| {
-        std.debug.panic("Failed to set thread name {s} for thread:{} {}", .{
+    const worker = Worker.Thread.init(self, thread_pool_name_buf) catch |e| {
+        std.debug.panic("Failed to initialize worker for threadpool thread {s}: {}", .{
             name,
-            self.getHandle(),
             e,
         });
     };
+
+    const previous = Worker.beginScope(worker);
+    defer Worker.endScope(previous);
+
     while (true) {
         const current_status = current_.?.status.load(.seq_cst);
         switch (current_status) {
