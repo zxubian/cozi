@@ -1,8 +1,9 @@
 const cozi = @import("../../root.zig");
 const std = @import("std");
 const Worker = @This();
-const Awaiter = cozi.@"await".Awaiter;
+const Awaiter = cozi.await.Awaiter;
 pub const Thread = @import("./thread.zig");
+const log = cozi.core.log.scoped(.worker);
 
 vtable: VTable,
 ptr: *anyopaque,
@@ -40,11 +41,25 @@ pub inline fn setName(self: Worker, name: [:0]const u8) void {
 
 pub fn beginScope(new: Worker) Worker {
     const previous = current();
+    log.debug(
+        "{s} running on {s}",
+        .{
+            new.getName(),
+            previous.getName(),
+        },
+    );
     current_ = new;
     return previous;
 }
 
 pub fn endScope(restore: Worker) void {
+    log.debug(
+        "{s} STOPPED running on {s}",
+        .{
+            if (current_) |c| c.getName() else "null",
+            restore.getName(),
+        },
+    );
     current_ = restore;
 }
 

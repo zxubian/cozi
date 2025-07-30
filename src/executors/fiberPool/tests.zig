@@ -56,10 +56,12 @@ test "Fiber Pool - many threads" {
     defer fiber_pool.stop();
 
     const exec = fiber_pool.executor();
-
     const Ctx = struct {
         wg: std.Thread.WaitGroup = .{},
         pub fn run(self: *@This()) void {
+            for (0..10000) |_| {
+                Fiber.yield();
+            }
             self.wg.finish();
         }
     };
@@ -69,7 +71,6 @@ test "Fiber Pool - many threads" {
     for (0..count) |_| {
         exec.submit(Ctx.run, .{&ctx}, testing.allocator);
     }
-
     ctx.wg.wait();
 }
 

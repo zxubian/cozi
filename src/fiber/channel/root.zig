@@ -11,9 +11,9 @@ const fault = cozi.fault;
 const stdlike = fault.stdlike;
 const Atomic = stdlike.atomic.Value;
 
-const generic_await = cozi.@"await";
+const generic_await = cozi.await;
 const Awaiter = generic_await.Awaiter;
-const Await = generic_await.@"await";
+const Await = generic_await.await;
 const Worker = generic_await.Worker;
 
 const containers = cozi.containers;

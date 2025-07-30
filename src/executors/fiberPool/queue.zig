@@ -1,20 +1,21 @@
 const std = @import("std");
+const assert = std.debug.assert;
 
 const cozi = @import("../../root.zig");
 const Fiber = cozi.Fiber;
 const core = cozi.core;
 const SpinLock = cozi.sync.Spinlock;
 const Runnable = core.Runnable;
-const Await = cozi.@"await".@"await";
-const Awaiter = cozi.@"await".Awaiter;
-const Worker = cozi.@"await".Worker;
+const Await = cozi.await.await;
+const Awaiter = cozi.await.Awaiter;
+const Worker = cozi.await.Worker;
 
 const Impl = @This();
 const Queue = cozi.containers.intrusive.ForwardList;
 
 queue: Queue(Runnable) = .{},
 lock: SpinLock = .{},
-closed: bool = false,
+closed_: bool = false,
 idle_fibers: Queue(IdleFibersQueueEntry) = .{},
 
 const IdleFibersQueueEntry = struct {
@@ -22,18 +23,26 @@ const IdleFibersQueueEntry = struct {
     fiber: *Fiber,
 };
 
-pub fn pushBack(
-    self: *@This(),
-    task: *Runnable,
-) void {
+const PushBackError = error{
+    closed,
+};
+
+pub fn closed(self: *@This()) bool {
     var guard = self.lock.guard();
     guard.lock();
     defer guard.unlock();
-    if (self.closed) {
-        std.debug.panic(
-            "pushBack on closed queue",
-            .{},
-        );
+    return self.closed_;
+}
+
+pub fn pushBack(
+    self: *@This(),
+    task: *Runnable,
+) !void {
+    var guard = self.lock.guard();
+    guard.lock();
+    defer guard.unlock();
+    if (self.closed_) {
+        return PushBackError.closed;
     }
     if (Fiber.current()) |_| {
         var awaiter: PushBackAwaiter = .{
@@ -60,16 +69,19 @@ pub fn popFront(
         .task_queue = self,
         .guard = &guard,
     };
-    return Await(&awaiter);
+    const result = Await(&awaiter);
+    return result;
 }
 
-const TryCloseError = error{already_closed};
+const TryCloseError = error{
+    already_closed,
+};
 
 pub fn tryClose(self: *@This()) TryCloseError!void {
     var guard = self.lock.guard();
     guard.lock();
     defer guard.unlock();
-    if (self.closed) {
+    if (self.closed_) {
         return TryCloseError.already_closed;
     }
     if (Fiber.current()) |_| {
@@ -79,7 +91,7 @@ pub fn tryClose(self: *@This()) TryCloseError!void {
         };
         Await(&awaiter);
     } else {
-        self.closed = true;
+        self.closed_ = true;
         while (self.idle_fibers.popFront()) |next| {
             next.fiber.scheduleSelf();
         }
@@ -110,9 +122,7 @@ const PushBackAwaiter = struct {
         self.task_queue.queue.pushBack(self.task);
         defer self.guard.unlock();
         if (self.task_queue.idle_fibers.popFront()) |waiting_fiber| {
-            return Awaiter.AwaitSuspendResult{
-                .symmetric_transfer_next = waiting_fiber,
-            };
+            waiting_fiber.fiber.scheduleSelf();
         }
         return .never_suspend;
     }
@@ -147,7 +157,7 @@ const PopFrontAwaiter = struct {
         handle: Worker,
     ) Awaiter.AwaitSuspendResult {
         defer self.guard.unlock();
-        if (self.task_queue.closed) {
+        if (self.task_queue.closed_) {
             return .never_suspend;
         }
         if (!self.task_queue.queue.isEmpty()) {
@@ -162,16 +172,13 @@ const PopFrontAwaiter = struct {
     }
 
     pub fn awaitReady(self: *@This()) bool {
-        return self.task_queue.closed or
+        return self.task_queue.closed_ or
             !self.task_queue.queue.isEmpty();
     }
 
     pub fn awaitResume(self: *@This(), suspended: bool) ?*Runnable {
         if (suspended) {
             self.guard.lock();
-        }
-        if (self.task_queue.closed) {
-            return null;
         }
         return self.task_queue.queue.popFront();
     }
