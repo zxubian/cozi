@@ -15,9 +15,12 @@ name_buf: [std.Thread.max_name_len:0]u8 = [_:0]u8{0} ** std.Thread.max_name_len,
 state: cozi.fault.stdlike.atomic.Value(u32) = .init(@intFromEnum(State.running)),
 handle: ?*std.Thread = null,
 
-pub fn init(handle: *std.Thread, name: [std.Thread.max_name_len:0]u8) !Worker {
+pub fn init(
+    handle: *std.Thread,
+    name: [:0]const u8,
+) !Worker {
     this_.handle = handle;
-    try setName(&this_, &name);
+    try setName(&this_, name);
     return worker(&this_);
 }
 

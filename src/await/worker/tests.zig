@@ -4,8 +4,8 @@ const testing = std.testing;
 
 const cozi = @import("../../root.zig");
 const Fiber = cozi.Fiber;
-const Worker = cozi.@"await".Worker;
-const Awaiter = cozi.@"await".Awaiter;
+const Worker = cozi.await.Worker;
+const Awaiter = cozi.await.Awaiter;
 const Thread = Worker.Thread;
 const ThreadPool = cozi.executors.threadPools.Compute;
 
@@ -16,11 +16,12 @@ test "Worker - Spawn System Thread - Current" {
     const Ctx = struct {
         ready: std.Thread.ResetEvent = .{},
         thread: *std.Thread = undefined,
+
         fn run(
             self: *@This(),
         ) !void {
             self.ready.wait();
-            const this_worker = Thread.worker(self.thread);
+            const this_worker = try Worker.Thread.init(self.thread, "Test thread");
             const previous = Worker.beginScope(this_worker);
             defer Worker.endScope(previous);
             try runInWorkerScope(self);
@@ -29,16 +30,10 @@ test "Worker - Spawn System Thread - Current" {
         fn runInWorkerScope(self: *@This()) !void {
             const current_worker = Worker.current();
             try std.testing.expectEqual(.thread, current_worker.type);
+            const system_thread_worker: *Worker.Thread = @ptrCast(@alignCast(current_worker.ptr));
             try std.testing.expectEqual(
                 self.thread,
-                @as(
-                    *std.Thread,
-                    @alignCast(
-                        @ptrCast(
-                            current_worker.ptr,
-                        ),
-                    ),
-                ),
+                system_thread_worker.handle,
             );
         }
     };
@@ -67,7 +62,8 @@ test "Worker - Thread Pool Current" {
             const current_worker = Worker.current();
             try std.testing.expectEqual(.thread, current_worker.type);
             const found = for (ThreadPool.current().?.threads) |*thread| {
-                if (thread == @as(*std.Thread, @alignCast(@ptrCast(current_worker.ptr)))) {
+                const pool_thread_worker: *Worker.Thread = @ptrCast(@alignCast(current_worker.ptr));
+                if (thread == pool_thread_worker.handle) {
                     break true;
                 }
             } else false;
