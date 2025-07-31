@@ -2,8 +2,8 @@ const std = @import("std");
 
 const cozi = @import("../../../root.zig");
 
-const Awaiter = cozi.@"await".Awaiter;
-const Worker = cozi.@"await".Worker;
+const Awaiter = cozi.await.Awaiter;
+const Worker = cozi.await.Worker;
 const Runnable = cozi.core.Runnable;
 const atomic = cozi.fault.stdlike.atomic;
 const SpinLock = cozi.sync.Spinlock;
@@ -111,14 +111,10 @@ pub fn Awaitable(Future: type) type {
             pub fn @"continue"(
                 self: *@This(),
                 value: Future.ValueType,
-                state: future.State,
+                _: future.State,
             ) void {
                 self.value = value;
-                self.runnable = .{
-                    .runFn = @ptrCast(&onContinue),
-                    .ptr = self,
-                };
-                state.executor.submitRunnable(&self.runnable);
+                onContinue(self);
             }
         };
     };
