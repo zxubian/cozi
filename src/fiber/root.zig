@@ -312,18 +312,11 @@ pub inline fn runTickAndMaybeTransfer(self: *Fiber, comptime owns_stack: bool) ?
 fn RunFunctions(comptime owns_stack: bool) type {
     return struct {
         fn runTickAndMaybeTransfer(self: *Fiber) ?*Fiber {
-            if (!self.cancel_context.isCancelled()) {
-                log.debug(
-                    "{s} about to resume",
-                    .{self.name},
-                );
-                self.runTick();
-            } else {
-                log.debug(
-                    "{s}: was cancelled, so won't go into coroutine",
-                    .{self.name},
-                );
-            }
+            log.debug(
+                "{s} about to resume",
+                .{self.name},
+            );
+            self.runTick();
             log.debug("{s} returned from coroutine", .{self.name});
             if (self.coroutine.is_completed or
                 self.cancel_context.isCancelled())

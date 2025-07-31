@@ -48,7 +48,9 @@ fn testCancelFiberPool(options: CancelFiberPoolTestCaseOptions) !void {
         }
     };
     fiber_pool.executor().submit(Ctx.a, .{}, testing.allocator);
-    std.Thread.sleep(options.delay_before_cancel_ns);
+    if (options.delay_before_cancel_ns > 0) {
+        std.Thread.sleep(options.delay_before_cancel_ns);
+    }
     fiber_pool.cancel_context.cancel();
 }
 
@@ -101,11 +103,13 @@ test "cancel - fiber pool - M:M" {
         .delay_before_cancel_ns = 300 * std.time.ns_per_ms,
     });
 }
-//         }
-//     }
-// };
-// fiber_pool.executor().submit(Ctx.a, .{}, testing.allocator);
-// std.Thread.sleep(std.time.ns_per_ms * 300);
-// fiber_pool.fiber_pool.cancel_context.cancel();
-// }
+
+test "cancel - fiber pool - immediate" {
+    const cpu_count = try std.Thread.getCpuCount();
+    try testCancelFiberPool(.{
+        .thread_count = cpu_count,
+        .fiber_count = cpu_count * 2,
+        .delay_before_cancel_ns = 0,
+    });
+}
 
