@@ -102,7 +102,6 @@ const PushBackAwaiter = struct {
     task: *Runnable,
     task_queue: *Impl,
     guard: *SpinLock.Guard,
-    fiber: *Fiber = undefined,
 
     pub fn awaiter(self: *@This()) Awaiter {
         return Awaiter{
@@ -118,7 +117,6 @@ const PushBackAwaiter = struct {
         worker: Worker,
     ) Awaiter.AwaitSuspendResult {
         std.debug.assert(worker.type == .fiber);
-        self.fiber = @alignCast(@ptrCast(worker.ptr));
         self.task_queue.queue.pushBack(self.task);
         defer self.guard.unlock();
         if (self.task_queue.idle_fibers.popFront()) |waiting_fiber| {
@@ -180,6 +178,8 @@ const PopFrontAwaiter = struct {
         if (suspended) {
             self.guard.lock();
         }
+        assert(!self.task_queue.queue.isEmpty() or
+            self.task_queue.closed_);
         return self.task_queue.queue.popFront();
     }
 };
