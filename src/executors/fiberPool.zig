@@ -88,7 +88,7 @@ pub fn deinit(self: *@This()) void {
     assert(self.task_queue.closed());
     assert(self.task_queue.idle_fibers.isEmpty());
     for (self.fibers) |f| {
-        assert(f.is_running.load(.seq_cst) == false);
+        assert(f.state.load(.seq_cst) == .finished);
     }
     self.allocator.free(self.stack_arena);
     self.allocator.free(self.fibers);
