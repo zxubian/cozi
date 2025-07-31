@@ -174,7 +174,7 @@ pub fn IntrusiveForwardList(T: type) type {
             );
             if (self.head) |head| {
                 var next = head.next;
-                std.debug.print("{?} -> ", .{head});
+                std.debug.print("{*} -> ", .{head});
                 while (next != null) : (next = next.?.next) {
                     std.debug.print("{?} -> ", .{next});
                 }

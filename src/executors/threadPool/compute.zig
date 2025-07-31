@@ -91,7 +91,7 @@ fn threadEntryPoint(
         "Pool@{}/Thread #{}",
         .{ @intFromPtr(thread_pool), i },
     ) catch "Thread Pool@(unknown) Thread#(unknown)";
-    const worker = Worker.Thread.init(self, thread_pool_name_buf) catch |e| {
+    const worker = Worker.Thread.init(self, &thread_pool_name_buf) catch |e| {
         std.debug.panic("Failed to initialize worker for threadpool thread {s}: {}", .{
             name,
             e,
