@@ -6,6 +6,8 @@ const executors = @import("../../root.zig").executors;
 const future = @import("../root.zig").lazy;
 const ThreadPool = executors.threadPools.Compute;
 const InlineExecutor = executors.@"inline";
+const cozi = @import("../../root.zig");
+const await = cozi.await.await;
 
 test "lazy future - just - basic" {
     const just = future.just();
@@ -1017,4 +1019,26 @@ test "lazy future - box" {
     const async_reader = reader.eraseType();
     const result: u32 = try future.get(async_reader.read());
     try testing.expectEqual(1, result);
+}
+
+test "future - submit error inside thread pool" {
+    var tp = try executors.threadPools.Compute.init(
+        2,
+        testing.allocator,
+    );
+    defer tp.deinit();
+    try tp.start();
+    defer tp.stop();
+    const Err = error{some};
+    const Ctx = struct {
+        pub fn throw() !void {
+            return Err.some;
+        }
+    };
+    const f = future.submit(
+        tp.executor(),
+        Ctx.throw,
+        .{},
+    );
+    try std.testing.expectError(Err.some, await(&f));
 }
