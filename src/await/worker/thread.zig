@@ -1,4 +1,6 @@
 const std = @import("std");
+const assert = std.debug.assert;
+
 const cozi = @import("../../root.zig");
 const Awaiter = cozi.await.Awaiter;
 const Worker = cozi.await.Worker;
@@ -7,13 +9,15 @@ const SystemThreadWorker = @This();
 
 threadlocal var this_: SystemThreadWorker = .{};
 
-pub const State = enum(u32) {
-    running,
-    suspended,
-};
 name_buf: [std.Thread.max_name_len:0]u8 = [_:0]u8{0} ** std.Thread.max_name_len,
 state: cozi.fault.stdlike.atomic.Value(u32) = .init(@intFromEnum(State.running)),
 handle: ?*std.Thread = null,
+
+pub const State = enum(u32) {
+    suspended = 0,
+    running = 1,
+    _,
+};
 
 pub fn init(
     handle: *std.Thread,
@@ -49,23 +53,38 @@ fn @"suspend"(self: *SystemThreadWorker, awaiter: Awaiter) void {
         .never_suspend => return,
         .always_suspend => {
             log.debug("[{s}] suspend begin\n", .{getName(self)});
-            if (self.state.cmpxchgStrong(
-                @intFromEnum(State.running),
-                @intFromEnum(State.suspended),
-                .seq_cst,
-                .seq_cst,
-            )) |actual| {
-                @branchHint(.unlikely);
-                std.debug.panic(
-                    "[{s}] invalid state transition. Actual: {}->{}",
-                    .{
-                        getName(self),
-                        @as(State, @enumFromInt(actual)),
-                        State.suspended,
-                    },
-                );
-            } else {
-                std.Thread.Futex.wait(&self.state, 1);
+            switch (@as(State, @enumFromInt(self.state.fetchSub(1, .seq_cst)))) {
+                .suspended => {
+                    @branchHint(.unlikely);
+                    std.debug.panic(
+                        "[{s}] invalid state transition: suspending twice",
+                        .{
+                            getName(self),
+                        },
+                    );
+                },
+                .running => {
+                    log.debug(
+                        "[{s}] Setting state to sleep {*} -> {}",
+                        .{
+                            self.getName(),
+                            &self.state,
+                            @intFromEnum(State.suspended),
+                        },
+                    );
+                    while (self.state.load(.seq_cst) == @intFromEnum(State.suspended)) {
+                        std.Thread.Futex.wait(
+                            &self.state,
+                            @intFromEnum(State.suspended),
+                        );
+                    }
+                    assert(self.state.load(.seq_cst) > 0);
+                    log.debug(
+                        "[{s}] Woke up from sleep",
+                        .{self.getName()},
+                    );
+                },
+                else => {},
             }
         },
         .symmetric_transfer_next => {
@@ -82,22 +101,16 @@ fn @"resume"(other: *SystemThreadWorker) void {
             .{ @src(), other },
         );
     }
-    log.debug("[{s}] resuming", .{getName(other)});
-    if (other.state.cmpxchgStrong(
-        @intFromEnum(State.suspended),
-        @intFromEnum(State.running),
-        .seq_cst,
-        .seq_cst,
-    )) |actual| {
-        @branchHint(.unlikely);
-        std.debug.panic(
-            "[{s}] invalid state transition. Actual: {}->{}",
-            .{
-                getName(other),
-                @as(State, @enumFromInt(actual)),
-                State.running,
-            },
-        );
+    log.debug(
+        "[{s}] resuming: {*} -> {}",
+        .{
+            getName(other),
+            &other.state,
+            @intFromEnum(State.running),
+        },
+    );
+    if (other.state.fetchAdd(1, .seq_cst) == 0) {
+        std.Thread.Futex.wake(&other.state, 1);
     }
 }
 
