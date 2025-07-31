@@ -64,6 +64,24 @@ pub fn Closure(
 
             pub fn run(ctx: *anyopaque) void {
                 const closure: *Self = @alignCast(@ptrCast(ctx));
+                var cancel: cozi.cancel.Context = .{};
+                var on_cancel: Runnable = .{
+                    .runFn = @ptrCast(&destroy),
+                    .ptr = closure,
+                };
+                cancel.addCancellationListener(&on_cancel) catch unreachable;
+                const parent_cancel_ctx = cozi.cancel.Context.current();
+                if (parent_cancel_ctx) |parent| {
+                    parent.link(&cancel) catch {
+                        destroy(closure);
+                        return;
+                    };
+                }
+                defer {
+                    if (parent_cancel_ctx) |parent| {
+                        parent.unlink(&cancel);
+                    }
+                }
                 if (comptime returnsErrorUnion(routine)) {
                     @call(.auto, routine, closure.raw.arguments) catch |e| {
                         std.debug.panic("Unhandled error in closure: {}", .{e});
@@ -72,6 +90,10 @@ pub fn Closure(
                     @call(.auto, routine, closure.raw.arguments);
                 }
                 closure.allocator.destroy(closure);
+            }
+
+            fn destroy(self: *Self) void {
+                self.allocator.destroy(self);
             }
 
             pub inline fn runnable(self: *Self) *Runnable {

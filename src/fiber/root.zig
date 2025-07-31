@@ -20,6 +20,8 @@ const Stack = core.Stack;
 const Await = cozi.await.await;
 const Awaiter = cozi.await.Awaiter;
 const Worker = cozi.await.Worker;
+const CancelContext = cozi.cancel.Context;
+const FiberPool = cozi.executors.FiberPool;
 
 const Sync = @import("./sync.zig");
 const Channel_ = @import("./channel/root.zig");
@@ -41,6 +43,8 @@ name: [:0]u8,
 state: stdlike.atomic.Value(State) = .init(.init),
 awaiter: ?Awaiter,
 suspend_illegal_scope_depth: Atomic(usize) = .init(0),
+cancel_context: cozi.cancel.Context = .{},
+pool: ?*FiberPool = null,
 
 pub const max_name_length_bytes = 100;
 pub const default_name = "Fiber";
@@ -247,6 +251,7 @@ pub fn current() ?*Fiber {
 }
 
 /// Suspend current fiber, and reschedule it for execution on the same executor.
+/// NOTE: the fiber will check cancellation state here: if cancelled, it will never return from yield()
 pub fn yield() void {
     if (current()) |curr| {
         curr.yield_();
@@ -309,11 +314,18 @@ fn RunFunctions(comptime owns_stack: bool) type {
             log.debug("{s} about to resume", .{self.name});
             self.runTick();
             log.debug("{s} returned from coroutine", .{self.name});
-            if (self.coroutine.is_completed) {
+            if (self.coroutine.is_completed or self.cancel_context.isCancelled()) {
                 defer {
                     if (owns_stack) {
                         log.debug("{s} about to deinit", .{self.name});
                         self.getManagedStack().deinit();
+                    }
+                }
+                defer {
+                    if (self.cancel_context.isCancelled()) {
+                        if (self.pool) |pool| {
+                            pool.join_wait_group.finish();
+                        }
                     }
                 }
                 if (self.state.cmpxchgStrong(
@@ -412,10 +424,16 @@ fn getManagedStack(self: *Fiber) Stack.Managed {
 fn runTick(self: *Fiber) void {
     const previous = Worker.beginScope(self.worker());
     defer Worker.endScope(previous);
-    if (self.state.swap(.running, .seq_cst) == .running) {
-        std.debug.panic("{s} resuming twice!!", .{self.name});
+    {
+        CancelContext.beginScope(&self.cancel_context);
+        defer CancelContext.endScope();
+        {
+            if (self.state.swap(.running, .seq_cst) == .running) {
+                std.debug.panic("{s} resuming twice!!", .{self.name});
+            }
+            self.coroutine.@"resume"();
+        }
     }
-    self.coroutine.@"resume"();
 }
 
 pub fn beginSuspendIllegalScope(self: *Fiber) void {
@@ -439,7 +457,7 @@ const YieldAwaiter = struct {
         assert(handle.type == .fiber);
         var fiber: *Fiber = @alignCast(@ptrCast(handle.ptr));
         fiber.scheduleSelf();
-        return Awaiter.AwaitSuspendResult{ .always_suspend = {} };
+        return .always_suspend;
     }
 
     pub fn awaiter(self: *YieldAwaiter) Awaiter {

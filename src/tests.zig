@@ -6,4 +6,5 @@ test {
     _ = @import("./fiber/root.zig");
     _ = @import("./sync/root.zig");
     _ = @import("./future/root.zig");
+    _ = @import("./cancel/root.zig");
 }

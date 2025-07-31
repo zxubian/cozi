@@ -8,6 +8,7 @@ const Fiber = cozi.Fiber;
 const core = cozi.core;
 const Runnable = core.Runnable;
 const Stack = core.Stack;
+const cancel = cozi.cancel;
 
 const log = cozi.core.log.scoped(.fiber_pool);
 
@@ -19,6 +20,7 @@ task_queue: TaskQueue = .{},
 allocator: std.mem.Allocator,
 join_wait_group: std.Thread.WaitGroup = .{},
 stack_arena: []align(16) u8,
+cancel_context: cancel.Context = .{},
 
 pub const Options = struct {
     fiber_count: usize,
@@ -81,6 +83,7 @@ pub fn init(
         .fibers = fibers,
         .allocator = allocator,
         .stack_arena = stack_arena,
+        .cancel_context = .{},
     };
 }
 
@@ -105,6 +108,8 @@ pub fn start(self: *@This()) void {
         closure.arguments = .{
             self,
         };
+        self.cancel_context.link(&fiber.cancel_context) catch unreachable;
+        fiber.pool = self;
         fiber.scheduleSelf();
     }
 }
