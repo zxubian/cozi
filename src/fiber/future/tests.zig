@@ -9,6 +9,8 @@ const await = Await.await;
 const executors = cozi.executors;
 const ManualExecutor = executors.Manual;
 const future = cozi.future.lazy;
+const ThreadPool = cozi.executors.threadPools.Compute;
+const FiberPool = cozi.executors.FiberPool;
 
 test "fiber - future - just" {
     const allocator = testing.allocator;
@@ -590,14 +592,16 @@ test "fiber - future - box" {
 }
 
 test "fiber - future - await" {
-    var tp = try cozi.executors.threadPools.Compute.init(
+    var tp: ThreadPool = undefined;
+    try tp.init(
         1,
         testing.allocator,
     );
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
-    var fiber_pool = try cozi.executors.FiberPool.init(
+    var fiber_pool: FiberPool = undefined;
+    try fiber_pool.init(
         testing.allocator,
         tp.executor(),
         .{

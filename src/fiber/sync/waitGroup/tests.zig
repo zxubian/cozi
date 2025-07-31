@@ -67,9 +67,10 @@ test "counter - multi-thread" {
     if (build_options.sanitizer_variant == .thread) {
         return error.SkipZigTest;
     }
-    var tp = try ThreadPool.init(4, testing.allocator);
+    var tp: ThreadPool = undefined;
+    try tp.init(4, testing.allocator);
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
 
     const count: usize = 500;
@@ -117,9 +118,10 @@ test "stress" {
         return error.SkipZigTest;
     }
     const cpu_count = try std.Thread.getCpuCount();
-    var tp = try ThreadPool.init(cpu_count, testing.allocator);
+    var tp: ThreadPool = undefined;
+    try tp.init(cpu_count, testing.allocator);
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
 
     const fibers: usize = 1000;

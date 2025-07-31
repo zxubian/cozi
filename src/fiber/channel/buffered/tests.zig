@@ -380,9 +380,10 @@ test "BufferedChannel - Fiber - Buffered Channel - Basic - Thread Pool" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
-    var tp = try ThreadPool.init(4, testing.allocator);
+    var tp: ThreadPool = undefined;
+    try tp.init(4, testing.allocator);
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
 
     const buffer_size = 4;
@@ -430,9 +431,10 @@ test "BufferedChannel - Fiber - Buffered Channel - Stress SPMC" {
     }
     const cpu_count = try std.Thread.getCpuCount();
 
-    var tp = try ThreadPool.init(cpu_count, testing.allocator);
+    var tp: ThreadPool = undefined;
+    try tp.init(cpu_count, testing.allocator);
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
 
     const buffer_size = 1000;
@@ -527,9 +529,10 @@ test "BufferedChannel - Fiber - Buffered Channel - Stress MPSC" {
     }
     const cpu_count = try std.Thread.getCpuCount();
 
-    var tp = try ThreadPool.init(cpu_count, testing.allocator);
+    var tp: ThreadPool = undefined;
+    try tp.init(cpu_count, testing.allocator);
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
 
     const buffer_size = 1000;
@@ -624,9 +627,10 @@ test "BufferedChannel - Fiber - Buffered Channel - Stress MPMC" {
     }
     const cpu_count = try std.Thread.getCpuCount();
 
-    var tp = try ThreadPool.init(cpu_count, testing.allocator);
+    var tp: ThreadPool = undefined;
+    try tp.init(cpu_count, testing.allocator);
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
 
     const buffer_size = 1000;

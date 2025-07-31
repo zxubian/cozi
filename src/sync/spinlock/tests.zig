@@ -27,7 +27,8 @@ test "SpinLock - counter" {
     }
     var lock: Spinlock = .{};
     const thread_count = try std.Thread.getCpuCount();
-    var tp: ThreadPool = try .init(thread_count, testing.allocator);
+    var tp: ThreadPool = undefined;
+    try tp.init(thread_count, testing.allocator);
     defer tp.deinit();
     var wait_group: WaitGroup = .{};
 
@@ -54,7 +55,7 @@ test "SpinLock - counter" {
     for (0..count) |_| {
         tp.executor().submit(Ctx.run, .{&ctx}, testing.allocator);
     }
-    try tp.start();
+    tp.start();
     defer tp.stop();
 
     wait_group.wait();
@@ -64,7 +65,8 @@ test "SpinLock - counter" {
 test "Spinlock - deadlock" {
     return error.SkipZigTest;
     // const thread_count = 3;
-    // var tp: ThreadPool = try .init(thread_count, testing.allocator);
+    // var tp: ThreadPool = undefined;
+    // try tp.init(thread_count, testing.allocator);
     // defer tp.deinit();
 
     // // A -> B -> C -> A
@@ -117,7 +119,7 @@ test "Spinlock - deadlock" {
     // executor.submit(Ctx.A, .{&ctx}, testing.allocator);
     // executor.submit(Ctx.B, .{&ctx}, testing.allocator);
     // executor.submit(Ctx.C, .{&ctx}, testing.allocator);
-    // try tp.start();
+    // tp.start();
     // defer tp.stop();
     // while (true) {}
 }

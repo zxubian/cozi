@@ -113,12 +113,13 @@ test "lazy future - submit - basic" {
         return error.SkipZigTest;
     }
     const allocator = testing.allocator;
-    var pool: ThreadPool = try .init(1, allocator);
-    defer pool.deinit();
-    try pool.start();
-    defer pool.stop();
+    var tp: ThreadPool = undefined;
+    try tp.init(1, allocator);
+    defer tp.deinit();
+    tp.start();
+    defer tp.stop();
     const compute = future.submit(
-        pool.executor(),
+        tp.executor(),
         struct {
             pub fn run() usize {
                 return 11;
@@ -135,12 +136,13 @@ test "lazy future - submit - timer" {
         return error.SkipZigTest;
     }
     const allocator = testing.allocator;
-    var pool: ThreadPool = try .init(1, allocator);
-    defer pool.deinit();
-    try pool.start();
-    defer pool.stop();
+    var tp: ThreadPool = undefined;
+    try tp.init(1, allocator);
+    defer tp.deinit();
+    tp.start();
+    defer tp.stop();
     const compute = future.submit(
-        pool.executor(),
+        tp.executor(),
         struct {
             pub fn run() usize {
                 std.Thread.sleep(std.time.ns_per_s);
@@ -604,9 +606,10 @@ test "lazy future - flatten" {
         return error.SkipZigTest;
     }
     const allocator = testing.allocator;
-    var tp: ThreadPool = try .init(1, allocator);
+    var tp: ThreadPool = undefined;
+    try tp.init(1, allocator);
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
 
     const Ctx = struct {
@@ -660,9 +663,10 @@ test "lazy future - contract - thread pool" {
         return error.SkipZigTest;
     }
     const allocator = testing.allocator;
-    var tp: ThreadPool = try .init(1, allocator);
+    var tp: ThreadPool = undefined;
+    try tp.init(1, allocator);
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
 
     const future_, const promise_ = try future.contract(usize, std.testing.allocator);
@@ -865,9 +869,10 @@ test "lazy future - pipline - threadpool - all" {
         return error.SkipZigTest;
     }
     const allocator = testing.allocator;
-    var tp: ThreadPool = try .init(1, allocator);
+    var tp: ThreadPool = undefined;
+    try tp.init(1, allocator);
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
     const executor = tp.executor();
 
@@ -924,9 +929,10 @@ test "lazy future - pipline - threadpool - first" {
         return error.SkipZigTest;
     }
     const allocator = testing.allocator;
-    var tp: ThreadPool = try .init(1, allocator);
+    var tp: ThreadPool = undefined;
+    try tp.init(1, allocator);
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
     const executor = tp.executor();
 
@@ -1022,12 +1028,13 @@ test "lazy future - box" {
 }
 
 test "future - submit error inside thread pool" {
-    var tp = try executors.threadPools.Compute.init(
+    var tp: ThreadPool = undefined;
+    try tp.init(
         2,
         testing.allocator,
     );
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
     const Err = error{some};
     const Ctx = struct {

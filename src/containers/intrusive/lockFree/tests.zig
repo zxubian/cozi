@@ -104,9 +104,10 @@ test "stack - stress" {
     }
     const cpu_count = try std.Thread.getCpuCount();
     const worker_count = if (build_options.sanitizer_variant == .none) cpu_count else 4;
-    var tp = try ThreadPool.init(worker_count, testing.allocator);
+    var tp: ThreadPool = undefined;
+    try tp.init(worker_count, testing.allocator);
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
 
     const Node = struct {
@@ -350,9 +351,10 @@ test "queue - stress" {
 
     var fiber_name_buffer: [Fiber.max_name_length_bytes:0]u8 = undefined;
     const cpu_count = try std.Thread.getCpuCount();
-    var tp = try ThreadPool.init(cpu_count, testing.allocator);
+    var tp: ThreadPool = undefined;
+    try tp.init(cpu_count, testing.allocator);
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
 
     const Node = struct {

@@ -276,9 +276,10 @@ test "Channel - Stress - SPSC" {
         return error.SkipZigTest;
     }
     const cpu_count = try std.Thread.getCpuCount();
-    var tp: ThreadPool = try .init(cpu_count, testing.allocator);
+    var tp: ThreadPool = undefined;
+    try tp.init(cpu_count, testing.allocator);
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
 
     const Ctx = struct {
@@ -356,9 +357,10 @@ test "Channel - Stress - MPSC" {
         return error.SkipZigTest;
     }
     const cpu_count = try std.Thread.getCpuCount();
-    var tp: ThreadPool = try .init(cpu_count, testing.allocator);
+    var tp: ThreadPool = undefined;
+    try tp.init(cpu_count, testing.allocator);
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
 
     const Ctx = struct {
@@ -436,9 +438,10 @@ test "Channel - Stress - SPMC" {
         return error.SkipZigTest;
     }
     const cpu_count = try std.Thread.getCpuCount();
-    var tp: ThreadPool = try .init(cpu_count, testing.allocator);
+    var tp: ThreadPool = undefined;
+    try tp.init(cpu_count, testing.allocator);
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
 
     const Ctx = struct {
@@ -516,9 +519,10 @@ test "Channel - Stress - MPMC" {
         return error.SkipZigTest;
     }
     const cpu_count = try std.Thread.getCpuCount();
-    var tp: ThreadPool = try .init(cpu_count, testing.allocator);
+    var tp: ThreadPool = undefined;
+    try tp.init(cpu_count, testing.allocator);
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
 
     const Ctx = struct {

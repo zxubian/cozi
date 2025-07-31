@@ -21,6 +21,46 @@ allocator: std.mem.Allocator,
 join_wait_group: std.Thread.WaitGroup = .{},
 stack_arena: []align(16) u8,
 cancel_context: cancel.Context = .{},
+on_cancel: Runnable = undefined,
+
+pub const Default = struct {
+    thread_pool: cozi.executors.threadPools.Compute = undefined,
+    fiber_pool: FiberPool = undefined,
+
+    pub fn init(
+        self: *@This(),
+        allocator: std.mem.Allocator,
+    ) !void {
+        const cpu_count = std.Thread.getCpuCount() catch 3;
+        try self.thread_pool.init(cpu_count, allocator);
+        try self.fiber_pool.init(
+            allocator,
+            self.thread_pool.executor(),
+            .{
+                .fiber_count = self.thread_pool.threads.len * 4,
+            },
+        );
+    }
+
+    pub fn deinit(self: *@This()) void {
+        self.fiber_pool.deinit();
+        self.thread_pool.deinit();
+    }
+
+    pub fn executor(self: *@This()) Executor {
+        return self.fiber_pool.executor();
+    }
+
+    pub fn start(self: *@This()) void {
+        self.thread_pool.start();
+        self.fiber_pool.start();
+    }
+
+    pub fn stop(self: *@This()) void {
+        self.fiber_pool.stop();
+        self.thread_pool.stop();
+    }
+};
 
 pub const Options = struct {
     fiber_count: usize,
@@ -29,10 +69,11 @@ pub const Options = struct {
 };
 
 pub fn init(
+    self: *FiberPool,
     allocator: std.mem.Allocator,
     inner_executor: cozi.executors.Executor,
     options: Options,
-) !FiberPool {
+) !void {
     assert(options.stack_size > 0);
     assert(options.fiber_count > 0);
     var fiber_name_buffer: [Fiber.max_name_length_bytes:0]u8 = undefined;
@@ -48,6 +89,12 @@ pub fn init(
         std.mem.Alignment.fromByteUnits(Stack.alignment_bytes),
         stack_arena_size,
     );
+    self.* = FiberPool{
+        .fibers = fibers,
+        .allocator = allocator,
+        .stack_arena = stack_arena,
+        .cancel_context = .{},
+    };
     for (fibers, 0..) |*fiber, fiber_idx| {
         const fiber_name = try std.fmt.bufPrintZ(
             &fiber_name_buffer,
@@ -70,7 +117,7 @@ pub fn init(
         fiber.* = try Fiber.initWithStack(
             fiberEntryPoint,
             .{
-                undefined,
+                self,
             },
             stack,
             inner_executor,
@@ -78,13 +125,15 @@ pub fn init(
                 .name = fiber_name,
             },
         );
+        self.cancel_context.link(
+            &fiber.*.cancel_context,
+        ) catch unreachable;
+        self.on_cancel = .{
+            .runFn = @ptrCast(&onCancel),
+            .ptr = self,
+        };
+        fiber.*.pool = self;
     }
-    return FiberPool{
-        .fibers = fibers,
-        .allocator = allocator,
-        .stack_arena = stack_arena,
-        .cancel_context = .{},
-    };
 }
 
 pub fn deinit(self: *@This()) void {
@@ -101,17 +150,12 @@ pub fn deinit(self: *@This()) void {
 pub fn start(self: *@This()) void {
     self.join_wait_group.startMany(self.fibers.len);
     for (self.fibers) |fiber| {
-        const closure: *cozi.core.Closure(fiberEntryPoint) =
-            @alignCast(
-                @ptrCast(fiber.coroutine.runnable.ptr),
-            );
-        closure.arguments = .{
-            self,
-        };
-        self.cancel_context.link(&fiber.cancel_context) catch unreachable;
-        fiber.pool = self;
         fiber.scheduleSelf();
     }
+}
+
+fn onCancel(_: *@This()) void {
+    log.debug("Fiber pool cancelled", .{});
 }
 
 pub fn stop(self: *@This()) void {

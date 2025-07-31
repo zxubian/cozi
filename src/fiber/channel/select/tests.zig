@@ -958,9 +958,10 @@ test "Select - stress" {
     const allocator = testing.allocator;
 
     const cpu_count = try std.Thread.getCpuCount();
-    var tp: ThreadPool = try .init(cpu_count, allocator);
+    var tp: ThreadPool = undefined;
+    try tp.init(cpu_count, allocator);
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
     const executor = tp.executor();
 

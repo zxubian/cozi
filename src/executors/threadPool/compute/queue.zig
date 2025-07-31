@@ -12,7 +12,7 @@ pub fn UnboundedBlockingQueue(comptime T: type) type {
     return struct {
         const Impl = @This();
 
-        backing_queue: BackingQueue = undefined,
+        backing_queue: BackingQueue = .{},
         mutex: Mutex = .{},
         has_entries_or_is_closed: CondVar = .{},
         closed: bool = false,
@@ -54,6 +54,14 @@ pub fn UnboundedBlockingQueue(comptime T: type) type {
             defer self.mutex.unlock();
             self.closed = true;
             self.has_entries_or_is_closed.broadcast();
+        }
+
+        pub fn reset(self: *Impl) void {
+            self.mutex.lock();
+            defer self.mutex.unlock();
+            assert(self.backing_queue.isEmpty());
+            self.backing_queue.reset();
+            self.closed = false;
         }
     };
 }

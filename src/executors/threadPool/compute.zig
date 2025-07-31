@@ -22,6 +22,7 @@ const Queue = @import("./compute/queue.zig").UnboundedBlockingQueue;
 const ThreadPool = @This();
 
 const Status = enum(u8) {
+    uninitialized,
     not_started,
     running_or_idle,
     // No new tasks may be submitted. Already submitted tasks will run to completion.
@@ -33,28 +34,83 @@ threads: []SystemThread,
 /// used to allocate the Threads. No allocations happen on runnable submit
 gpa: ?Allocator = null,
 tasks: Queue(Runnable) = .{},
-status: Atomic(Status) = .init(.not_started),
+status: Atomic(Status) = .init(.uninitialized),
 finish_init_barrier: SystemThread.ResetEvent = .{},
 thread_start_barrier: SystemThread.WaitGroup = .{},
+init_options: Options,
 
 threadlocal var current_: ?*ThreadPool = null;
 
-pub fn init(thread_count: usize, gpa: Allocator) !ThreadPool {
+pub const Options = struct {
+    stack_size: u64 = std.Thread.SpawnConfig.default_stack_size,
+    stack_allocator: Allocator,
+};
+
+/// Initialize the thread pool with default options.
+/// NOTE: internally, this will spawn system threads,
+/// initialize them as necessary, and pause them just
+/// before entering the main event loop.
+pub fn init(
+    self: *ThreadPool,
+    thread_count: usize,
+    gpa: Allocator,
+) !void {
+    try self.initOptions(
+        thread_count,
+        gpa,
+        .{
+            .stack_allocator = gpa,
+        },
+    );
+}
+
+/// Initialize the thread pool with explicit options.
+/// NOTE: internally, this will spawn system threads,
+/// initialize them as necessary, and pause them just
+/// before entering the main event loop.
+pub fn initOptions(
+    self: *@This(),
+    thread_count: usize,
+    gpa: Allocator,
+    options: Options,
+) !void {
+    assert(thread_count > 0);
     const threads = try gpa.alloc(SystemThread, thread_count);
-    return ThreadPool{
+    self.* = ThreadPool{
         .threads = threads,
         .gpa = gpa,
+        .init_options = options,
     };
+    try self.initInternal();
 }
 
-pub fn initNoAlloc(threads: []SystemThread) ThreadPool {
-    return ThreadPool{
+/// Initialize the thread pool with explicit options.
+/// NOTE: internally, this will spawn system threads,
+/// initialize them as necessary, and pause them just
+/// before entering the main event loop.
+/// TODO: misleading name. allocation is still required for system thread stacks.
+pub fn initNoAlloc(
+    self: *@This(),
+    threads: []SystemThread,
+    options: Options,
+) !void {
+    self.* = .{
         .threads = threads,
+        .gpa = null,
+        .init_options = options,
     };
+    try self.initInternal();
 }
 
-pub fn start(self: *ThreadPool) !void {
-    assert(self.status.cmpxchgStrong(.not_started, .running_or_idle, .seq_cst, .seq_cst) == null);
+fn initInternal(self: *@This()) !void {
+    if (self.status.cmpxchgStrong(
+        .uninitialized,
+        .not_started,
+        .seq_cst,
+        .seq_cst,
+    )) |_| {
+        unreachable;
+    }
     self.thread_start_barrier.startMany(self.threads.len);
     for (self.threads, 0..) |*thread, i| {
         thread.* = try SystemThread.spawn(
@@ -68,6 +124,20 @@ pub fn start(self: *ThreadPool) !void {
         );
     }
     self.thread_start_barrier.wait();
+}
+
+/// Wakes up worker threads.
+/// Workers will proceed to enter the main event loop,
+/// executing tasks from the queue one-by-one.
+pub fn start(self: *ThreadPool) void {
+    if (self.status.cmpxchgStrong(
+        .not_started,
+        .running_or_idle,
+        .seq_cst,
+        .seq_cst,
+    )) |_| {
+        unreachable;
+    }
     self.finish_init_barrier.set();
 }
 
@@ -111,7 +181,7 @@ fn threadEntryPoint(
                 log.debug("{s} acquired a new task: {}", .{ name, next_task.runFn });
                 next_task.run();
             },
-            .not_started => unreachable,
+            .not_started, .uninitialized => unreachable,
         }
     }
     assert(current_.?.status.load(.seq_cst) == .stopped);
@@ -146,6 +216,12 @@ pub fn executor(self: *ThreadPool) Executor {
     };
 }
 
+/// Closes the queue. Addition task submissions will fail.
+/// Tasks submitted before stop() was called will be executed
+/// before stop() returns.
+/// Invariants after stop() returns:
+/// - task queue is empty and closed
+/// - worker threads have stopped execution
 pub fn stop(self: *ThreadPool) void {
     assert(self.status.load(.seq_cst) == .running_or_idle);
     self.status.store(.stopped, .seq_cst);
@@ -155,6 +231,7 @@ pub fn stop(self: *ThreadPool) void {
     }
 }
 
+/// Frees all memory associated with the thread pool
 pub fn deinit(self: *ThreadPool) void {
     assert(self.status.load(.seq_cst) == .stopped);
     self.status.store(undefined, .seq_cst);
@@ -162,6 +239,7 @@ pub fn deinit(self: *ThreadPool) void {
     if (self.gpa) |gpa_| {
         gpa_.free(self.threads);
     }
+    self.* = undefined;
 }
 
 test {

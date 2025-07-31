@@ -156,9 +156,10 @@ test "event - threadpool - stress" {
     if (build_options.sanitizer_variant == .thread) {
         return error.SkipZigTest;
     }
-    var tp = try ThreadPool.init(4, testing.allocator);
+    var tp: ThreadPool = undefined;
+    try tp.init(4, testing.allocator);
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
     var wait_group: WaitGroup = .{};
     const Ctx = struct {

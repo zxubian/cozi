@@ -24,7 +24,8 @@ test "Submit Lambda" {
     };
     const alloc = thread_safe_alloc.allocator();
 
-    var tp = try ThreadPool.init(1, alloc);
+    var tp: ThreadPool = undefined;
+    try tp.init(1, alloc);
     defer tp.deinit();
 
     const Context = struct {
@@ -42,7 +43,7 @@ test "Submit Lambda" {
     executor.submit(Context.run, .{&ctx}, alloc);
     try testing.expectEqual(0, ctx.a);
 
-    try tp.start();
+    tp.start();
     defer tp.stop();
     ctx.wait_group.wait();
     ctx.wait_group.reset();
@@ -73,9 +74,10 @@ test "Wait" {
     };
     const alloc = thread_safe_alloc.allocator();
 
-    var tp = try ThreadPool.init(1, alloc);
+    var tp: ThreadPool = undefined;
+    try tp.init(1, alloc);
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
 
     const Context = struct {
@@ -106,9 +108,10 @@ test "Multi-wait" {
     };
     const alloc = thread_safe_alloc.allocator();
 
-    var tp = try ThreadPool.init(1, alloc);
+    var tp: ThreadPool = undefined;
+    try tp.init(1, alloc);
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
 
     var wait_group: WaitGroup = .{};
@@ -148,9 +151,10 @@ test "Many Tasks" {
     };
     const alloc = thread_safe_alloc.allocator();
 
-    var tp = try ThreadPool.init(4, alloc);
+    var tp: ThreadPool = undefined;
+    try tp.init(4, alloc);
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
 
     const task_count: usize = 17;
@@ -183,9 +187,10 @@ test "Parallel" {
     };
     const alloc = thread_safe_alloc.allocator();
 
-    var tp = try ThreadPool.init(4, alloc);
+    var tp: ThreadPool = undefined;
+    try tp.init(4, alloc);
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
 
     const Context = struct {
@@ -224,12 +229,14 @@ test "Two Pools" {
     };
     const alloc = thread_safe_alloc.allocator();
 
-    var tp1 = try ThreadPool.init(1, alloc);
-    var tp2 = try ThreadPool.init(1, alloc);
+    var tp1: ThreadPool = undefined;
+    try tp1.init(1, alloc);
+    var tp2: ThreadPool = undefined;
+    try tp2.init(1, alloc);
     defer tp1.deinit();
     defer tp2.deinit();
-    try tp1.start();
-    try tp2.start();
+    tp1.start();
+    tp2.start();
     defer tp1.stop();
     defer tp2.stop();
 
@@ -271,9 +278,10 @@ test "Stop" {
     };
     const alloc = thread_safe_alloc.allocator();
 
-    var tp = try ThreadPool.init(1, alloc);
+    var tp: ThreadPool = undefined;
+    try tp.init(1, alloc);
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
 
     const Context = struct {
@@ -304,9 +312,10 @@ test "Current" {
     };
     const alloc = thread_safe_alloc.allocator();
 
-    var tp = try ThreadPool.init(1, alloc);
+    var tp: ThreadPool = undefined;
+    try tp.init(1, alloc);
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
 
     try std.testing.expectEqual(null, ThreadPool.current());
@@ -340,9 +349,10 @@ test "Submit after waitgroup finish" {
     };
     const alloc = thread_safe_alloc.allocator();
 
-    var tp = try ThreadPool.init(1, alloc);
+    var tp: ThreadPool = undefined;
+    try tp.init(1, alloc);
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
     var wait_group: WaitGroup = .{};
     wait_group.startMany(2);
@@ -406,9 +416,10 @@ test "Use Threads" {
         };
         const alloc = thread_safe_alloc.allocator();
 
-        var tp = try ThreadPool.init(4, alloc);
+        var tp: ThreadPool = undefined;
+        try tp.init(4, alloc);
         defer tp.deinit();
-        try tp.start();
+        tp.start();
         defer tp.stop();
 
         const task_count: usize = 4;
@@ -449,9 +460,10 @@ test "Too Many Threads" {
         };
         const alloc = thread_safe_alloc.allocator();
 
-        var tp = try ThreadPool.init(3, alloc);
+        var tp: ThreadPool = undefined;
+        try tp.init(3, alloc);
         defer tp.deinit();
-        try tp.start();
+        tp.start();
         defer tp.stop();
 
         const task_count: usize = 4;
@@ -490,9 +502,10 @@ test "Racy" {
     };
     const alloc = thread_safe_alloc.allocator();
 
-    var tp = try ThreadPool.init(4, alloc);
+    var tp: ThreadPool = undefined;
+    try tp.init(4, alloc);
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
 
     const task_count: usize = 100500;
@@ -523,9 +536,15 @@ test "Racy" {
 test "threadpool - compute - init no alloc" {
     var threads: [4]std.Thread = undefined;
     _ = &threads;
-    var tp = ThreadPool.initNoAlloc(&threads);
+    var tp: ThreadPool = undefined;
+    try tp.initNoAlloc(
+        &threads,
+        .{
+            .stack_allocator = testing.allocator,
+        },
+    );
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
     const Ctx = struct {
         counter: Atomic(usize) = .init(0),

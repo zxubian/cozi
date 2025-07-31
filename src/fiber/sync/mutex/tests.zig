@@ -147,9 +147,10 @@ test "threadpool" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
-    var tp = try ThreadPool.init(4, testing.allocator);
+    var tp: ThreadPool = undefined;
+    try tp.init(4, testing.allocator);
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
 
     const Ctx = struct {
@@ -185,9 +186,10 @@ test "threadpool - parallel" {
     }
     var limit = try TimeLimit.init(std.time.ns_per_s * 5);
     {
-        var tp = try ThreadPool.init(4, testing.allocator);
+        var tp: ThreadPool = undefined;
+        try tp.init(4, testing.allocator);
         defer tp.deinit();
-        try tp.start();
+        tp.start();
         defer tp.stop();
 
         const Ctx = struct {

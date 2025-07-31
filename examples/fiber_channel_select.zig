@@ -16,11 +16,12 @@ pub fn main() !void {
         }
     }
 
-    var thread_pool = try ThreadPool.init(1, allocator);
-    const executor = thread_pool.executor();
-    defer thread_pool.deinit();
-    try thread_pool.start();
-    defer thread_pool.stop();
+    var tp: ThreadPool = undefined;
+    try tp.init(1, allocator);
+    const executor = tp.executor();
+    defer tp.deinit();
+    tp.start();
+    defer tp.stop();
 
     const Ctx = struct {
         channel_usize: Channel(usize) = .{},

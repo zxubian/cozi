@@ -67,12 +67,13 @@ test "barrier - stress" {
     for (0..runs) |_| {
         const cpu_count = try std.Thread.getCpuCount();
         _ = cpu_count;
-        var tp = try ThreadPool.init(
+        var tp: ThreadPool = undefined;
+        try tp.init(
             2,
             testing.allocator,
         );
         defer tp.deinit();
-        try tp.start();
+        tp.start();
         defer tp.stop();
 
         const fiber_count = 10;

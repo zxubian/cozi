@@ -15,11 +15,13 @@ test "Fiber Pool - basic" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
-    var thread_pool = try ThreadPool.init(1, testing.allocator);
+    var thread_pool: ThreadPool = undefined;
+    try thread_pool.init(1, testing.allocator);
     defer thread_pool.deinit();
-    try thread_pool.start();
+    thread_pool.start();
     defer thread_pool.stop();
-    var fiber_pool = try FiberPool.init(
+    var fiber_pool: FiberPool = undefined;
+    try fiber_pool.init(
         testing.allocator,
         thread_pool.executor(),
         .{
@@ -42,7 +44,7 @@ test "Fiber Pool - many threads" {
     //     testing.allocator,
     // );
     // defer tp.deinit();
-    // try tp.start();
+    // tp.start();
     // defer tp.stop();
 
     // var fiber_pool = try cozi.executors.FiberPool.init(
@@ -84,17 +86,18 @@ test "Fiber Pool - future" {
     // if (builtin.single_threaded) {
     //     return error.SkipZigTest;
     // }
-    // var thread_pool = try ThreadPool.init(
+    // var tp: ThreadPool = undefined;
+    // try tp.init(
     //     1,
     //     testing.allocator,
     // );
-    // defer thread_pool.deinit();
-    // try thread_pool.start();
-    // defer thread_pool.stop();
+    // defer tp.deinit();
+    // tp.start();
+    // defer tp.stop();
 
     // var fiber_pool = try FiberPool.init(
     //     testing.allocator,
-    //     thread_pool.executor(),
+    //     tp.executor(),
     //     .{
     //         .fiber_count = 1,
     //     },
@@ -130,17 +133,18 @@ test "Fiber Pool - future - stress " {
     // if (builtin.single_threaded) {
     //     return error.SkipZigTest;
     // }
-    // var thread_pool = try ThreadPool.init(
+    // var tp: ThreadPool = undefined;
+    // try tp.init(
     //     try std.Thread.getCpuCount(),
     //     testing.allocator,
     // );
-    // defer thread_pool.deinit();
-    // try thread_pool.start();
-    // defer thread_pool.stop();
+    // defer tp.deinit();
+    // tp.start();
+    // defer tp.stop();
 
     // var fiber_pool = try FiberPool.init(
     //     testing.allocator,
-    //     thread_pool.executor(),
+    //     tp.executor(),
     //     .{
     //         .fiber_count = 100,
     //     },
@@ -193,7 +197,7 @@ test "Fiber Pool - future - stress " {
     // }
     // const pipeline = future.pipeline(.{
     //     future.just(),
-    //     future.via(thread_pool.executor()),
+    //     future.via(tp.executor()),
     //     future.all(futures),
     // });
     // _ = future.get(pipeline);

@@ -4,7 +4,7 @@
 - `Executor` allows users to submit [Runnable](/src/core/runnable.zig)s (an abstract representation a task) for eventual execution.
 
 ```zig
-const executor = thread_pool.executor();
+const executor = tp.executor();
 executor.submit(some_function, .{args}, allocator);
 // eventually, some_function(args) will be called.
 // exact timing depends on the specific Executor implementation
@@ -66,10 +66,11 @@ try expectEqual(4, ctx.step);
 ```zig
 const ThreadPool = cozi.executors.threadPools.Compute;
 // Create fixed number of "worker threads" at init time.
-var thread_pool = try ThreadPool.init(4, allocator);
-defer thread_pool.deinit();
-try thread_pool.start();
-defer thread_pool.stop();
+var tp: ThreadPool = undefined;
+ try tp.init(4, allocator);
+defer tp.deinit();
+tp.start();
+defer tp.stop();
 
 const Ctx = struct {
     wait_group: std.Thread.WaitGroup = .{},
@@ -86,7 +87,7 @@ const task_count = 4;
 ctx.wait_group.startMany(task_count);
 for (0..task_count) |_| {
     // submit tasks to worker threads
-    thread_pool.executor().submit(Ctx.run, .{&ctx}, allocator);
+    tp.executor().submit(Ctx.run, .{&ctx}, allocator);
 }
 // Submitted task will eventually be executed by some worker thread.
 // To wait for task completion, need to either synchronize manually

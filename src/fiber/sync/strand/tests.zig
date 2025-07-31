@@ -159,9 +159,10 @@ test "strand - thread pool" {
     if (builtin.single_threaded) {
         return error.SkipZigTest;
     }
-    var tp = try ThreadPool.init(4, testing.allocator);
+    var tp: ThreadPool = undefined;
+    try tp.init(4, testing.allocator);
     defer tp.deinit();
-    try tp.start();
+    tp.start();
     defer tp.stop();
     var fiber_name: [Fiber.max_name_length_bytes:0]u8 = undefined;
     const iterations_per_fiber = 3;
@@ -224,9 +225,10 @@ test "strand - stress" {
     const cpu_count = try std.Thread.getCpuCount();
     const runs = 10;
     for (0..runs) |_| {
-        var tp = try ThreadPool.init(cpu_count, testing.allocator);
+        var tp: ThreadPool = undefined;
+        try tp.init(cpu_count, testing.allocator);
         defer tp.deinit();
-        try tp.start();
+        tp.start();
         defer tp.stop();
         var fiber_name: [Fiber.max_name_length_bytes:0]u8 = undefined;
         const iterations_per_fiber = 100;

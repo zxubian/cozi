@@ -59,13 +59,14 @@ test "fiber - thread pool" {
             self.wait_group.finish();
         }
     };
-    var thread_pool = try ThreadPool.init(1, alloc);
-    defer thread_pool.deinit();
+    var tp: ThreadPool = undefined;
+    try tp.init(1, alloc);
+    defer tp.deinit();
     var ctx: Ctx = .{};
     ctx.wait_group.start();
-    try Fiber.go(Ctx.run, .{&ctx}, alloc, thread_pool.executor());
-    try thread_pool.start();
-    defer thread_pool.stop();
+    try Fiber.go(Ctx.run, .{&ctx}, alloc, tp.executor());
+    tp.start();
+    defer tp.stop();
     ctx.wait_group.wait();
     try testing.expectEqual(ctx.step, 1);
 }
@@ -98,13 +99,14 @@ test "fiber - threadpool child" {
             self.wait_group.finish();
         }
     };
-    var thread_pool = try ThreadPool.init(1, alloc);
-    defer thread_pool.deinit();
+    var tp: ThreadPool = undefined;
+    try tp.init(1, alloc);
+    defer tp.deinit();
     var ctx: Ctx = .{};
     ctx.wait_group.startMany(2);
-    try Fiber.go(Ctx.run, .{&ctx}, alloc, thread_pool.executor());
-    try thread_pool.start();
-    defer thread_pool.stop();
+    try Fiber.go(Ctx.run, .{&ctx}, alloc, tp.executor());
+    tp.start();
+    defer tp.stop();
     ctx.wait_group.wait();
     try testing.expectEqual(ctx.step.load(.monotonic), 2);
 }
@@ -135,14 +137,15 @@ test "fiber - Ping Pong" {
             self.wait_group.finish();
         }
     };
-    var thread_pool = try ThreadPool.init(1, alloc);
-    defer thread_pool.deinit();
+    var tp: ThreadPool = undefined;
+    try tp.init(1, alloc);
+    defer tp.deinit();
     var ctx: Ctx = .{};
     ctx.wait_group.startMany(2);
-    try Fiber.go(Ctx.runPong, .{&ctx}, alloc, thread_pool.executor());
-    try Fiber.go(Ctx.runPing, .{&ctx}, alloc, thread_pool.executor());
-    try thread_pool.start();
-    defer thread_pool.stop();
+    try Fiber.go(Ctx.runPong, .{&ctx}, alloc, tp.executor());
+    try Fiber.go(Ctx.runPing, .{&ctx}, alloc, tp.executor());
+    tp.start();
+    defer tp.stop();
     ctx.wait_group.wait();
 }
 
@@ -187,13 +190,15 @@ test "fiber - two pools" {
     };
     const outer_count = 2;
     wait_group.startMany(outer_count);
-    var thread_pool_a = try ThreadPool.init(1, alloc);
+    var thread_pool_a: ThreadPool = undefined;
+    try thread_pool_a.init(1, alloc);
     defer thread_pool_a.deinit();
-    var thread_pool_b = try ThreadPool.init(1, alloc);
+    var thread_pool_b: ThreadPool = undefined;
+    try thread_pool_b.init(1, alloc);
     defer thread_pool_b.deinit();
-    try thread_pool_a.start();
+    thread_pool_a.start();
     defer thread_pool_a.stop();
-    try thread_pool_b.start();
+    thread_pool_b.start();
     defer thread_pool_b.stop();
     var ctx: Ctx = .{
         .wait_group = &wait_group,
@@ -272,13 +277,14 @@ test "fiber - switch" {
     };
     var manual_executor_1 = ManualExecutor{};
     var manual_executor_2 = ManualExecutor{};
-    var thread_pool = try ThreadPool.init(1, alloc);
-    defer thread_pool.deinit();
+    var tp: ThreadPool = undefined;
+    try tp.init(1, alloc);
+    defer tp.deinit();
     var ctx: Ctx = .{
         .stage = 0,
         .manual_executor_1 = &manual_executor_1,
         .manual_executor_2 = &manual_executor_2,
-        .thread_pool = &thread_pool,
+        .thread_pool = &tp,
         .wait_group = .{},
     };
     try Fiber.go(Ctx.run, .{&ctx}, alloc, manual_executor_1.executor());
@@ -287,8 +293,8 @@ test "fiber - switch" {
     try testing.expectEqual(1, ctx.stage);
     _ = manual_executor_2.drain();
     try testing.expectEqual(2, ctx.stage);
-    try thread_pool.start();
-    defer thread_pool.stop();
+    tp.start();
+    defer tp.stop();
     ctx.wait_group.start();
     ctx.wait_group.wait();
     try testing.expectEqual(3, ctx.stage);
