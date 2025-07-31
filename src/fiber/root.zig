@@ -48,10 +48,11 @@ pool: ?*FiberPool = null,
 
 pub const max_name_length_bytes = 100;
 pub const default_name = "Fiber";
+
 pub const State = enum(u8) {
     init,
     running,
-    susended,
+    suspended,
     finished,
 };
 
@@ -311,45 +312,43 @@ pub inline fn runTickAndMaybeTransfer(self: *Fiber, comptime owns_stack: bool) ?
 fn RunFunctions(comptime owns_stack: bool) type {
     return struct {
         fn runTickAndMaybeTransfer(self: *Fiber) ?*Fiber {
-            log.debug("{s} about to resume", .{self.name});
-            self.runTick();
+            if (!self.cancel_context.isCancelled()) {
+                log.debug(
+                    "{s} about to resume",
+                    .{self.name},
+                );
+                self.runTick();
+            } else {
+                log.debug(
+                    "{s}: was cancelled, so won't go into coroutine",
+                    .{self.name},
+                );
+            }
             log.debug("{s} returned from coroutine", .{self.name});
-            if (self.coroutine.is_completed or self.cancel_context.isCancelled()) {
+            if (self.coroutine.is_completed or
+                self.cancel_context.isCancelled())
+            {
                 defer {
                     if (owns_stack) {
                         log.debug("{s} about to deinit", .{self.name});
                         self.getManagedStack().deinit();
                     }
                 }
-                defer {
-                    if (self.cancel_context.isCancelled()) {
-                        if (self.pool) |pool| {
-                            pool.join_wait_group.finish();
-                        }
-                    }
-                }
-                if (self.state.cmpxchgStrong(
-                    .running,
-                    .finished,
-                    .seq_cst,
-                    .seq_cst,
-                )) |actual| {
-                    std.debug.panic(
-                        "Invalid fiber state transition: expected {}->{}. actual: {}->{}",
-                        .{
-                            State.running,
-                            State.finished,
-                            actual,
-                            State.finished,
-                        },
-                    );
+                switch (self.state.swap(.finished, .seq_cst)) {
+                    else => {},
+                    .finished => {
+                        std.debug.panic(
+                            "{s}: Invalid fiber state transition: finishing twice.expected",
+                            .{self.name},
+                        );
+                    },
                 }
                 return null;
             }
             if (self.awaiter) |awaiter| {
                 if (self.state.cmpxchgStrong(
                     .running,
-                    .susended,
+                    .suspended,
                     .seq_cst,
                     .seq_cst,
                 )) |actual| {
@@ -357,9 +356,9 @@ fn RunFunctions(comptime owns_stack: bool) type {
                         "Invalid fiber state transition: expected {}->{}. actual: {}->{}",
                         .{
                             State.running,
-                            State.susended,
+                            State.suspended,
                             actual,
-                            State.susended,
+                            State.suspended,
                         },
                     );
                 }
@@ -379,6 +378,7 @@ fn RunFunctions(comptime owns_stack: bool) type {
                 }
                 return null;
             } else {
+                @branchHint(.unlikely);
                 std.debug.panic("Fiber coroutine suspended without setting fiber awaiter", .{});
             }
         }

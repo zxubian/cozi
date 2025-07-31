@@ -216,7 +216,7 @@ pub fn executor(self: *ThreadPool) Executor {
     };
 }
 
-/// Closes the queue. Addition task submissions will fail.
+/// Closes the queue. Additional task submissions will fail.
 /// Tasks submitted before stop() was called will be executed
 /// before stop() returns.
 /// Invariants after stop() returns:

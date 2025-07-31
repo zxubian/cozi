@@ -6,9 +6,10 @@ const Fiber = cozi.Fiber;
 const core = cozi.core;
 const SpinLock = cozi.sync.Spinlock;
 const Runnable = core.Runnable;
-const Await = cozi.await.await;
+const await = cozi.await.await;
 const Awaiter = cozi.await.Awaiter;
 const Worker = cozi.await.Worker;
+const log = core.log.scoped(.fiber_pool_queue);
 
 const Impl = @This();
 const Queue = cozi.containers.intrusive.ForwardList;
@@ -50,7 +51,7 @@ pub fn pushBack(
             .task_queue = self,
             .guard = &guard,
         };
-        Await(&awaiter);
+        await(&awaiter);
     } else {
         self.queue.pushBack(task);
         if (self.idle_fibers.popFront()) |next| {
@@ -65,12 +66,19 @@ pub fn popFront(
     var guard = self.lock.guard();
     guard.lock();
     defer guard.unlock();
-    var awaiter: PopFrontAwaiter = .{
-        .task_queue = self,
-        .guard = &guard,
-    };
-    const result = Await(&awaiter);
-    return result;
+    while (true) {
+        var awaiter: PopFrontAwaiter = .{
+            .task_queue = self,
+            .guard = &guard,
+        };
+        const result = await(&awaiter);
+        if (result == null) {
+            if (!self.closed_) {
+                continue;
+            }
+        }
+        return result;
+    }
 }
 
 const TryCloseError = error{
@@ -89,10 +97,16 @@ pub fn tryClose(self: *@This()) TryCloseError!void {
             .task_queue = self,
             .guard = &guard,
         };
-        Await(&awaiter);
+        await(&awaiter);
     } else {
         self.closed_ = true;
         while (self.idle_fibers.popFront()) |next| {
+            log.debug(
+                "about to awake {s} because queue was closed",
+                .{
+                    next.fiber.name,
+                },
+            );
             next.fiber.scheduleSelf();
         }
     }
@@ -178,8 +192,6 @@ const PopFrontAwaiter = struct {
         if (suspended) {
             self.guard.lock();
         }
-        assert(!self.task_queue.queue.isEmpty() or
-            self.task_queue.closed_);
         return self.task_queue.queue.popFront();
     }
 };

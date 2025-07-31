@@ -18,7 +18,6 @@ const FiberPool = @This();
 fibers: []*Fiber,
 task_queue: TaskQueue = .{},
 allocator: std.mem.Allocator,
-join_wait_group: std.Thread.WaitGroup = .{},
 stack_arena: []align(16) u8,
 cancel_context: cancel.Context = .{},
 on_cancel: Runnable = undefined,
@@ -31,13 +30,20 @@ pub const Default = struct {
         self: *@This(),
         allocator: std.mem.Allocator,
     ) !void {
-        const cpu_count = std.Thread.getCpuCount() catch 3;
-        try self.thread_pool.init(cpu_count, allocator);
+        const cpu_count = std.Thread.getCpuCount() catch 2;
+        assert(cpu_count > 1);
+        const thread_count = cpu_count - 1;
+        try self.thread_pool.init(
+            thread_count,
+            allocator,
+        );
+        // const fiber_count = thread_count * 2;
+        const fiber_count = 1;
         try self.fiber_pool.init(
             allocator,
             self.thread_pool.executor(),
             .{
-                .fiber_count = self.thread_pool.threads.len * 4,
+                .fiber_count = fiber_count,
             },
         );
     }
@@ -148,7 +154,7 @@ pub fn deinit(self: *@This()) void {
 }
 
 pub fn start(self: *@This()) void {
-    self.join_wait_group.startMany(self.fibers.len);
+    // self.join_wait_group.startMany(self.fibers.len);
     for (self.fibers) |fiber| {
         fiber.scheduleSelf();
     }
@@ -161,7 +167,8 @@ fn onCancel(_: *@This()) void {
 pub fn stop(self: *@This()) void {
     log.debug("stopping fiber pool", .{});
     self.task_queue.tryClose() catch unreachable;
-    self.join_wait_group.wait();
+    // self.join_wait_group.wait();
+    log.debug("all fibers joined waitgroup", .{});
     while (true) {
         const all_fibers_finished = for (self.fibers) |fiber| {
             if (fiber.state.load(.seq_cst) == .finished) {
@@ -178,17 +185,23 @@ pub fn stop(self: *@This()) void {
 }
 
 fn fiberEntryPoint(pool: *FiberPool) !void {
-    const self = Fiber.current();
-    log.debug("{s}: started", .{self.?.name});
-    while (pool.task_queue.popFront()) |next| {
-        log.debug("{s}: acquired new task {*}", .{
-            self.?.name,
-            next,
-        });
-        next.run();
+    const self = Fiber.current().?;
+    log.debug("{s}: started", .{self.name});
+    while (true) {
+        if (self.cancel_context.isCancelled()) {
+            break;
+        }
+        if (pool.task_queue.popFront()) |next| {
+            log.debug("{s}: acquired new task {*}", .{
+                self.name,
+                next,
+            });
+            next.run();
+        } else {
+            break;
+        }
     }
-    log.debug("{s}: task queue closed -> finishing", .{self.?.name});
-    pool.join_wait_group.finish();
+    log.debug("{s}: task queue closed -> finishing (joining wg)", .{self.name});
 }
 
 pub fn executor(self: *FiberPool) Executor {
