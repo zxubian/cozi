@@ -1,14 +1,14 @@
 const std = @import("std");
 
 const cozi = @import("../root.zig");
-const log = cozi.core.log.scoped(.@"await");
+const log = cozi.core.log.scoped(.await);
 
 pub const Awaiter = @import("./awaiter.zig");
 pub const Worker = @import("./worker/root.zig");
 
 /// Generic await algorithm
 /// https://lewissbaker.github.io/2017/11/17/understanding-operator-co-await
-pub fn @"await"(expr_ptr: anytype) awaitReturnType(getAwaitableType(@TypeOf(expr_ptr.*))) {
+pub fn await(expr_ptr: anytype) awaitReturnType(getAwaitableType(@TypeOf(expr_ptr.*))) {
     const Expr = @TypeOf(expr_ptr.*);
     const Awaitable = getAwaitableType(Expr);
     const awaitable: *Awaitable = getAwaitable(expr_ptr);

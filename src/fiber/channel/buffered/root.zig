@@ -7,7 +7,7 @@ const Atomic = stdlike.atomic.Value;
 
 const GenericAwait = @import("../../../await/root.zig");
 const Awaiter = GenericAwait.Awaiter;
-const Await = GenericAwait.@"await";
+const Await = GenericAwait.await;
 
 const containers = @import("../../../containers/root.zig");
 const Queue = containers.intrusive.ForwardList;

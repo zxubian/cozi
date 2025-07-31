@@ -1,5 +1,5 @@
 //! Type-erased awaiter interface
-//! See `cozi.cozi.@"await".@"await"` for usage.
+//! See `cozi.cozi.await.await` for usage.
 //! See `cozi.fiber.YieldAwaiter` for example implementation.
 const std = @import("std");
 const Awaiter = @This();

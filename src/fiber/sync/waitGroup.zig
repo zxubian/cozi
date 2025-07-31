@@ -14,9 +14,9 @@ const containers = cozi.containers;
 const Queue = containers.intrusive.lock_free.MpscQueue;
 
 const Fiber = cozi.Fiber;
-const Await = cozi.@"await".@"await";
-const Awaiter = cozi.@"await".Awaiter;
-const Worker = cozi.@"await".Worker;
+const Await = cozi.await.await;
+const Awaiter = cozi.await.Awaiter;
+const Worker = cozi.await.Worker;
 
 const WaitGroup = @This();
 
