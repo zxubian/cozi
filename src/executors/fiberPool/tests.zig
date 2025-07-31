@@ -34,178 +34,178 @@ test "Fiber Pool - basic" {
 }
 
 test "Fiber Pool - many threads" {
-    return error.SkipZigTest;
-    // if (builtin.single_threaded) {
-    //     return error.SkipZigTest;
-    // }
-    // const count = 4;
-    // var tp = try cozi.executors.threadPools.Compute.init(
-    //     count,
-    //     testing.allocator,
-    // );
-    // defer tp.deinit();
-    // tp.start();
-    // defer tp.stop();
+    if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
+    const count = 4;
+    var tp: ThreadPool = undefined;
+    try tp.init(
+        count,
+        testing.allocator,
+    );
+    defer tp.deinit();
+    tp.start();
+    defer tp.stop();
 
-    // var fiber_pool = try cozi.executors.FiberPool.init(
-    //     testing.allocator,
-    //     tp.executor(),
-    //     .{
-    //         .fiber_count = count,
-    //     },
-    // );
-    // defer fiber_pool.deinit();
-    // fiber_pool.start();
-    // defer fiber_pool.stop();
+    var fiber_pool: FiberPool = undefined;
+    try fiber_pool.init(
+        testing.allocator,
+        tp.executor(),
+        .{
+            .fiber_count = count,
+        },
+    );
+    defer fiber_pool.deinit();
+    fiber_pool.start();
+    defer fiber_pool.stop();
 
-    // const exec = fiber_pool.executor();
-    // const Ctx = struct {
-    //     wg: std.Thread.WaitGroup = .{},
-    //     pub fn run(self: *@This()) void {
-    //         for (0..10000) |_| {
-    //             Fiber.yield();
-    //         }
-    //         self.wg.finish();
-    //     }
-    // };
-    // var ctx: Ctx = .{};
-    // ctx.wg.startMany(count);
+    const exec = fiber_pool.executor();
+    const Ctx = struct {
+        wg: std.Thread.WaitGroup = .{},
+        pub fn run(self: *@This()) void {
+            for (0..10000) |_| {
+                Fiber.yield();
+            }
+            self.wg.finish();
+        }
+    };
+    var ctx: Ctx = .{};
+    ctx.wg.startMany(count);
 
-    // for (0..count) |_| {
-    //     exec.submit(Ctx.run, .{&ctx}, testing.allocator);
-    // }
-    // ctx.wg.wait();
+    for (0..count) |_| {
+        exec.submit(Ctx.run, .{&ctx}, testing.allocator);
+    }
+    ctx.wg.wait();
 }
 
 test "Fiber Pool - future" {
-    return error.SkipZigTest;
+    if (cozi.build_options.options.sanitizer_variant == .thread) {
+        return error.SkipZigTest;
+    }
+    if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
+    var tp: ThreadPool = undefined;
+    try tp.init(
+        1,
+        testing.allocator,
+    );
+    defer tp.deinit();
+    tp.start();
+    defer tp.stop();
 
-    // if (cozi.build_options.options.sanitizer_variant == .thread) {
-    //     return error.SkipZigTest;
-    // }
-    // if (builtin.single_threaded) {
-    //     return error.SkipZigTest;
-    // }
-    // var tp: ThreadPool = undefined;
-    // try tp.init(
-    //     1,
-    //     testing.allocator,
-    // );
-    // defer tp.deinit();
-    // tp.start();
-    // defer tp.stop();
+    var fiber_pool: FiberPool = undefined;
+    try fiber_pool.init(
+        testing.allocator,
+        tp.executor(),
+        .{
+            .fiber_count = 1,
+        },
+    );
+    defer fiber_pool.deinit();
+    fiber_pool.start();
+    defer fiber_pool.stop();
 
-    // var fiber_pool = try FiberPool.init(
-    //     testing.allocator,
-    //     tp.executor(),
-    //     .{
-    //         .fiber_count = 1,
-    //     },
-    // );
-    // defer fiber_pool.deinit();
-    // fiber_pool.start();
-    // defer fiber_pool.stop();
-
-    // const executor = fiber_pool.executor();
-    // const Ctx = struct {
-    //     done: bool,
-    //     pub fn run(self: *@This()) !void {
-    //         self.done = true;
-    //     }
-    // };
-    // var ctx: Ctx = .{
-    //     .done = false,
-    // };
-    // const f = future.submit(
-    //     executor,
-    //     Ctx.run,
-    //     .{&ctx},
-    // );
-    // try future.get(f);
-    // try testing.expect(ctx.done);
+    const executor = fiber_pool.executor();
+    const Ctx = struct {
+        done: bool,
+        pub fn run(self: *@This()) !void {
+            self.done = true;
+        }
+    };
+    var ctx: Ctx = .{
+        .done = false,
+    };
+    const f = future.submit(
+        executor,
+        Ctx.run,
+        .{&ctx},
+    );
+    try future.get(f);
+    try testing.expect(ctx.done);
 }
 
 test "Fiber Pool - future - stress " {
-    return error.SkipZigTest;
-    // if (cozi.build_options.options.sanitizer_variant == .thread) {
-    //     return error.SkipZigTest;
-    // }
-    // if (builtin.single_threaded) {
-    //     return error.SkipZigTest;
-    // }
-    // var tp: ThreadPool = undefined;
-    // try tp.init(
-    //     try std.Thread.getCpuCount(),
-    //     testing.allocator,
-    // );
-    // defer tp.deinit();
-    // tp.start();
-    // defer tp.stop();
+    if (cozi.build_options.options.sanitizer_variant == .thread) {
+        return error.SkipZigTest;
+    }
+    if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
+    var tp: ThreadPool = undefined;
+    try tp.init(
+        try std.Thread.getCpuCount(),
+        testing.allocator,
+    );
+    defer tp.deinit();
+    tp.start();
+    defer tp.stop();
 
-    // var fiber_pool = try FiberPool.init(
-    //     testing.allocator,
-    //     tp.executor(),
-    //     .{
-    //         .fiber_count = 100,
-    //     },
-    // );
-    // defer fiber_pool.deinit();
-    // fiber_pool.start();
-    // defer fiber_pool.stop();
+    var fiber_pool: FiberPool = undefined;
+    try fiber_pool.init(
+        testing.allocator,
+        tp.executor(),
+        .{
+            .fiber_count = 100,
+        },
+    );
+    defer fiber_pool.deinit();
+    fiber_pool.start();
+    defer fiber_pool.stop();
 
-    // const executor = fiber_pool.executor();
-    // const future_count = 10;
-    // const iterations_per_future = 1000;
-    // @setEvalBranchQuota(100_000);
-    // const Ctx = struct {
-    //     stage: usize,
-    //     mutex: Fiber.Mutex = .{},
-    //     done: [future_count]bool = [_]bool{false} ** future_count,
-    //     pub fn run(
-    //         self: *@This(),
-    //         idx: usize,
-    //     ) !void {
-    //         for (0..iterations_per_future) |_| {
-    //             {
-    //                 self.mutex.lock();
-    //                 defer self.mutex.unlock();
-    //                 self.stage += 1;
-    //             }
-    //             Fiber.yield();
-    //         }
-    //         self.done[idx] = true;
-    //     }
-    // };
-    // var ctx: Ctx = .{
-    //     .stage = 0,
-    // };
-    // var futures: std.meta.Tuple(
-    //     &[_]type{
-    //         future.Submit(
-    //             @TypeOf(Ctx.run),
-    //             std.meta.ArgsTuple(@TypeOf(Ctx.run)),
-    //         ),
-    //     } ** future_count,
-    // ) = undefined;
-    // inline for (&futures, 0..) |*f, i| {
-    //     const idx: usize = i;
-    //     f.* = future.submit(
-    //         executor,
-    //         Ctx.run,
-    //         .{ &ctx, idx },
-    //     );
-    // }
-    // const pipeline = future.pipeline(.{
-    //     future.just(),
-    //     future.via(tp.executor()),
-    //     future.all(futures),
-    // });
-    // _ = future.get(pipeline);
-    // for (ctx.done) |i| {
-    //     try testing.expect(i);
-    // }
-    // try testing.expectEqual(
-    //     iterations_per_future * future_count,
-    //     ctx.stage,
-    // );
+    const executor = fiber_pool.executor();
+    const future_count = 10;
+    const iterations_per_future = 1000;
+    @setEvalBranchQuota(100_000);
+    const Ctx = struct {
+        stage: usize,
+        mutex: Fiber.Mutex = .{},
+        done: [future_count]bool = [_]bool{false} ** future_count,
+        pub fn run(
+            self: *@This(),
+            idx: usize,
+        ) !void {
+            for (0..iterations_per_future) |_| {
+                {
+                    self.mutex.lock();
+                    defer self.mutex.unlock();
+                    self.stage += 1;
+                }
+                Fiber.yield();
+            }
+            self.done[idx] = true;
+        }
+    };
+    var ctx: Ctx = .{
+        .stage = 0,
+    };
+    var futures: std.meta.Tuple(
+        &[_]type{
+            future.Submit(
+                @TypeOf(Ctx.run),
+                std.meta.ArgsTuple(@TypeOf(Ctx.run)),
+            ),
+        } ** future_count,
+    ) = undefined;
+    inline for (&futures, 0..) |*f, i| {
+        const idx: usize = i;
+        f.* = future.submit(
+            executor,
+            Ctx.run,
+            .{ &ctx, idx },
+        );
+    }
+    const pipeline = future.pipeline(.{
+        future.just(),
+        future.via(tp.executor()),
+        future.all(futures),
+    });
+    _ = future.get(pipeline);
+    for (ctx.done) |i| {
+        try testing.expect(i);
+    }
+    try testing.expectEqual(
+        iterations_per_future * future_count,
+        ctx.stage,
+    );
 }
