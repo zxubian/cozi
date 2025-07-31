@@ -186,19 +186,27 @@ pub fn All(Inputs: type) type {
                 pub fn materialize(
                     self: @This(),
                     continuation: anytype,
-                ) Computation(@TypeOf(continuation)) {
+                    computation_storage: *Computation(@TypeOf(continuation)),
+                ) void {
                     const Result = Computation(@TypeOf(continuation));
-                    var result: Result = undefined;
-                    result.next = continuation;
-                    result.rendezvous_state = .init(inputs_count);
-                    inline for (&result.input_computations, 0..) |*computation, i| {
+                    computation_storage.* = .{
+                        .rendezvous_state = .init(inputs_count),
+                        .next = continuation,
+                        .pipe_input_computation = undefined,
+                        .input_computations = undefined,
+                        .input_computation_runnables = undefined,
+                    };
+                    inline for (&computation_storage.input_computations, 0..) |*computation, i| {
                         const F = comptime getFutureType(i);
-                        computation.* = self.inputs[i].materialize(Result.InputContinuation(F, i){});
+                        self.inputs[i].materialize(
+                            Result.InputContinuation(F, i){},
+                            computation,
+                        );
                     }
-                    result.pipe_input_computation = self.pipe_input_future.materialize(
+                    self.pipe_input_future.materialize(
                         Result.PipeContinuation{},
+                        &computation_storage.pipe_input_computation,
                     );
-                    return result;
                 }
 
                 fn getFutureType(comptime index: usize) type {

@@ -32,11 +32,12 @@ pub fn detach(
     const DemandType = Demand(Future);
     const Continuation = DemandType.Continuation;
     const computation = try allocator.create(Future.Computation(Continuation));
-    computation.* = future.materialize(
+    future.materialize(
         Continuation{
             .allocator = allocator,
             .computation = computation,
         },
+        computation,
     );
     computation.start();
 }

@@ -31,8 +31,9 @@ pub fn Future(V: type) type {
         pub fn materialize(
             self: @This(),
             continuation: anytype,
-        ) Computation(@TypeOf(continuation)) {
-            return .{
+            computation_storage: *Computation(@TypeOf(continuation)),
+        ) void {
+            computation_storage.* = .{
                 .input = self.value,
                 .next = continuation,
             };

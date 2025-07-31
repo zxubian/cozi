@@ -6,6 +6,7 @@ const Get = @This();
 
 fn Demand(Future: type) type {
     return struct {
+        input_computation: Future.Computation(Continuation) = undefined,
         result: Future.ValueType = undefined,
         ready: std.Thread.ResetEvent = .{},
 
@@ -30,10 +31,8 @@ pub fn get(
 ) @TypeOf(future).ValueType {
     const Future = @TypeOf(future);
     var demand: Demand(Future) = .{};
-    var computation = future.materialize(
-        Demand(Future).Continuation{ .parent = &demand },
-    );
-    computation.start();
+    future.materialize(Demand(Future).Continuation{ .parent = &demand }, &demand.input_computation);
+    demand.input_computation.start();
     demand.ready.wait();
     return demand.result;
 }

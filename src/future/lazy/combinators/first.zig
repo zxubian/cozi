@@ -250,21 +250,26 @@ pub fn First(Inputs: type) type {
                 pub fn materialize(
                     self: @This(),
                     continuation: anytype,
-                ) Computation(@TypeOf(continuation)) {
+                    computation_storage: *Computation(@TypeOf(continuation)),
+                ) void {
                     const Result = Computation(@TypeOf(continuation));
-                    var result: Result = .{
+                    computation_storage.* = .{
                         .next = continuation,
                         .completed = .init(false),
-                        .pipe_input_computation = self.pipe_input_future.materialize(Result.PipeContinuation{}),
+                        .pipe_input_computation = undefined,
                         .input_computations = undefined,
                     };
-                    inline for (&result.input_computations, 0..) |*computation, i| {
+                    self.pipe_input_future.materialize(
+                        Result.PipeContinuation{},
+                        &computation_storage.pipe_input_computation,
+                    );
+                    inline for (&computation_storage.input_computations, 0..) |*computation, i| {
                         const InputFuture = comptime getFutureType(i);
-                        computation.* = self.inputs[i].materialize(
+                        self.inputs[i].materialize(
                             Result.InputContinuation(InputFuture, i){},
+                            computation,
                         );
                     }
-                    return result;
                 }
 
                 fn getFutureType(comptime index: usize) type {

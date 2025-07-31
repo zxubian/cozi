@@ -21,7 +21,7 @@ pub fn Future(InputFuture: type) type {
 
         pub fn Computation(Continuation: type) type {
             return struct {
-                outer_computation: OuterComputation,
+                outer_computation: OuterComputation = undefined,
                 inner_computation: InnerComputation = undefined,
                 next: Continuation,
 
@@ -38,8 +38,9 @@ pub fn Future(InputFuture: type) type {
                     const outer_computation: *OuterComputation = @fieldParentPtr("next", outer_continuation);
                     const self: *Impl = @fieldParentPtr("outer_computation", outer_computation);
                     const inner_future = &outer_continuation.value;
-                    self.inner_computation = inner_future.materialize(
+                    inner_future.materialize(
                         InnerFutureContinuation{},
+                        &self.inner_computation,
                     );
                     self.inner_computation.start();
                 }
@@ -96,15 +97,19 @@ pub fn Future(InputFuture: type) type {
         pub fn materialize(
             self: @This(),
             continuation: anytype,
-        ) Computation(@TypeOf(continuation)) {
+            computation_storage: *Computation(@TypeOf(continuation)),
+        ) void {
             const Result = Computation(@TypeOf(continuation));
             const InputContinuation = Result.OuterFutureContinuation;
-            return .{
-                .outer_computation = self.outer_future.materialize(
-                    InputContinuation{},
-                ),
+            computation_storage.* = .{
+                .outer_computation = undefined,
+                .inner_computation = undefined,
                 .next = continuation,
             };
+            self.outer_future.materialize(
+                InputContinuation{},
+                &computation_storage.outer_computation,
+            );
         }
     };
 }

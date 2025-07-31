@@ -42,7 +42,10 @@ pub fn Awaitable(Future: type) type {
             handle: Worker,
         ) Awaiter.AwaitSuspendResult {
             self.worker = handle;
-            self.input_computation = self.future.materialize(Demand{});
+            self.future.materialize(
+                Demand{},
+                &self.input_computation,
+            );
             self.input_computation.start();
             switch (@as(
                 Demand.State,

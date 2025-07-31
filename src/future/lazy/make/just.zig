@@ -31,8 +31,9 @@ pub fn Computation(Continuation: type) type {
 pub fn materialize(
     _: @This(),
     continuation: anytype,
-) Computation(@TypeOf(continuation)) {
-    return .{
+    computation_storage: *Computation(@TypeOf(continuation)),
+) void {
+    computation_storage.* = .{
         .next = continuation,
     };
 }

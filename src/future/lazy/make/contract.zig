@@ -33,8 +33,9 @@ pub fn Contract(V: type) type {
             pub fn materialize(
                 self: @This(),
                 continuation: anytype,
-            ) Computation(@TypeOf(continuation)) {
-                return .{
+                computation_storage: *Computation(@TypeOf(continuation)),
+            ) void {
+                computation_storage.* = .{
                     .shared_state = self.shared_state,
                     .next = continuation,
                 };

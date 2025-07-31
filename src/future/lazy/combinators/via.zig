@@ -73,16 +73,20 @@ pub fn Future(InputFuture: type) type {
         pub fn materialize(
             self: @This(),
             continuation: anytype,
-        ) Computation(@TypeOf(continuation)) {
+            computation_storage: *Computation(@TypeOf(continuation)),
+        ) void {
             const Result = Computation(@TypeOf(continuation));
             const InputContinuation = Result.InputContinuation;
-            return .{
-                .input_computation = self.input_future.materialize(
-                    InputContinuation{},
-                ),
+
+            computation_storage.* = .{
                 .next_executor = self.next_executor,
                 .next = continuation,
+                .input_computation = undefined,
             };
+            self.input_future.materialize(
+                InputContinuation{},
+                &computation_storage.input_computation,
+            );
         }
 
         pub fn awaitable(self: @This()) future.Impl.Awaitable(@This()) {

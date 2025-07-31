@@ -89,10 +89,11 @@ fn BoxedComputation(V: type) type {
                 },
             };
             const input_computation = boxed.contents.inputComputation(InputComputation);
-            input_computation.* = f.materialize(
+            f.materialize(
                 InputContinuation{
                     .boxed_input_computation = boxed,
                 },
+                input_computation,
             );
             return boxed;
         }
@@ -162,8 +163,9 @@ pub fn BoxedFuture(V: type) type {
         pub fn materialize(
             self: @This(),
             continuation: anytype,
-        ) Computation(@TypeOf(continuation)) {
-            return .{
+            computation_storage: *Computation(@TypeOf(continuation)),
+        ) void {
+            computation_storage.* = .{
                 .next = continuation,
                 .boxed_input_computation = self.boxed_input_computation,
             };

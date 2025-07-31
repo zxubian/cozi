@@ -141,17 +141,20 @@ pub fn MapOk(
                 pub fn materialize(
                     self: @This(),
                     continuation: anytype,
-                ) Computation(@TypeOf(continuation)) {
+                    computation_storage: *Computation(@TypeOf(continuation)),
+                ) void {
                     const Result = Computation(@TypeOf(continuation));
                     const InputContinuation = Result.InputContinuation;
-                    return .{
-                        .input_computation = self.input_future.materialize(
-                            InputContinuation{},
-                        ),
+                    computation_storage.* = .{
+                        .input_computation = undefined,
                         .map_fn = self.map_fn,
                         .map_ctx = self.map_ctx,
                         .next = continuation,
                     };
+                    self.input_future.materialize(
+                        InputContinuation{},
+                        &computation_storage.input_computation,
+                    );
                 }
 
                 pub fn awaitable(self: @This()) future.Impl.Awaitable(@This()) {
