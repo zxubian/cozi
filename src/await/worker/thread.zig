@@ -10,6 +10,7 @@ const SystemThreadWorker = @This();
 threadlocal var this_: SystemThreadWorker = .{};
 
 name_buf: [std.Thread.max_name_len:0]u8 = [_:0]u8{0} ** std.Thread.max_name_len,
+print_buf: [std.Thread.max_name_len:0]u8 = [_:0]u8{0} ** std.Thread.max_name_len,
 state: cozi.fault.stdlike.atomic.Value(u32) = .init(@intFromEnum(State.running)),
 handle: ?*std.Thread = null,
 
@@ -52,7 +53,7 @@ fn @"suspend"(self: *SystemThreadWorker, awaiter: Awaiter) void {
     switch (awaiter.awaitSuspend(worker(self))) {
         .never_suspend => return,
         .always_suspend => {
-            log.debug("[{s}] suspend begin\n", .{getName(self)});
+            log.debug("[{s}] suspend begin", .{getName(self)});
             switch (@as(State, @enumFromInt(self.state.fetchSub(1, .seq_cst)))) {
                 .suspended => {
                     @branchHint(.unlikely);
@@ -115,7 +116,7 @@ fn @"resume"(other: *SystemThreadWorker) void {
 }
 
 pub fn getName(self: *SystemThreadWorker) [:0]const u8 {
-    return getNameWithBuffer(self, &self.name_buf) catch unreachable;
+    return getNameWithBuffer(self, &this_.print_buf) catch unreachable;
 }
 
 pub fn getNameWithBuffer(
