@@ -4,6 +4,7 @@ const cozi = @import("../root.zig");
 const Fiber = cozi.Fiber;
 const build_options = cozi.build_options.options;
 const fault_variant = build_options.fault_variant;
+const log = cozi.core.log.scoped(.fault_injector);
 
 const Injector = @This();
 
@@ -29,6 +30,12 @@ inline fn maybeInit(self: *Injector) void {
 }
 
 pub fn injectFault() void {
+    log.debug(
+        "About to inject fault for worker {s}",
+        .{
+            cozi.await.Worker.current().getName(),
+        },
+    );
     switch (fault_variant) {
         .none => {},
         .thread_yield, .fiber => Impl.yield(),

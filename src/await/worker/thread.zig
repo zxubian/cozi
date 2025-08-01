@@ -74,7 +74,7 @@ fn @"suspend"(self: *SystemThreadWorker, awaiter: Awaiter) void {
                         },
                     );
                     while (self.state.load(.seq_cst) == @intFromEnum(State.suspended)) {
-                        std.Thread.Futex.wait(
+                        cozi.fault.stdlike.Futex.wait(
                             &self.state,
                             @intFromEnum(State.suspended),
                         );
@@ -111,7 +111,7 @@ fn @"resume"(other: *SystemThreadWorker) void {
         },
     );
     if (other.state.fetchAdd(1, .seq_cst) == 0) {
-        std.Thread.Futex.wake(&other.state, 1);
+        cozi.fault.stdlike.Futex.wake(&other.state, 1);
     }
 }
 
