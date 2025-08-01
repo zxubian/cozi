@@ -21,6 +21,7 @@ pub const Impl = struct {
     pub const contract = make.contract.contract;
     pub const contractNoAlloc = make.contract.contractNoAlloc;
     pub const Contract = make.contract.Contract;
+    pub const never = make.never.never;
     // --- sequential combinators ---
     pub const via = combinators.via.via;
     pub const map = combinators.map.map;
@@ -31,6 +32,10 @@ pub const Impl = struct {
     pub const box = combinators.box.box;
     pub const Boxed = combinators.box.BoxedFuture;
     pub const Box = combinators.box.Future;
+    // --- cancellation ---
+    pub const withCancellation = combinators.withCancellation.withCancellation;
+    pub const WithCancellation = combinators.withCancellation.Future;
+    pub const CancellationError = combinators.withCancellation.CancellationError;
     // --- parallel combinators ---
     pub const all = combinators.all.all;
     pub const All = combinators.all.All;

@@ -1049,3 +1049,214 @@ test "future - submit error inside thread pool" {
     );
     try std.testing.expectError(Err.some, await(&f));
 }
+
+test "future - lazy - cancel - never - cancel first" {
+    if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
+    for (0..1000) |_| {
+        const Ctx = struct {
+            cancel_context: cozi.cancel.Context = .{},
+            cancel_done: std.Thread.ResetEvent = .{},
+            all_done: std.Thread.ResetEvent = .{},
+
+            pub fn cancel_thread(self: *@This()) void {
+                self.cancel_context.cancel();
+                self.cancel_done.set();
+            }
+
+            pub fn wait_thread(self: *@This()) !void {
+                const pipeline = future.pipeline(
+                    .{
+                        future.never(),
+                        future.withCancellation(&self.cancel_context),
+                    },
+                );
+                try testing.expectError(
+                    future.CancellationError.cancelled,
+                    await(&pipeline),
+                );
+                self.all_done.set();
+            }
+        };
+
+        var tp: ThreadPool = undefined;
+        try tp.init(2, testing.allocator);
+        defer tp.deinit();
+        tp.start();
+        defer tp.stop();
+
+        var ctx: Ctx = .{};
+
+        tp.executor().submit(
+            Ctx.cancel_thread,
+            .{&ctx},
+            testing.allocator,
+        );
+        ctx.cancel_done.wait();
+        tp.executor().submit(
+            Ctx.wait_thread,
+            .{&ctx},
+            testing.allocator,
+        );
+        ctx.all_done.wait();
+    }
+}
+
+test "future - lazy - cancel - never - computation first" {
+    if (builtin.single_threaded) {
+        return error.SkipZigTest;
+    }
+    for (0..10) |_| {
+        const Ctx = struct {
+            cancel_context: cozi.cancel.Context = .{},
+            wait_ready: std.Thread.ResetEvent = .{},
+            all_done: std.Thread.ResetEvent = .{},
+            cancel_done: std.Thread.ResetEvent = .{},
+
+            pub fn cancel_thread(self: *@This()) void {
+                self.cancel_context.cancel();
+                self.cancel_done.set();
+            }
+
+            pub fn wait_thread(self: *@This()) !void {
+                const pipeline = future.pipeline(
+                    .{
+                        future.never(),
+                        future.withCancellation(&self.cancel_context),
+                    },
+                );
+                self.wait_ready.set();
+                try testing.expectError(
+                    future.CancellationError.cancelled,
+                    await(&pipeline),
+                );
+                // Waiting here is necessary, because cancel_thread's cancel_context
+                // references this thread's stack memory
+                self.cancel_done.wait();
+                self.all_done.set();
+            }
+        };
+
+        var tp: ThreadPool = undefined;
+        try tp.init(2, testing.allocator);
+        defer tp.deinit();
+        tp.start();
+        defer tp.stop();
+
+        var ctx: Ctx = .{};
+
+        tp.executor().submit(
+            Ctx.wait_thread,
+            .{&ctx},
+            testing.allocator,
+        );
+        ctx.wait_ready.wait();
+        // allow wait thread to enter sleep
+        std.Thread.sleep(std.time.ns_per_ms * 300);
+        tp.executor().submit(
+            Ctx.cancel_thread,
+            .{&ctx},
+            testing.allocator,
+        );
+        ctx.all_done.wait();
+    }
+}
+
+// test "future - lazy - cancel - never - race stress" {
+//     if (builtin.single_threaded) {
+//         return error.SkipZigTest;
+//     }
+//     const Ctx = struct {
+//         cancel_context: cozi.cancel.Context = .{},
+//         all_done: std.Thread.ResetEvent = .{},
+//         cancel_done: std.Thread.ResetEvent = .{},
+
+//         pub fn cancel_thread(self: *@This()) void {
+//             self.cancel_context.cancel();
+//             self.cancel_done.set();
+//         }
+
+//         pub fn wait_thread(self: *@This()) !void {
+//             const pipeline = future.pipeline(
+//                 .{
+//                     future.never(),
+//                     future.withCancellation(&self.cancel_context),
+//                 },
+//             );
+//             try testing.expectError(
+//                 future.CancellationError.cancelled,
+//                 await(&pipeline),
+//             );
+//             self.cancel_done.wait();
+//             self.all_done.set();
+//         }
+//     };
+//     for (0..100) |_| {
+//         var tp: ThreadPool = undefined;
+//         try tp.init(2, testing.allocator);
+//         defer tp.deinit();
+//         tp.start();
+//         defer tp.stop();
+//         var ctx: Ctx = .{};
+//         tp.executor().submit(
+//             Ctx.wait_thread,
+//             .{&ctx},
+//             testing.allocator,
+//         );
+//         tp.executor().submit(
+//             Ctx.cancel_thread,
+//             .{&ctx},
+//             testing.allocator,
+//         );
+//         ctx.all_done.timedWait(500 * std.time.ns_per_ms);
+//     }
+// }
+
+// test "future - lazy - cancel - never - multiple cancellations race" {
+//     if (builtin.single_threaded) {
+//         return error.SkipZigTest;
+//     }
+//     const Ctx = struct {
+//         cancel_context: cozi.cancel.Context = .{},
+//         all_done: std.Thread.ResetEvent = .{},
+
+//         pub fn cancel_thread(self: *@This()) void {
+//             self.cancel_context.cancel();
+//         }
+
+//         pub fn wait_thread(self: *@This()) !void {
+//             const pipeline = future.pipeline(
+//                 .{
+//                     future.never(),
+//                     future.withCancellation(&self.cancel_context),
+//                 },
+//             );
+//             try testing.expectError(
+//                 future.CancellationError.cancelled,
+//                 await(&pipeline),
+//             );
+//             self.all_done.set();
+//         }
+//     };
+//     for (0..10000) |_| {
+//         var tp: ThreadPool = undefined;
+//         try tp.init(2, testing.allocator);
+//         defer tp.deinit();
+//         tp.start();
+//         defer tp.stop();
+//         var ctx: Ctx = .{};
+//         tp.executor().submit(
+//             Ctx.wait_thread,
+//             .{&ctx},
+//             testing.allocator,
+//         );
+//         // allow wait thread to enter sleep
+//         tp.executor().submit(
+//             Ctx.cancel_thread,
+//             .{&ctx},
+//             testing.allocator,
+//         );
+//         ctx.all_done.wait();
+//     }
+// }
