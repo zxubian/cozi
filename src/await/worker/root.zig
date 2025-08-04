@@ -20,7 +20,7 @@ pub const VTable = struct {
     @"suspend": *const fn (self: *anyopaque, awaiter: Awaiter) void,
     @"resume": *const fn (self: *anyopaque) void,
     getName: *const fn (self: *anyopaque) [:0]const u8,
-    setName: *const fn (self: Worker, name: [:0]const u8) void,
+    setName: *const fn (self: *anyopaque, name: [:0]const u8) void,
 };
 
 pub inline fn @"suspend"(self: Worker, awaiter: Awaiter) void {
